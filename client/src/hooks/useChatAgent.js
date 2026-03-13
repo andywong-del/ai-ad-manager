@@ -509,7 +509,17 @@ export const useChatAgent = ({ token, adAccountId, selectedAccount } = {}) => {
             addMsg('agent', 'No Facebook Pages found for this account.\n\n`GET /me/accounts` — `pages_read_engagement`');
           } else {
             setPages(pagesData);
-            addMsg('agent', `**${pagesData.length} Page${pagesData.length !== 1 ? 's' : ''}** loaded — see the data panel on the left.\n\n\`GET /me/accounts\` · \`pages_read_engagement\``);
+            const columns = ['Page', 'Category', 'Followers', 'Engagement'];
+            const rows = pagesData.map(p => [
+              p.name,
+              p.category || '—',
+              p.fan_count ? p.fan_count.toLocaleString() : '—',
+              p.engagement?.count ? p.engagement.count.toLocaleString() : '—',
+            ]);
+            addMsg({
+              role: 'agent', type: 'table', columns, rows,
+              summary: `📡 \`GET /me/accounts\` · \`pages_read_engagement\` · ${pagesData.length} Page${pagesData.length !== 1 ? 's' : ''} connected`,
+            });
           }
         } catch {
           addMsg('agent', 'Could not fetch pages. Please check your permissions.');
