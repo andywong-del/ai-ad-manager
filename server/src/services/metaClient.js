@@ -3,7 +3,7 @@ import axios from 'axios';
 const BASE_URL = process.env.META_BASE_URL || 'https://graph.facebook.com';
 const API_VERSION = process.env.FB_API_VERSION || 'v19.0';
 
-const metaApi = axios.create({ baseURL: `${BASE_URL}/${API_VERSION}` });
+const metaApi = axios.create({ baseURL: `${BASE_URL}/${API_VERSION}`, timeout: 12000 });
 
 export const getCampaigns = async (token, adAccountId) => {
   const { data } = await metaApi.get(`/${adAccountId}/campaigns`, {
