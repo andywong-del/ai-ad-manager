@@ -1,8 +1,14 @@
 const FB_APP_ID    = import.meta.env.VITE_FB_APP_ID;
 const FB_CONFIG_ID = import.meta.env.VITE_FB_CONFIG_ID;
 
+// Track whether FB.init() has been called in this session
+let fbInitialized = false;
+
 export const initFacebookSdk = () =>
   new Promise((resolve) => {
+    // Already initialized — safe to proceed
+    if (fbInitialized) return resolve();
+
     window.fbAsyncInit = function () {
       window.FB.init({
         appId: FB_APP_ID,
@@ -10,17 +16,19 @@ export const initFacebookSdk = () =>
         xfbml: false,
         version: 'v25.0'
       });
+      fbInitialized = true;
       resolve();
     };
 
     if (document.getElementById('facebook-jssdk')) {
-      // Script already in DOM — wait for window.FB to be initialized
-      const waitForFB = (attempt = 0) => {
-        if (window.FB) return resolve();
-        if (attempt > 20) return resolve(); // give up after ~2s, caller handles error
-        setTimeout(() => waitForFB(attempt + 1), 100);
+      // Script already in DOM — wait for fbAsyncInit to fire (not just window.FB to exist)
+      // window.FB can exist before fbAsyncInit fires, so we wait for fbInitialized
+      const waitForInit = (attempt = 0) => {
+        if (fbInitialized) return;          // fbAsyncInit fired, already resolved
+        if (attempt > 40) return resolve(); // give up after ~4s
+        setTimeout(() => waitForInit(attempt + 1), 100);
       };
-      return waitForFB();
+      return waitForInit();
     }
 
     const script = document.createElement('script');
