@@ -21,3 +21,4 @@ npm-debug.log*
 
 # Vite
 client/.vite/
+.vercel

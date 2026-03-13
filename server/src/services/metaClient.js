@@ -80,6 +80,33 @@ export const getOwnedAdAccounts = async (token, businessId) => {
   return data.data;
 };
 
+export const getPageAds = async (token, pageId) => {
+  const { data } = await metaApi.get(`/${pageId}/ads`, {
+    params: { access_token: token, fields: 'id,name,status,effective_status', limit: 25 }
+  });
+  return data.data;
+};
+
+export const createCustomAudience = async (token, adAccountId, params) => {
+  const { data } = await metaApi.post(`/${adAccountId}/customaudiences`, null, {
+    params: {
+      access_token: token,
+      name: params.name,
+      subtype: params.subtype || 'WEBSITE',
+      description: params.description || '',
+      retention_days: 30,
+    }
+  });
+  return data;
+};
+
+export const createCampaign = async (token, adAccountId, params) => {
+  const { data } = await metaApi.post(`/${adAccountId}/campaigns`, null, {
+    params: { access_token: token, ...params }
+  });
+  return data;
+};
+
 export const exchangeToken = async (shortLivedToken) => {
   const { data } = await metaApi.get('/oauth/access_token', {
     params: {

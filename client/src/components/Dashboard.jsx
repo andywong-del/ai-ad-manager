@@ -14,7 +14,7 @@ const SUGGESTED_ACTIONS = [
 
 export const Dashboard = ({ token = null, adAccountId = null, selectedAccount = null, onLogout }) => {
   const [view, setView] = useState('home');
-  const { messages, isTyping, thinkingText, sendMessage, resetChat, notification } = useChatAgent({ token, adAccountId });
+  const { messages, isTyping, thinkingText, sendMessage, resetChat, notification } = useChatAgent({ token, adAccountId, selectedAccount });
 
   const goHome = useCallback(() => {
     resetChat();

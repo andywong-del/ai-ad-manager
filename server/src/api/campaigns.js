@@ -42,4 +42,17 @@ router.patch('/:id', async (req, res, next) => {
   }
 });
 
+router.post('/', async (req, res, next) => {
+  try {
+    const { adAccountId, name, objective } = req.body;
+    if (!adAccountId || !name || !objective) {
+      return res.status(400).json({ error: 'adAccountId, name, and objective are required' });
+    }
+    const result = await metaClient.createCampaign(getToken(), adAccountId, { name, objective, status: 'PAUSED', special_ad_categories: '[]', is_adset_budget_sharing_enabled: false });
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;

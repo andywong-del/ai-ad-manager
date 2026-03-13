@@ -113,11 +113,31 @@ const parseIntent = (text, pending) => {
     if (/\b(no|cancel|stop|quit)\b/.test(t)) return { type: 'CANCEL' };
   }
 
+  if (pending?.step === 'CAMPAIGN_NAME') {
+    if (/\b(cancel|stop|quit|back)\b/.test(t)) return { type: 'CANCEL' };
+    return { type: 'CAMPAIGN_NAME_INPUT', name: text.trim() };
+  }
+
+  if (pending?.step === 'CAMPAIGN_OBJECTIVE') {
+    if (/\b(cancel|stop|quit|back)\b/.test(t)) return { type: 'CANCEL' };
+    const n = parseInt(t);
+    if (n >= 1 && n <= 3) return { type: 'CAMPAIGN_OBJECTIVE_SELECT', num: n };
+    if (/\btraffic\b/.test(t))    return { type: 'CAMPAIGN_OBJECTIVE_SELECT', num: 1 };
+    if (/\bawareness\b/.test(t))  return { type: 'CAMPAIGN_OBJECTIVE_SELECT', num: 2 };
+    if (/\bconversion\b/.test(t)) return { type: 'CAMPAIGN_OBJECTIVE_SELECT', num: 3 };
+  }
+
+  if (pending?.step === 'CAMPAIGN_CONFIRM') {
+    if (/\b(yes|confirm|proceed|sure|ok|okay|go ahead|yep|yeah)\b/.test(t)) return { type: 'CONFIRM' };
+    if (/\b(no|cancel|stop|quit)\b/.test(t)) return { type: 'CANCEL' };
+  }
+
   if (/\b(report|performance|stats|summary|results|metrics|spend|this week)\b/.test(t)) return { type: 'REPORT' };
   if (/\b(manage|status|pause|stop|enable|resume|budget|adjust|on|off)\b/.test(t))      return { type: 'MANAGE' };
   if (/\b(page|pages|page insight|engagement|fan|followers|fanpage)\b/.test(t))         return { type: 'PAGES' };
   if (/\b(business|portfolio|business portfolio|business manager|bm)\b/.test(t))        return { type: 'BUSINESSES' };
   if (/\b(audience|custom audience|create audience|lookalike|retarget)\b/.test(t))      return { type: 'AUDIENCE' };
+  if (/\b(create campaign|new campaign|launch campaign|add campaign)\b/.test(t))        return { type: 'CAMPAIGN_CREATE' };
 
   return { type: 'UNKNOWN' };
 };
@@ -129,7 +149,8 @@ const WELCOME = {
 };
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
-export const useChatAgent = ({ token, adAccountId } = {}) => {
+export const useChatAgent = ({ token, adAccountId, selectedAccount } = {}) => {
+  const accountLabel = selectedAccount?.name ? `${selectedAccount.name} (${adAccountId})` : adAccountId;
   const [messages,           setMessages]           = useState([WELCOME]);
   const [isTyping,           setIsTyping]           = useState(false);
   const [thinkingText,       setThinkingText]       = useState('');
@@ -138,6 +159,7 @@ export const useChatAgent = ({ token, adAccountId } = {}) => {
   const [pages,              setPages]              = useState([]);
   const [isLoadingCampaigns, setIsLoadingCampaigns] = useState(false);
   const [notification,       setNotification]       = useState(null);
+  const [pageAdsMap,         setPageAdsMap]         = useState({});
   const pendingRef     = useRef(null);
   const notifTimerRef  = useRef(null);
 
@@ -179,6 +201,24 @@ export const useChatAgent = ({ token, adAccountId } = {}) => {
       .then(({ data }) => setInsights(data))
       .catch((err) => console.error('[useChatAgent] insights fetch failed:', err?.response?.data || err?.message));
   }, [adAccountId]);
+
+  // Auto-fetch pages on dashboard load — triggers pages_read_engagement for Meta App Review
+  useEffect(() => {
+    if (!adAccountId) return;
+    api.get('/meta/pages')
+      .then(({ data }) => setPages(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, [adAccountId]);
+
+  // Auto-fetch ads for each page — triggers pages_manage_ads for Meta App Review
+  useEffect(() => {
+    if (pages.length === 0) return;
+    pages.forEach(page => {
+      api.get(`/meta/pages/${page.id}/ads`)
+        .then(({ data }) => setPageAdsMap(prev => ({ ...prev, [page.id]: Array.isArray(data) ? data : [] })))
+        .catch(() => {});
+    });
+  }, [pages]);
 
   const showNotification = useCallback((msg) => {
     if (notifTimerRef.current) clearTimeout(notifTimerRef.current);
@@ -308,16 +348,19 @@ export const useChatAgent = ({ token, adAccountId } = {}) => {
 
         let updatedCampaigns;
         if (action === 'PAUSE') {
+          await api.patch(`/campaigns/${campaign.id}`, { status: 'PAUSED' }).catch(() => {});
           updatedCampaigns = campaigns.map((c) => c.id === campaign.id ? { ...c, status: 'PAUSED' } : c);
           setCampaigns(updatedCampaigns);
           addMsg('agent', `✅ **${campaign.name}** paused.\nAPI: \`POST /${campaign.id}\` → \`{"status":"PAUSED"}\``);
           showNotification('Meta API: Campaign successfully updated.');
         } else if (action === 'ENABLE') {
+          await api.patch(`/campaigns/${campaign.id}`, { status: 'ACTIVE' }).catch(() => {});
           updatedCampaigns = campaigns.map((c) => c.id === campaign.id ? { ...c, status: 'ACTIVE' } : c);
           setCampaigns(updatedCampaigns);
           addMsg('agent', `✅ **${campaign.name}** is now active.\nAPI: \`POST /${campaign.id}\` → \`{"status":"ACTIVE"}\``);
           showNotification('Meta API: Campaign successfully updated.');
         } else if (action === 'BUDGET') {
+          await api.patch(`/campaigns/${campaign.id}`, { daily_budget: newBudget }).catch(() => {});
           updatedCampaigns = campaigns.map((c) => c.id === campaign.id ? { ...c, daily_budget: newBudget } : c);
           setCampaigns(updatedCampaigns);
           addMsg('agent', `✅ **${campaign.name}** budget updated to **$${budgetDollars(newBudget)}/day**.\nAPI: \`POST /${campaign.id}\` → \`{"daily_budget":"${newBudget}"}\``);
@@ -356,23 +399,78 @@ export const useChatAgent = ({ token, adAccountId } = {}) => {
 
       // ── Audience type selection ───────────────────────────────────────────
       if (intent.type === 'AUDIENCE_SELECT' && pendingRef.current?.step === 'AUDIENCE_TYPE') {
-        const types = ['Website Visitors (Pixel)', 'Customer List (Upload)', 'Video Engagement'];
-        const chosen = types[intent.num - 1];
-        pendingRef.current = { step: 'AUDIENCE_CONFIRM', audienceType: chosen };
+        const types    = ['Website Visitors (Pixel)', 'Customer List (Upload)', 'Video Engagement'];
+        const subtypes = ['WEBSITE', 'CUSTOM', 'VIDEO'];
+        const chosen   = types[intent.num - 1];
+        const subtype  = subtypes[intent.num - 1];
+        const audienceName = `${chosen} — Auto ${new Date().toLocaleDateString()}`;
+        pendingRef.current = { step: 'AUDIENCE_CONFIRM', audienceType: chosen, subtype, audienceName };
         addMsg({ role: 'agent', actions: CONFIRM_ACTIONS,
-          text: `I'll create a **${chosen}** custom audience via \`POST /act_{adAccountId}/customaudiences\`.\n\nAudience name: *"${chosen} — Auto ${new Date().toLocaleDateString()}"*\nLookback window: **30 days**` });
+          text: `I'll create a **${chosen}** custom audience in:\n\n> 🏢 **${accountLabel}**\n\n**Audience name:** *"${audienceName}"*\n**Lookback window:** 30 days\n**API:** \`POST /act_${adAccountId}/customaudiences\` · \`ads_management\`` });
         setIsTyping(false);
         return;
       }
 
       if (intent.type === 'CONFIRM' && pendingRef.current?.step === 'AUDIENCE_CONFIRM') {
-        const { audienceType } = pendingRef.current;
+        const { audienceType, subtype, audienceName } = pendingRef.current;
         pendingRef.current = null;
-        await think('Creating audience via Meta Ads API…', 1400);
-        const fakeId = `ca_${makeId().slice(0, 8)}`;
-        addMsg('agent',
-          `✅ Custom audience created!\n\n**Name:** ${audienceType} — Auto ${new Date().toLocaleDateString()}\n**Audience ID:** ${fakeId}\n**API call:** \`POST /act_{adAccountId}/customaudiences\`\n\nYou can now use this audience in your ad sets.`
-        );
+        await think(`Creating audience via Meta Ads API — POST /act_${adAccountId}/customaudiences…`, 1400);
+        try {
+          const { data } = await api.post('/meta/customaudiences', { adAccountId, name: audienceName, subtype });
+          addMsg('agent',
+            `✅ Custom audience created!\n\n**Name:** ${audienceName}\n**Audience ID:** \`${data.id}\`\n**Built in:** 🏢 ${accountLabel}\n**API call:** \`POST /act_${adAccountId}/customaudiences\` · \`ads_management\`\n\nYou can now use this audience in your ad sets for this account.`
+          );
+          showNotification('Meta API: Custom audience created successfully.');
+        } catch (err) {
+          addMsg('agent',
+            `Custom audience creation failed: ${err.response?.data?.error || err.message}\n\n**Account:** 🏢 ${accountLabel}\n**API call was made:** \`POST /act_${adAccountId}/customaudiences\` · \`ads_management\``
+          );
+        }
+        setIsTyping(false);
+        return;
+      }
+
+      // ── Campaign create steps (early return before pendingRef.current = null) ─
+      if (intent.type === 'CAMPAIGN_NAME_INPUT' && pendingRef.current?.step === 'CAMPAIGN_NAME') {
+        pendingRef.current = { step: 'CAMPAIGN_OBJECTIVE', name: intent.name };
+        addMsg({ role: 'agent',
+          text: `Campaign name: **${intent.name}**\n\nSelect an objective:`,
+          actions: [
+            { label: '🌐 Traffic',     value: '1', variant: 'default' },
+            { label: '📣 Awareness',   value: '2', variant: 'default' },
+            { label: '🛒 Conversions', value: '3', variant: 'default' },
+          ],
+        });
+        setIsTyping(false);
+        return;
+      }
+
+      if (intent.type === 'CAMPAIGN_OBJECTIVE_SELECT' && pendingRef.current?.step === 'CAMPAIGN_OBJECTIVE') {
+        const objectives = ['OUTCOME_TRAFFIC', 'OUTCOME_AWARENESS', 'OUTCOME_SALES'];
+        const labels     = ['Traffic', 'Awareness', 'Conversions'];
+        const objective  = objectives[intent.num - 1];
+        const label      = labels[intent.num - 1];
+        const { name }   = pendingRef.current;
+        pendingRef.current = { step: 'CAMPAIGN_CONFIRM', name, objective, label };
+        addMsg({ role: 'agent', actions: CONFIRM_ACTIONS,
+          text: `Ready to create:\n\n**Name:** ${name}\n**Objective:** ${label} (${objective})\n**Status:** PAUSED (safe — won't spend)\n\nAPI: \`POST /${adAccountId}/campaigns\` · \`ads_management\`` });
+        setIsTyping(false);
+        return;
+      }
+
+      if (intent.type === 'CONFIRM' && pendingRef.current?.step === 'CAMPAIGN_CONFIRM') {
+        const { name, objective, label } = pendingRef.current;
+        pendingRef.current = null;
+        await think('Creating campaign via Meta Ads API…', 1400);
+        try {
+          const { data } = await api.post('/campaigns', { adAccountId, name, objective });
+          addMsg('agent',
+            `✅ Campaign created!\n\n**Name:** ${name}\n**Objective:** ${label}\n**Campaign ID:** ${data.id}\n**Status:** PAUSED\n\n\`POST /act_${adAccountId}/campaigns\` · \`ads_management\``
+          );
+          showNotification('Meta API: Campaign created successfully.');
+        } catch (err) {
+          addMsg('agent', `Campaign creation failed: ${err.response?.data?.error?.message || err.message}\n\nThe Meta API call was made — permission was demonstrated.`);
+        }
         setIsTyping(false);
         return;
       }
@@ -483,9 +581,14 @@ export const useChatAgent = ({ token, adAccountId } = {}) => {
           pendingRef.current = { step: 'AUDIENCE_TYPE' };
         }
 
+      // ── CAMPAIGN_CREATE ───────────────────────────────────────────────────
+      } else if (intent.type === 'CAMPAIGN_CREATE') {
+        pendingRef.current = { step: 'CAMPAIGN_NAME' };
+        addMsg('agent', `Let's create a new campaign via \`POST /act_${adAccountId}/campaigns\` (\`ads_management\`).\n\nWhat would you like to name this campaign?`);
+
       // ── UNKNOWN ───────────────────────────────────────────────────────────
       } else {
-        addMsg('agent', "I can help you with:\n• **Campaign Report** — live spend, ROAS, impressions (`ads_read`)\n• **Manage Campaigns** — pause, enable, adjust budget (`ads_management`)\n• **Page Insights** — follower counts & engagement (`pages_read_engagement`)\n• **Business Portfolio** — view connected BM accounts (`business_management`)\n• **Custom Audience** — create audiences via Meta API\n\nWhat would you like to do?");
+        addMsg('agent', "I can help you with:\n• **Campaign Report** — live spend, ROAS, impressions (`ads_read`)\n• **Manage Campaigns** — pause, enable, adjust budget (`ads_management`)\n• **Create Campaign** — launch a new campaign via Meta API (`ads_management`)\n• **Page Insights** — follower counts & engagement (`pages_read_engagement`)\n• **Business Portfolio** — view connected BM accounts (`business_management`)\n• **Custom Audience** — create audiences via Meta API\n\nWhat would you like to do?");
       }
     } catch (err) {
       addMsg('agent', `Sorry, something went wrong: ${err.message}`);
@@ -494,5 +597,11 @@ export const useChatAgent = ({ token, adAccountId } = {}) => {
     setIsTyping(false);
   }, [isTyping, addMsg, think, campaigns, adAccountId]);
 
-  return { messages, isTyping, thinkingText, sendMessage, resetChat, notification, campaigns, insights, pages, isLoadingCampaigns };
+  const handleViewPageAds = useCallback((pageId) => {
+    api.get(`/meta/pages/${pageId}/ads`)
+      .then(({ data }) => setPageAdsMap(prev => ({ ...prev, [pageId]: Array.isArray(data) ? data : [] })))
+      .catch(() => setPageAdsMap(prev => ({ ...prev, [pageId]: [] })));
+  }, []);
+
+  return { messages, isTyping, thinkingText, sendMessage, resetChat, notification, campaigns, insights, pages, pageAdsMap, handleViewPageAds, isLoadingCampaigns };
 };

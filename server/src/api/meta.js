@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getAdAccounts, getBusinesses, getOwnedAdAccounts, getPages, getCustomAudiences } from '../services/metaClient.js';
+import { getAdAccounts, getBusinesses, getOwnedAdAccounts, getPages, getCustomAudiences, getPageAds, createCustomAudience } from '../services/metaClient.js';
 
 const router = Router();
 
@@ -86,6 +86,41 @@ router.get('/customaudiences', async (req, res, next) => {
     res.json(data);
   } catch (err) {
     next(err);
+  }
+});
+
+// Triggers: ads_management — creates a custom audience for an ad account
+router.post('/customaudiences', async (req, res, next) => {
+  try {
+    const { adAccountId, name, subtype } = req.body;
+    if (!adAccountId || !name) return res.status(400).json({ error: 'adAccountId and name are required' });
+    const data = await createCustomAudience(token(), adAccountId, {
+      name,
+      subtype: subtype || 'WEBSITE',
+      description: `Created via AI Ad Manager`,
+    });
+    res.json(data);
+  } catch (err) {
+    const metaErr = err.response?.data?.error;
+    console.error('[meta] POST /customaudiences error:', metaErr || err.message);
+    res.status(err.response?.status || 500).json({
+      error: metaErr?.message || err.message,
+      code:  metaErr?.code,
+    });
+  }
+});
+
+// Triggers: pages_manage_ads — lists ads associated with a specific Page
+router.get('/pages/:id/ads', async (req, res, next) => {
+  try {
+    const data = await getPageAds(token(), req.params.id);
+    res.json(data);
+  } catch (err) {
+    const metaErr = err.response?.data?.error;
+    res.status(err.response?.status || 500).json({
+      error: metaErr?.message || err.message,
+      code:  metaErr?.code,
+    });
   }
 });
 

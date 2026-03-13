@@ -119,7 +119,7 @@ const CampaignTable = ({ campaigns, loading, onSend, adAccountId }) => {
 };
 
 // ── Pages Table ───────────────────────────────────────────────────────────────
-const PagesTable = ({ pages }) => (
+const PagesTable = ({ pages, onViewPageAds, pageAdsMap }) => (
   <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
     <table className="w-full text-xs">
       <thead>
@@ -128,27 +128,44 @@ const PagesTable = ({ pages }) => (
           <th className="px-3 py-2.5 text-left font-semibold text-slate-600">Category</th>
           <th className="px-3 py-2.5 text-right font-semibold text-slate-600">Followers</th>
           <th className="px-3 py-2.5 text-right font-semibold text-slate-600">Engagement</th>
+          <th className="px-3 py-2.5 text-right font-semibold text-slate-600"></th>
         </tr>
       </thead>
       <tbody>
-        {pages.map((p, i) => (
-          <tr key={p.id} className={`border-b border-slate-100 last:border-0 ${i % 2 === 1 ? 'bg-slate-50/40' : ''}`}>
-            <td className="px-4 py-3">
-              <p className="font-medium text-slate-800 truncate">{p.name}</p>
-              <p className="text-slate-400 font-mono text-[10px] truncate">{p.id}</p>
-            </td>
-            <td className="px-3 py-3 text-slate-500">{p.category || '—'}</td>
-            <td className="px-3 py-3 text-right font-medium text-slate-700">{p.fan_count ? p.fan_count.toLocaleString() : '—'}</td>
-            <td className="px-3 py-3 text-right text-slate-600">{p.engagement?.count ? p.engagement.count.toLocaleString() : '—'}</td>
-          </tr>
-        ))}
+        {pages.map((p, i) => {
+          const ads = pageAdsMap?.[p.id];
+          return (
+            <tr key={p.id} className={`border-b border-slate-100 last:border-0 ${i % 2 === 1 ? 'bg-slate-50/40' : ''}`}>
+              <td className="px-4 py-3">
+                <p className="font-medium text-slate-800 truncate">{p.name}</p>
+                <p className="text-slate-400 font-mono text-[10px] truncate">{p.id}</p>
+                {ads !== undefined && (
+                  <p className="text-[10px] text-violet-600 mt-0.5 font-mono">
+                    {ads.length === 0 ? 'No ads found' : `${ads.length} ad${ads.length !== 1 ? 's' : ''} · GET /${p.id}/ads · pages_manage_ads`}
+                  </p>
+                )}
+              </td>
+              <td className="px-3 py-3 text-slate-500">{p.category || '—'}</td>
+              <td className="px-3 py-3 text-right font-medium text-slate-700">{p.fan_count ? p.fan_count.toLocaleString() : '—'}</td>
+              <td className="px-3 py-3 text-right text-slate-600">{p.engagement?.count ? p.engagement.count.toLocaleString() : '—'}</td>
+              <td className="px-3 py-3 text-right">
+                <button
+                  onClick={() => onViewPageAds(p.id)}
+                  className="text-xs font-medium text-violet-600 hover:text-violet-800 hover:underline whitespace-nowrap"
+                >
+                  View Ads →
+                </button>
+              </td>
+            </tr>
+          );
+        })}
       </tbody>
     </table>
   </div>
 );
 
 // ── Main DataPanel ────────────────────────────────────────────────────────────
-export const DataPanel = ({ adAccountId, selectedAccount, campaigns, insights, pages, isLoadingCampaigns, onSend }) => {
+export const DataPanel = ({ adAccountId, selectedAccount, campaigns, insights, pages, pageAdsMap, isLoadingCampaigns, onSend, onViewPageAds }) => {
   const totalSpend = insights?.totalSpend ?? null;
   const impressions = insights?.impressions ?? null;
   const clicks = insights?.clicks ?? null;
@@ -198,8 +215,8 @@ export const DataPanel = ({ adAccountId, selectedAccount, campaigns, insights, p
       {pages.length > 0 && (
         <>
           <SectionHeading title="Facebook Pages" />
-          <PagesTable pages={pages} />
-          <SourceLabel endpoint="GET /me/accounts" permission="pages_read_engagement" />
+          <PagesTable pages={pages} pageAdsMap={pageAdsMap} onViewPageAds={onViewPageAds} />
+          <SourceLabel endpoint="GET /me/accounts · GET /{pageId}/ads" permission="pages_read_engagement · pages_manage_ads" />
         </>
       )}
     </div>
