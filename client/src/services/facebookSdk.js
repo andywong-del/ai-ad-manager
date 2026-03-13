@@ -33,8 +33,17 @@ export const initFacebookSdk = () =>
 
 export const login = () =>
   new Promise((resolve, reject) => {
+    if (!window.FB) {
+      return reject(new Error('Facebook SDK not loaded. Please refresh and try again.'));
+    }
+
+    const timeout = setTimeout(() => {
+      reject(new Error('Facebook login timed out. Please try again.'));
+    }, 30000);
+
     window.FB.login(
       (response) => {
+        clearTimeout(timeout);
         console.log('[FB.login] full response:', JSON.stringify(response, null, 2));
         if (response.authResponse) {
           console.log('[FB.login] success — accessToken:', response.authResponse.accessToken);
