@@ -17,7 +17,7 @@ const StatusChip = ({ code }) => {
 };
 
 export const AdAccountSelector = ({ token, business, onSelect, onBack }) => {
-  const { adAccounts, error } = useAdAccounts(token);
+  const { adAccounts, error } = useAdAccounts(business?.id);
   const [fetching,    setFetching]    = useState(true);
   const [connecting,  setConnecting]  = useState(null);
 
@@ -27,7 +27,7 @@ export const AdAccountSelector = ({ token, business, onSelect, onBack }) => {
     return () => clearTimeout(t);
   }, []);
 
-  const accounts = (Array.isArray(adAccounts) ? adAccounts : []).filter((a) => a.business_id === business?.id);
+  const accounts = Array.isArray(adAccounts) ? adAccounts : [];
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">

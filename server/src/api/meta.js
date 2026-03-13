@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getAdAccounts, getBusinesses, getPages, getCustomAudiences } from '../services/metaClient.js';
+import { getAdAccounts, getBusinesses, getOwnedAdAccounts, getPages, getCustomAudiences } from '../services/metaClient.js';
 
 const router = Router();
 
@@ -32,7 +32,27 @@ router.get('/adaccounts', async (req, res, next) => {
 router.get('/businesses', async (req, res, next) => {
   try {
     const data = await getBusinesses(getToken(req));
+    console.log(`[meta] /businesses → found ${data.length} businesses`);
     res.json(data);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Returns ad accounts owned by a specific business
+router.get('/businesses/:id/adaccounts', async (req, res, next) => {
+  try {
+    const raw = await getOwnedAdAccounts(getToken(req), req.params.id);
+    console.log(`[meta] /businesses/${req.params.id}/adaccounts → found ${raw.length} accounts`);
+    const normalized = raw.map(acc => ({
+      id:             acc.id,
+      account_id:     acc.account_id,
+      name:           acc.name,
+      account_status: acc.account_status,
+      currency:       acc.currency,
+      business_id:    req.params.id,
+    }));
+    res.json(normalized);
   } catch (err) {
     next(err);
   }

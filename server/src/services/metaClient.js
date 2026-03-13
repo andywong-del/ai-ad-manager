@@ -69,6 +69,17 @@ export const getCustomAudiences = async (token, adAccountId) => {
   return data.data;
 };
 
+export const getOwnedAdAccounts = async (token, businessId) => {
+  const { data } = await metaApi.get(`/${businessId}/owned_ad_accounts`, {
+    params: {
+      access_token: token,
+      fields: 'id,name,account_id,account_status,currency',
+      limit: 100
+    }
+  });
+  return data.data;
+};
+
 export const exchangeToken = async (shortLivedToken) => {
   const { data } = await metaApi.get('/oauth/access_token', {
     params: {

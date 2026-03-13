@@ -1,23 +1,10 @@
 import { useState } from 'react';
 import { Bot, ArrowLeft, Building2, ChevronRight } from 'lucide-react';
-import { useAdAccounts } from '../hooks/useAdAccounts.js';
-
-// Derive unique businesses with account counts from the full account list
-const getBusinesses = (accounts) => {
-  const map = new Map();
-  for (const acc of accounts) {
-    if (!map.has(acc.business_id)) {
-      map.set(acc.business_id, { id: acc.business_id, name: acc.business_name, count: 0 });
-    }
-    map.get(acc.business_id).count++;
-  }
-  return Array.from(map.values());
-};
+import { useBusinesses } from '../hooks/useBusinesses.js';
 
 export const BusinessSelector = ({ onSelect, onBack }) => {
-  const { adAccounts, isLoading, error } = useAdAccounts(null);
+  const { businesses, isLoading, error } = useBusinesses();
   const [connecting, setConnecting] = useState(null);
-  const businesses = getBusinesses(Array.isArray(adAccounts) ? adAccounts : []);
 
   const handleSelect = (biz) => {
     setConnecting(biz);
@@ -60,7 +47,7 @@ export const BusinessSelector = ({ onSelect, onBack }) => {
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
               </svg>
               <p className="text-sm text-slate-500 font-medium">Loading Business Portfolios…</p>
-              <p className="text-xs text-slate-400 font-mono">GET /me/adaccounts · business_management</p>
+              <p className="text-xs text-slate-400 font-mono">GET /me/businesses · business_management</p>
             </div>
           ) : connecting ? (
             <div className="flex flex-col items-center gap-3 py-16">
@@ -89,26 +76,21 @@ export const BusinessSelector = ({ onSelect, onBack }) => {
                   onClick={() => handleSelect(biz)}
                   className="w-full bg-white border border-slate-200 rounded-2xl px-5 py-4 flex items-center gap-4 hover:border-blue-400 hover:shadow-sm transition-all text-left group"
                 >
-                  {/* Icon */}
                   <div className="w-11 h-11 rounded-xl bg-violet-50 flex items-center justify-center shrink-0 group-hover:bg-violet-100 transition-colors">
                     <Building2 size={20} className="text-violet-500" />
                   </div>
 
-                  {/* Info */}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-slate-800 truncate">{biz.name}</p>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-xs text-slate-400 font-mono">BM ID: {biz.id}</span>
+                      {biz.verification_status && (
+                        <span className="text-xs text-slate-400">· {biz.verification_status}</span>
+                      )}
                     </div>
                   </div>
 
-                  {/* Account count + arrow */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
-                      {biz.count} account{biz.count !== 1 ? 's' : ''}
-                    </span>
-                    <ChevronRight size={16} className="text-slate-300 group-hover:text-blue-400 transition-colors" />
-                  </div>
+                  <ChevronRight size={16} className="text-slate-300 group-hover:text-blue-400 transition-colors shrink-0" />
                 </button>
               ))}
             </div>
@@ -116,7 +98,7 @@ export const BusinessSelector = ({ onSelect, onBack }) => {
 
           {/* Permissions footer */}
           <div className="mt-8 flex flex-col items-center gap-2">
-            <p className="text-xs text-slate-400">Data fetched via <code className="bg-slate-100 px-1 rounded font-mono">GET /me/adaccounts</code> · <code className="bg-slate-100 px-1 rounded font-mono">business_management</code></p>
+            <p className="text-xs text-slate-400">Data fetched via <code className="bg-slate-100 px-1 rounded font-mono">GET /me/businesses</code> · <code className="bg-slate-100 px-1 rounded font-mono">business_management</code></p>
             <div className="flex items-center justify-center gap-2 flex-wrap">
               {['ads_read', 'ads_management', 'business_management'].map((p) => (
                 <span key={p} className="inline-flex items-center gap-1 text-xs bg-emerald-50 text-emerald-600 border border-emerald-200 px-2 py-0.5 rounded-full font-mono">
