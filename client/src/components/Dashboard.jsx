@@ -1,6 +1,7 @@
-import { useState, useCallback } from 'react';
-import { Bot, LayoutDashboard, MessageSquare, BarChart3, CreditCard, Settings, LogOut, ChevronLeft, ChevronDown } from 'lucide-react';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { Bot, LayoutDashboard, MessageSquare, BarChart3, CreditCard, Settings, LogOut, ChevronLeft, ChevronDown, Check, ArrowLeftRight } from 'lucide-react';
 import { useChatAgent } from '../hooks/useChatAgent.js';
+import { useAdAccounts } from '../hooks/useAdAccounts.js';
 import { ChatInterface } from './ChatInterface.jsx';
 
 const NAV_ITEMS = [
@@ -19,7 +20,91 @@ const SUGGESTED_ACTIONS = [
   { label: 'Daily KPI Report',            prompt: "Show today's KPI report" },
 ];
 
-export const Dashboard = ({ token = null, adAccountId = null, selectedAccount = null, onLogout }) => {
+// ── Account Switcher Dropdown ─────────────────────────────────────────────────
+const AccountSwitcher = ({ selectedAccount, selectedBusiness, onSwitchAccount, onSwitchBusiness }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const { adAccounts } = useAdAccounts(selectedBusiness?.id);
+  const accounts = Array.isArray(adAccounts) ? adAccounts : [];
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-3 px-3 py-3 rounded-xl bg-[#1a2236] border border-[#1e293b] hover:border-slate-600 transition-colors text-left"
+      >
+        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shrink-0">
+          <span className="text-white text-xs font-bold">
+            {selectedAccount?.name?.[0]?.toUpperCase() || 'A'}
+          </span>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-white truncate">{selectedAccount?.name || 'Ad Account'}</p>
+          <p className="text-[11px] text-slate-500 font-mono truncate">{selectedAccount?.account_id ? `act_${selectedAccount.account_id}` : selectedAccount?.id || '—'}</p>
+        </div>
+        <ChevronDown size={14} className={`text-slate-500 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute bottom-full left-0 right-0 mb-2 bg-[#1a2236] border border-[#1e293b] rounded-xl shadow-xl z-50 overflow-hidden max-h-72 overflow-y-auto">
+          {/* Account list */}
+          {accounts.length > 0 && accounts.map((account) => {
+            const isActive = account.id === selectedAccount?.id;
+            return (
+              <button
+                key={account.id}
+                onClick={() => {
+                  if (!isActive) onSwitchAccount(account);
+                  setOpen(false);
+                }}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors
+                  ${isActive ? 'bg-blue-900/20' : 'hover:bg-[#232d42]'}`}
+              >
+                <div className="w-7 h-7 rounded-md bg-[#141b2d] flex items-center justify-center shrink-0">
+                  <span className="text-slate-300 text-[10px] font-bold">{account.name?.[0]?.toUpperCase()}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-xs font-medium truncate ${isActive ? 'text-blue-400' : 'text-slate-300'}`}>{account.name}</p>
+                  <p className="text-[10px] text-slate-500 font-mono truncate">act_{account.account_id}</p>
+                </div>
+                {isActive && <Check size={14} className="text-blue-400 shrink-0" />}
+              </button>
+            );
+          })}
+
+          {/* Switch business */}
+          <div className="border-t border-[#1e293b]">
+            <button
+              onClick={() => { setOpen(false); onSwitchBusiness(); }}
+              className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-[#232d42] transition-colors"
+            >
+              <ArrowLeftRight size={14} className="text-slate-400" />
+              <span className="text-xs text-slate-400">Switch Business Portfolio</span>
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+export const Dashboard = ({
+  token = null,
+  adAccountId = null,
+  selectedAccount = null,
+  selectedBusiness = null,
+  onSwitchAccount,
+  onSwitchBusiness,
+  onLogout,
+}) => {
   const [activeNav, setActiveNav] = useState('chat');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const { messages, isTyping, thinkingText, sendMessage, resetChat, notification } = useChatAgent({ token, adAccountId, selectedAccount });
@@ -28,6 +113,12 @@ export const Dashboard = ({ token = null, adAccountId = null, selectedAccount = 
     setActiveNav('chat');
     sendMessage(text);
   }, [sendMessage]);
+
+  // Reset chat when account changes
+  const handleSwitchAccount = useCallback((account) => {
+    resetChat();
+    onSwitchAccount(account);
+  }, [resetChat, onSwitchAccount]);
 
   return (
     <div className="flex h-screen bg-[#0f1623]">
@@ -72,18 +163,12 @@ export const Dashboard = ({ token = null, adAccountId = null, selectedAccount = 
         {/* Ad Account Selector */}
         <div className="px-3 mb-4">
           <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-3 mb-2">Ad Account</p>
-          <button className="w-full flex items-center gap-3 px-3 py-3 rounded-xl bg-[#1a2236] border border-[#1e293b] hover:border-slate-600 transition-colors text-left">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shrink-0">
-              <span className="text-white text-xs font-bold">
-                {selectedAccount?.name?.[0]?.toUpperCase() || 'A'}
-              </span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate">{selectedAccount?.name || 'Ad Account'}</p>
-              <p className="text-[11px] text-slate-500 font-mono">{selectedAccount?.id || adAccountId}</p>
-            </div>
-            <ChevronDown size={14} className="text-slate-500 shrink-0" />
-          </button>
+          <AccountSwitcher
+            selectedAccount={selectedAccount}
+            selectedBusiness={selectedBusiness}
+            onSwitchAccount={handleSwitchAccount}
+            onSwitchBusiness={onSwitchBusiness}
+          />
         </div>
 
         {/* User Profile */}
@@ -111,7 +196,6 @@ export const Dashboard = ({ token = null, adAccountId = null, selectedAccount = 
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0">
-        {/* Collapsed sidebar toggle */}
         {!sidebarOpen && (
           <button
             onClick={() => setSidebarOpen(true)}

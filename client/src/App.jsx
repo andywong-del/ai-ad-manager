@@ -68,13 +68,16 @@ export default function App() {
     );
   }
 
-  // Step 4: Dashboard
+  // Step 4: Dashboard — pass switching callbacks
   return (
     <ErrorBoundary>
       <Dashboard
         token={longLivedToken}
         adAccountId={selectedAccount.id}
         selectedAccount={selectedAccount}
+        selectedBusiness={selectedBusiness}
+        onSwitchAccount={(account) => setSelectedAccount(account)}
+        onSwitchBusiness={() => { setSelectedAccount(null); setSelectedBusiness(null); }}
         onLogout={() => { logout(); setSelectedBusiness(null); setSelectedAccount(null); }}
       />
     </ErrorBoundary>
