@@ -5,11 +5,11 @@ class ErrorBoundary extends Component {
   static getDerivedStateFromError(e) { return { error: e }; }
   render() {
     if (this.state.error) return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-8">
-        <div className="bg-white border border-red-200 rounded-2xl p-6 max-w-md w-full text-center">
-          <p className="text-sm font-semibold text-red-600 mb-2">Something went wrong loading the dashboard</p>
-          <p className="text-xs text-slate-500 font-mono break-all mb-4">{this.state.error.message}</p>
-          <button onClick={() => this.setState({ error: null })} className="text-xs text-blue-600 underline">Try again</button>
+      <div className="min-h-screen bg-[#0f1623] flex items-center justify-center p-8">
+        <div className="bg-[#141b2d] border border-[#1e293b] rounded-2xl p-6 max-w-md w-full text-center">
+          <p className="text-sm font-semibold text-red-400 mb-2">Something went wrong loading the dashboard</p>
+          <p className="text-xs text-slate-400 font-mono break-all mb-4">{this.state.error.message}</p>
+          <button onClick={() => this.setState({ error: null })} className="text-xs text-blue-400 underline">Try again</button>
         </div>
       </div>
     );
@@ -29,7 +29,7 @@ export default function App() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="min-h-screen bg-[#0f1623] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3 text-slate-400">
           <svg className="animate-spin h-8 w-8" viewBox="0 0 24 24" fill="none">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>

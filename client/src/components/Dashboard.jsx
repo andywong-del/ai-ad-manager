@@ -1,94 +1,138 @@
 import { useState, useCallback } from 'react';
-import { Bot, ArrowLeft, LogOut, CheckCircle } from 'lucide-react';
+import { Bot, LayoutDashboard, MessageSquare, BarChart3, CreditCard, Settings, LogOut, ChevronLeft, ChevronDown } from 'lucide-react';
 import { useChatAgent } from '../hooks/useChatAgent.js';
-import { HomeScreen } from './HomeScreen.jsx';
 import { ChatInterface } from './ChatInterface.jsx';
 
-const PERMISSIONS = ['ads_read', 'ads_management', 'business_management'];
+const NAV_ITEMS = [
+  { id: 'dashboard', label: 'Dashboard',    icon: LayoutDashboard },
+  { id: 'chat',      label: 'Chat',         icon: MessageSquare },
+  { id: 'reports',   label: 'Reports',      icon: BarChart3 },
+  { id: 'accounts',  label: 'Ad accounts',  icon: CreditCard },
+  { id: 'settings',  label: 'Settings',     icon: Settings },
+];
 
 const SUGGESTED_ACTIONS = [
-  { label: '📊 Campaign Report', prompt: "Show this week's campaign report"  },
-  { label: '⚙️ On/Off & Budget', prompt: 'Manage campaign status and budget' },
-  { label: '👥 Custom Audience', prompt: 'Create a custom audience'           },
+  { label: 'Full Audit',                  prompt: 'Run a full audit of my ad account' },
+  { label: 'Root Cause Analysis',         prompt: 'Perform a root cause analysis on underperforming campaigns' },
+  { label: 'Performance Drop Diagnostic', prompt: 'Diagnose recent performance drops across my campaigns' },
+  { label: 'Search Term Analysis',        prompt: 'Analyze search terms and keyword performance' },
+  { label: 'Daily KPI Report',            prompt: "Show today's KPI report" },
 ];
 
 export const Dashboard = ({ token = null, adAccountId = null, selectedAccount = null, onLogout }) => {
-  const [view, setView] = useState('home');
+  const [activeNav, setActiveNav] = useState('chat');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const { messages, isTyping, thinkingText, sendMessage, resetChat, notification } = useChatAgent({ token, adAccountId, selectedAccount });
 
-  const goHome = useCallback(() => {
-    resetChat();
-    setView('home');
-  }, [resetChat]);
-
   const handleSend = useCallback((text) => {
-    setView('chat');
+    setActiveNav('chat');
     sendMessage(text);
   }, [sendMessage]);
 
   return (
-    <div className="flex flex-col h-screen bg-slate-50">
+    <div className="flex h-screen bg-[#0f1623]">
 
-      {/* Header */}
-      <header className="shrink-0 bg-white border-b border-slate-200 px-4 py-2.5 flex items-center gap-3">
-        {view !== 'home' && (
+      {/* Sidebar */}
+      <aside className={`${sidebarOpen ? 'w-[260px]' : 'w-0 overflow-hidden'} shrink-0 bg-[#141b2d] border-r border-[#1e293b] flex flex-col transition-all duration-200`}>
+
+        {/* Logo */}
+        <div className="px-5 py-5 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
+              <Bot size={18} className="text-white" />
+            </div>
+            <span className="text-[15px] font-bold text-white tracking-tight">AI Ad Manager</span>
+          </div>
           <button
-            onClick={goHome}
-            className="flex items-center gap-1.5 text-slate-500 hover:text-slate-800 transition-colors mr-1"
+            onClick={() => setSidebarOpen(false)}
+            className="text-slate-500 hover:text-slate-300 transition-colors"
           >
-            <ArrowLeft size={16} />
-            <span className="text-sm">Back</span>
+            <ChevronLeft size={18} />
+          </button>
+        </div>
+
+        {/* Navigation */}
+        <nav className="flex-1 px-3 mt-1">
+          {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              onClick={() => setActiveNav(id)}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-colors mb-0.5
+                ${activeNav === id
+                  ? 'bg-[#1e293b] text-white'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-[#1a2236]'
+                }`}
+            >
+              <Icon size={18} strokeWidth={activeNav === id ? 2 : 1.5} />
+              {label}
+            </button>
+          ))}
+        </nav>
+
+        {/* Ad Account Selector */}
+        <div className="px-3 mb-4">
+          <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-3 mb-2">Ad Account</p>
+          <button className="w-full flex items-center gap-3 px-3 py-3 rounded-xl bg-[#1a2236] border border-[#1e293b] hover:border-slate-600 transition-colors text-left">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shrink-0">
+              <span className="text-white text-xs font-bold">
+                {selectedAccount?.name?.[0]?.toUpperCase() || 'A'}
+              </span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-white truncate">{selectedAccount?.name || 'Ad Account'}</p>
+              <p className="text-[11px] text-slate-500 font-mono">{selectedAccount?.id || adAccountId}</p>
+            </div>
+            <ChevronDown size={14} className="text-slate-500 shrink-0" />
+          </button>
+        </div>
+
+        {/* User Profile */}
+        <div className="px-3 pb-4 border-t border-[#1e293b] pt-3">
+          <div className="flex items-center gap-3 px-2">
+            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center shrink-0">
+              <span className="text-white text-xs font-bold">A</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-white truncate">Andy Wong</p>
+              <p className="text-[11px] text-slate-500 truncate">andy.wong@presslogic.com</p>
+            </div>
+            {onLogout && (
+              <button
+                onClick={onLogout}
+                className="text-slate-500 hover:text-slate-300 transition-colors"
+                title="Log out"
+              >
+                <LogOut size={16} />
+              </button>
+            )}
+          </div>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col min-w-0">
+        {/* Collapsed sidebar toggle */}
+        {!sidebarOpen && (
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="absolute top-4 left-4 z-10 w-8 h-8 rounded-lg bg-[#1a2236] border border-[#1e293b] flex items-center justify-center text-slate-400 hover:text-white transition-colors"
+          >
+            <MessageSquare size={16} />
           </button>
         )}
 
-        <div className="bg-gradient-to-br from-blue-500 to-violet-600 p-1.5 rounded-lg shrink-0">
-          <Bot size={16} className="text-white" />
-        </div>
-
-        <div className="flex-1 min-w-0">
-          <h1 className="text-sm font-bold text-slate-900 leading-tight">AI Ad Manager</h1>
-          {selectedAccount && (
-            <p className="text-xs text-slate-400 truncate leading-tight">{selectedAccount.name}</p>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0">
-          <div className="hidden sm:flex items-center gap-1">
-            {PERMISSIONS.map((p) => (
-              <span key={p} className="inline-flex items-center gap-1 text-[10px] bg-emerald-50 text-emerald-600 border border-emerald-200 px-1.5 py-0.5 rounded font-mono">
-                <span className="w-1 h-1 rounded-full bg-emerald-400" />{p}
-              </span>
-            ))}
-          </div>
-          <div className="flex items-center gap-1.5 ml-1">
-            <span className="w-2 h-2 rounded-full animate-pulse bg-emerald-400" />
-            <span className="text-xs font-medium text-emerald-600">Development</span>
-          </div>
-          {onLogout && (
-            <button onClick={onLogout} className="flex items-center gap-1.5 text-slate-400 hover:text-slate-700 transition-colors" title="Disconnect">
-              <LogOut size={15} />
-            </button>
-          )}
-        </div>
-      </header>
-
-      {/* Main */}
-      <main className="flex-1 overflow-hidden">
-        {view === 'home' && <HomeScreen onSend={handleSend} selectedAccount={selectedAccount} />}
-        {view === 'chat' && (
-          <ChatInterface
-            messages={messages}
-            isTyping={isTyping}
-            thinkingText={thinkingText}
-            onSend={sendMessage}
-            suggestedActions={SUGGESTED_ACTIONS}
-          />
-        )}
+        <ChatInterface
+          messages={messages}
+          isTyping={isTyping}
+          thinkingText={thinkingText}
+          onSend={handleSend}
+          suggestedActions={SUGGESTED_ACTIONS}
+        />
       </main>
 
+      {/* Notification Toast */}
       {notification && (
         <div className="fixed bottom-6 right-6 z-50 bg-emerald-500 text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-2 text-sm font-medium">
-          <CheckCircle size={16} />
           {notification}
         </div>
       )}
