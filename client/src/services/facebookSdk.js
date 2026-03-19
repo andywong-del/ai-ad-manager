@@ -13,8 +13,14 @@ export const initFacebookSdk = () => {
       return resolve();
     }
 
+    // Timeout — if SDK doesn't load within 15s, reject so the UI can recover
+    const timeout = setTimeout(() => {
+      reject(new Error('Facebook SDK timed out. Please refresh and try again.'));
+    }, 15000);
+
     // Set fbAsyncInit BEFORE injecting the script — the SDK calls this when truly ready
     window.fbAsyncInit = () => {
+      clearTimeout(timeout);
       window.FB.init({ appId: FB_APP_ID, cookie: true, xfbml: false, version: 'v25.0' });
       resolve();
     };
@@ -25,10 +31,17 @@ export const initFacebookSdk = () => {
       script.id = 'facebook-jssdk';
       script.src = 'https://connect.facebook.net/en_US/sdk.js';
       script.async = true;
-      script.onerror = () => reject(new Error('Failed to load Facebook SDK'));
+      script.onerror = () => {
+        clearTimeout(timeout);
+        reject(new Error('Failed to load Facebook SDK'));
+      };
       document.body.appendChild(script);
     }
     // If script already injected and still loading, fbAsyncInit will fire when SDK is ready
+  }).catch((err) => {
+    // Reset cached promise so the user can retry
+    _initPromise = null;
+    throw err;
   });
 
   return _initPromise;
@@ -53,7 +66,7 @@ export const login = () =>
           response_type: 'token',
         }
       );
-    });
+    }).catch(reject);
   });
 
 export const getLoginStatus = () =>
