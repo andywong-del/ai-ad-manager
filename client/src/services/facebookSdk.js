@@ -1,44 +1,48 @@
+// ── Facebook SDK — Global Promise Initialization Guard ────────────────────────
+//
+// Pattern:
+//   window.fbPromise is a single global Promise that resolves ONLY after
+//   fbAsyncInit fires and FB.init() completes. Every SDK call (login, logout,
+//   getLoginStatus) awaits this promise before touching window.FB.
+//
+
 const FB_APP_ID    = import.meta.env.VITE_FB_APP_ID;
 const FB_CONFIG_ID = import.meta.env.VITE_FB_CONFIG_ID;
 
-// SDK readiness — only true AFTER fbAsyncInit fires AND FB.init() completes
-let _sdkReady = false;
-let _readyResolve = null;
+// ── 1. Create the global initialization promise ──────────────────────────────
+window.fbPromise = new Promise((resolve, reject) => {
+  // Case A: SDK already fully loaded (HMR, re-import, etc.)
+  if (window.FB?.getLoginStatus) {
+    window.FB.init({ appId: FB_APP_ID, cookie: true, xfbml: false, version: 'v25.0' });
+    return resolve();
+  }
 
-// Promise that resolves when the SDK is fully initialized
-export const sdkReady = new Promise((resolve) => {
-  _readyResolve = resolve;
-});
-
-// ── Load + init the SDK on import ─────────────────────────────────────────────
-(function loadSdk() {
-  // Already fully initialized (e.g. HMR re-import)
-  if (_sdkReady) return;
-
-  // fbAsyncInit is called BY the SDK when it's truly ready for FB.init()
+  // Case B: SDK not yet loaded — wait for fbAsyncInit
   window.fbAsyncInit = () => {
     window.FB.init({ appId: FB_APP_ID, cookie: true, xfbml: false, version: 'v25.0' });
-    _sdkReady = true;
-    _readyResolve();
+    resolve();
   };
 
-  // Inject script if not already in DOM
+  // Case C: Timeout — reject after 10s so the UI doesn't spin forever
+  setTimeout(() => {
+    reject(new Error('Facebook SDK failed to load. Please check your connection and refresh.'));
+  }, 10000);
+
+  // Inject the script tag if not already present
   if (!document.getElementById('facebook-jssdk')) {
-    const script = document.createElement('script');
-    script.id    = 'facebook-jssdk';
-    script.src   = 'https://connect.facebook.net/en_US/sdk.js';
-    script.async = true;
+    const script  = document.createElement('script');
+    script.id     = 'facebook-jssdk';
+    script.src    = 'https://connect.facebook.net/en_US/sdk.js';
+    script.async  = true;
+    script.onerror = () =>
+      reject(new Error('Failed to load Facebook SDK script.'));
     document.body.appendChild(script);
   }
-})();
+});
 
-// ── Login — MUST be called from a click handler ──────────────────────────────
-export const login = () => {
-  if (!_sdkReady || !window.FB) {
-    return Promise.reject(new Error('Facebook is still loading. Please try again in a moment.'));
-  }
-
-  // FB.init() already called, FB.login() runs synchronously in the click stack
+// ── 2. Login — awaits the guard, then calls FB.login() ───────────────────────
+export const login = async () => {
+  await window.fbPromise;                       // ← Initialization Guard
   return new Promise((resolve, reject) => {
     window.FB.login(
       (response) => {
@@ -53,19 +57,20 @@ export const login = () => {
   });
 };
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-export const isSdkReady = () => _sdkReady;
-
-export const initFacebookSdk = () => sdkReady;
-
-export const getLoginStatus = () =>
-  new Promise((resolve) => {
-    if (_sdkReady && window.FB) window.FB.getLoginStatus((r) => resolve(r));
-    else resolve({ status: 'unknown' });
+// ── 3. Helpers — all guarded by the same promise ─────────────────────────────
+export const getLoginStatus = async () => {
+  await window.fbPromise;
+  return new Promise((resolve) => {
+    window.FB.getLoginStatus((response) => resolve(response));
   });
+};
 
-export const logout = () =>
-  new Promise((resolve) => {
-    if (_sdkReady && window.FB) window.FB.logout(() => resolve());
-    else resolve();
+export const logout = async () => {
+  await window.fbPromise;
+  return new Promise((resolve) => {
+    window.FB.logout(() => resolve());
   });
+};
+
+// Re-export the guard so React components can track readiness
+export const fbPromise = window.fbPromise;
