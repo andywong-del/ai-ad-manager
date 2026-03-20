@@ -24,12 +24,20 @@ export function initFacebookSdk() {
       reject(new Error('Facebook SDK failed to load. Please check your connection and refresh.'));
     }, 10000);
 
-    // fbAsyncInit is the ONLY reliable signal that the SDK is ready for FB.init()
-    window.fbAsyncInit = () => {
+    const doInit = () => {
       clearTimeout(timeout);
       window.FB.init({ appId: FB_APP_ID, cookie: true, xfbml: false, version: 'v25.0' });
       resolve();
     };
+
+    // If FB SDK already loaded (cached script), init immediately
+    if (window.FB) {
+      doInit();
+      return;
+    }
+
+    // fbAsyncInit is called by the SDK once it loads
+    window.fbAsyncInit = doInit;
 
     // Inject the script ONLY if not already in the DOM
     if (document.getElementById('facebook-jssdk')) return;
