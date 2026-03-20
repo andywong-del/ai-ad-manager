@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Bot, Send, Paperclip, CheckCircle2, XCircle } from 'lucide-react';
+import { Bot, Send, Paperclip, CheckCircle2, XCircle, ArrowUpRight, BarChart3, Target, TrendingDown, Search, FileText, DollarSign, AlertTriangle, Zap } from 'lucide-react';
 
 // ── Typing indicator ──────────────────────────────────────────────────────────
 const TypingIndicator = ({ thinkingText }) => (
@@ -365,6 +365,30 @@ const MessageBubble = ({ message, isLatest, onSend, isTyping }) => {
   );
 };
 
+// ── Icon map for action cards ────────────────────────────────────────────────
+const ICON_MAP = { BarChart3, Target, TrendingDown, Search, FileText, DollarSign, AlertTriangle, Zap };
+
+// ── Action card grid ─────────────────────────────────────────────────────────
+const ActionCard = ({ icon, color, label, desc, prompt, onSend, disabled }) => {
+  const Icon = ICON_MAP[icon] || Zap;
+  return (
+    <button
+      onClick={() => onSend(prompt)}
+      disabled={disabled}
+      className="flex flex-col bg-[#141b2d] border border-[#1e293b] rounded-xl p-4 text-left hover:border-slate-600 hover:bg-[#1a2236] transition-all disabled:opacity-40 group"
+    >
+      <div className="flex items-start justify-between mb-3">
+        <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${color} flex items-center justify-center`}>
+          <Icon size={18} className="text-white" />
+        </div>
+        <ArrowUpRight size={14} className="text-slate-600 group-hover:text-slate-400 transition-colors mt-1" />
+      </div>
+      <p className="text-sm font-semibold text-white mb-1">{label}</p>
+      <p className="text-xs text-slate-500 leading-relaxed">{desc}</p>
+    </button>
+  );
+};
+
 // ── Mode toggle (Fast / Deep Research) ───────────────────────────────────────
 const ModeToggle = ({ mode, setMode }) => (
   <div className="flex items-center gap-1 bg-[#1a2236] rounded-full p-0.5">
@@ -420,8 +444,8 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, sugges
           </h1>
 
           {/* Input area */}
-          <div className="w-full max-w-2xl">
-            <div className="bg-[#141b2d] border border-[#1e293b] rounded-2xl overflow-hidden">
+          <div className="w-full max-w-4xl">
+            <div className="max-w-2xl mx-auto bg-[#141b2d] border border-[#1e293b] rounded-2xl overflow-hidden">
               <div className="px-4 pt-4 pb-3">
                 <textarea
                   ref={inputRef}
@@ -452,17 +476,10 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, sugges
               </div>
             </div>
 
-            {/* Quick action chips */}
-            <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
-              {suggestedActions.map(({ label, prompt }) => (
-                <button
-                  key={label}
-                  onClick={() => onSend(prompt)}
-                  disabled={isTyping}
-                  className="px-4 py-2 rounded-full text-[13px] font-medium bg-[#141b2d] border border-[#1e293b] text-slate-300 hover:bg-[#1a2236] hover:border-slate-600 hover:text-white transition-colors disabled:opacity-40"
-                >
-                  {label}
-                </button>
+            {/* Action cards grid */}
+            <div className="grid grid-cols-4 gap-3 mt-6">
+              {suggestedActions.map((action) => (
+                <ActionCard key={action.label} {...action} onSend={onSend} disabled={isTyping} />
               ))}
             </div>
           </div>

@@ -14,11 +14,14 @@ const NAV_ITEMS = [
 ];
 
 const SUGGESTED_ACTIONS = [
-  { label: 'Full Audit',                  prompt: 'Run a full audit of my ad account' },
-  { label: 'Root Cause Analysis',         prompt: 'Perform a root cause analysis on underperforming campaigns' },
-  { label: 'Performance Drop Diagnostic', prompt: 'Diagnose recent performance drops across my campaigns' },
-  { label: 'Search Term Analysis',        prompt: 'Analyze search terms and keyword performance' },
-  { label: 'Daily KPI Report',            prompt: "Show today's KPI report" },
+  { icon: 'BarChart3',    color: 'from-blue-500 to-indigo-600',     label: 'Account Audit',         desc: 'Spot wasted spend and find opportunities to improve ROAS across your account.',                            prompt: 'Run a full audit of my ad account' },
+  { icon: 'Target',       color: 'from-emerald-500 to-teal-600',    label: 'Root Cause Analysis',   desc: 'Diagnose why key metrics changed and trace it back to the source.',                                       prompt: 'Perform a root cause analysis on underperforming campaigns' },
+  { icon: 'TrendingDown', color: 'from-red-500 to-rose-600',        label: 'Performance Drop',      desc: 'Identify what caused a sudden drop in conversions, CTR, or ROAS.',                                       prompt: 'Diagnose recent performance drops across my campaigns' },
+  { icon: 'Search',       color: 'from-violet-500 to-purple-600',   label: 'Search Term Analysis',  desc: 'Find irrelevant search terms burning budget and high-intent terms to add.',                               prompt: 'Analyze search terms and keyword performance' },
+  { icon: 'FileText',     color: 'from-amber-500 to-yellow-600',    label: 'Daily KPI Report',      desc: "Get a snapshot of today's spend, conversions, CPA, and ROAS at a glance.",                                prompt: "Show today's KPI report" },
+  { icon: 'DollarSign',   color: 'from-cyan-500 to-blue-600',       label: 'Budget Optimization',   desc: 'Reallocate budget to top performers and cut waste from underperformers.',                                 prompt: 'Analyze my budget allocation and suggest optimizations' },
+  { icon: 'AlertTriangle',color: 'from-orange-500 to-amber-600',    label: 'Wasted Spend Alert',    desc: 'Surface keywords and placements that are spending without converting.',                                   prompt: 'Find wasted spend across my campaigns — placements and keywords with zero conversions' },
+  { icon: 'Zap',          color: 'from-yellow-400 to-orange-500',   label: 'Quick Wins',            desc: 'Get actionable recommendations you can implement right now for fast impact.',                              prompt: 'Give me quick wins I can implement today to improve ad performance' },
 ];
 
 // ── Cascading Account Picker ─────────────────────────────────────────────────
