@@ -16,8 +16,8 @@ const sse = (res, obj) => {
 // Response: SSE stream of agent events
 router.post('/', async (req, res) => {
   try {
-    const { message, sessionId: clientSessionId, adAccountId, token } = req.body;
-    console.log(`[chat] message="${message?.slice(0, 60)}" adAccountId=${adAccountId} session=${clientSessionId?.slice(0, 8)}`);
+    const { message, sessionId: clientSessionId, adAccountId, token, mode = 'Fast' } = req.body;
+    console.log(`[chat] message="${message?.slice(0, 60)}" adAccountId=${adAccountId} mode=${mode} session=${clientSessionId?.slice(0, 8)}`);
     console.log(`[chat] env check: GEMINI_API_KEY=${!!process.env.GEMINI_API_KEY} META_DEMO_TOKEN=${!!process.env.META_DEMO_TOKEN}`);
 
     if (!message) {
@@ -61,9 +61,13 @@ router.post('/', async (req, res) => {
     }
 
     // Build the user message in Gemini Content format
+    // Deep Research mode: prepend instruction to do thorough multi-step analysis
+    const deepPrefix = mode === 'Deep Research'
+      ? '[DEEP RESEARCH MODE] Analyze thoroughly: pull data from multiple tools, cross-reference metrics, compare time periods, check all related objects. Provide comprehensive breakdown with detailed tables and specific numbers. Do NOT summarize briefly — go deep.\n\n'
+      : '';
     const newMessage = {
       role: 'user',
-      parts: [{ text: message }],
+      parts: [{ text: deepPrefix + message }],
     };
 
     // Run the agent and stream events

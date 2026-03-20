@@ -136,6 +136,28 @@ function getAdVideos(_, c) {
   if (!adAccountId) return { error: 'No ad account selected.' };
   return meta.getAdVideos(token, adAccountId);
 }
+function uploadAdImage({ bytes, name }, c) {
+  const { token, adAccountId } = ctx(c);
+  if (!adAccountId) return { error: 'No ad account selected.' };
+  return meta.uploadAdImage(token, adAccountId, { bytes, name });
+}
+function uploadAdVideo({ file_url, title, description }, c) {
+  const { token, adAccountId } = ctx(c);
+  if (!adAccountId) return { error: 'No ad account selected.' };
+  const params = {};
+  if (file_url) params.file_url = file_url;
+  if (title) params.title = title;
+  if (description) params.description = description;
+  return meta.uploadAdVideo(token, adAccountId, params);
+}
+function deleteAdImage({ image_hash }, c) {
+  const { token, adAccountId } = ctx(c);
+  if (!adAccountId) return { error: 'No ad account selected.' };
+  return meta.deleteAdImage(token, adAccountId, image_hash);
+}
+function getAdVideoStatus({ video_id }, c) {
+  return meta.getAdVideoStatus(ctx(c).token, video_id);
+}
 
 // ─── Insights ───────────────────────────────────────────────────────────────
 function getAccountInsights({ date_preset = 'last_7d' }, c) {
@@ -189,6 +211,12 @@ function deleteCustomAudience({ audience_id }, c) {
 }
 function createLookalikeAudience(args, c) {
   return meta.createLookalikeAudience(ctx(c).token, ctx(c).adAccountId, args);
+}
+function addUsersToAudience({ audience_id, payload }, c) {
+  return meta.addUsersToAudience(ctx(c).token, audience_id, payload);
+}
+function removeUsersFromAudience({ audience_id, payload }, c) {
+  return meta.removeUsersFromAudience(ctx(c).token, audience_id, payload);
 }
 function getSavedAudiences(_, c) {
   const { token, adAccountId } = ctx(c);
@@ -259,6 +287,17 @@ function getPixels(_, c) {
 }
 function getPixelStats({ pixel_id }, c) {
   return meta.getPixelStats(ctx(c).token, pixel_id);
+}
+function createPixel({ name }, c) {
+  const { token, adAccountId } = ctx(c);
+  if (!adAccountId) return { error: 'No ad account selected.' };
+  return meta.createPixel(token, adAccountId, name);
+}
+function updatePixel({ pixel_id, ...updates }, c) {
+  return meta.updatePixel(ctx(c).token, pixel_id, updates);
+}
+function sendConversionEvent({ pixel_id, event_data }, c) {
+  return meta.sendConversionEvent(ctx(c).token, pixel_id, event_data);
 }
 function getCustomConversions(_, c) {
   const { token, adAccountId } = ctx(c);
@@ -379,6 +418,14 @@ const adTools = [
   // ── Assets ──────────────────────────────────────────────────────────────
   T('get_ad_images', 'List all ad images in the account.', getAdImages),
   T('get_ad_videos', 'List all ad videos in the account.', getAdVideos),
+  T('upload_ad_image', 'Upload an ad image (base64-encoded bytes).', uploadAdImage,
+    obj({ bytes: str('Base64-encoded image data'), name: str('Image name') }, ['bytes'])),
+  T('upload_ad_video', 'Upload an ad video from a URL.', uploadAdVideo,
+    obj({ file_url: str('URL of the video file'), title: str('Video title'), description: str('Video description') }, ['file_url'])),
+  T('delete_ad_image', 'Delete an ad image by hash.', deleteAdImage,
+    obj({ image_hash: str('Image hash to delete') }, ['image_hash'])),
+  T('get_ad_video_status', 'Check the upload/processing status of a video.', getAdVideoStatus,
+    obj({ video_id: str('Video ID') }, ['video_id'])),
 
   // ── Insights ────────────────────────────────────────────────────────────
   T('get_account_insights', 'Get account-level performance for a date range.', getAccountInsights,
@@ -395,14 +442,18 @@ const adTools = [
   T('get_custom_audiences', 'List all custom audiences.', getCustomAudiences),
   T('get_custom_audience', 'Get details of a single audience (size, status, etc).', getCustomAudience,
     obj({ audience_id: str('Audience ID') }, ['audience_id'])),
-  T('create_custom_audience', 'Create a new custom audience.', createCustomAudience,
-    obj({ name: str('Audience name'), description: str('Description'), subtype: str('WEBSITE, APP, ENGAGEMENT') }, ['name'])),
+  T('create_custom_audience', 'Create a new custom audience. Only needs name, subtype, and description. Do NOT ask about special_ad_categories — that is a CAMPAIGN-level field, not audience.', createCustomAudience,
+    obj({ name: str('Audience name'), description: str('Description'), subtype: str('WEBSITE, APP, ENGAGEMENT, VIDEO, IG_BUSINESS') }, ['name'])),
   T('update_custom_audience', 'Update an audience.', updateCustomAudience,
     obj({ audience_id: str('Audience ID'), name: str('New name'), description: str('New description') }, ['audience_id'])),
   T('delete_custom_audience', 'Delete an audience. CONFIRM first.', deleteCustomAudience,
     obj({ audience_id: str('Audience ID') }, ['audience_id'])),
   T('create_lookalike_audience', 'Create a lookalike audience from an existing source audience.', createLookalikeAudience,
     obj({ name: str('Audience name'), origin_audience_id: str('Source audience ID'), lookalike_spec: { type: 'object', description: '{ country: "US", ratio: 0.01-0.20 }' } }, ['name', 'origin_audience_id', 'lookalike_spec'])),
+  T('add_users_to_audience', 'Add users (email, phone, etc.) to a custom audience.', addUsersToAudience,
+    obj({ audience_id: str('Audience ID'), payload: { type: 'object', description: '{ schema: ["EMAIL"|"PHONE"|"FN"|"LN"], data: [["hash1"],["hash2"]] }' } }, ['audience_id', 'payload'])),
+  T('remove_users_from_audience', 'Remove users from a custom audience.', removeUsersFromAudience,
+    obj({ audience_id: str('Audience ID'), payload: { type: 'object', description: '{ schema: ["EMAIL"|"PHONE"], data: [["hash1"]] }' } }, ['audience_id', 'payload'])),
   T('get_saved_audiences', 'List saved audiences.', getSavedAudiences),
 
   // ── Targeting ───────────────────────────────────────────────────────────
@@ -442,6 +493,12 @@ const adTools = [
   T('get_pixels', 'List all tracking pixels.', getPixels),
   T('get_pixel_stats', 'Get pixel event statistics.', getPixelStats,
     obj({ pixel_id: str('Pixel ID') }, ['pixel_id'])),
+  T('create_pixel', 'Create a new tracking pixel. CONFIRM first.', createPixel,
+    obj({ name: str('Pixel name') }, ['name'])),
+  T('update_pixel', 'Update a pixel (name, etc).', updatePixel,
+    obj({ pixel_id: str('Pixel ID'), name: str('New name') }, ['pixel_id'])),
+  T('send_conversion_event', 'Send a server-side conversion event via Conversions API. Use for testing pixel events.', sendConversionEvent,
+    obj({ pixel_id: str('Pixel ID'), event_data: { type: 'object', description: '{ data: [{ event_name, event_time, user_data, custom_data }], test_event_code? }' } }, ['pixel_id', 'event_data'])),
   T('get_custom_conversions', 'List all custom conversions.', getCustomConversions),
   T('create_custom_conversion', 'Create a custom conversion event.', createCustomConversion,
     obj({ name: str('Conversion name'), pixel_id: str('Pixel ID'), custom_event_type: str('Event type'), rule: str('URL rule') }, ['name'])),
@@ -488,17 +545,18 @@ Every response starts with ONE bold sentence summarizing the finding:
 ## 2. Use tables for any multi-item data
 NEVER list campaigns, ad sets, or ads as paragraphs. ALWAYS use a markdown table:
 
-| Campaign | Status | Spend | ROAS | Impressions | Action |
-|---|---|---|---|---|---|
-| Summer Sale | ✅ Active | $450 | 3.2x | 45,200 | Scale budget |
-| Retargeting | ⚠️ Active | $280 | 0.8x | 12,100 | Pause or fix |
+| Campaign | Status | Spend | ROAS | Action |
+|---|---|---|---|---|
+| Summer Sale | ✅ Active | $450 | 3.2x | Scale budget |
+| Retargeting | ⚠️ Active | $280 | 0.8x | Pause or fix |
 
 Table rules:
-- Max 5-6 columns
+- Max 4-5 columns — keep tables narrow for readability
 - Always include a Status column with ✅ ⚠️ or ❌
 - Always include an Action column with your recommendation
 - Dollar amounts in dollars (API returns cents — divide by 100)
 - ROAS = action_values / spend
+- Truncate long names to ~25 chars with …
 
 ## 3. Keep text short
 - Max 2-3 sentences per paragraph
@@ -527,15 +585,64 @@ Then list what's good (✅) and what needs fixing (❌).
 
 ## 7. Confirmations for changes
 Before any write operation (pause, delete, update budget, create):
-- State exactly what you'll change
-- Show the expected impact
-- Ask "Should I proceed?" so the user can confirm or cancel
+- Show a summary of what you will change
+- End with exactly: **"Should I proceed?"**
+- The UI will show Confirm / Cancel buttons automatically
 
 ## 8. No account selected
 If no ad account is selected, say: "Select an ad account from the sidebar to get started."
 
-## 9. Expertise areas (reference when relevant)
-Meta auction mechanics, CBO vs ABO, bidding strategies, audience segmentation, lookalike scaling, creative fatigue signals, iOS attribution impacts, frequency capping, placement optimization.`;
+## 9. Expertise areas
+Meta auction mechanics, CBO vs ABO, bidding strategies, audience segmentation, lookalike scaling, creative fatigue signals, iOS attribution impacts, frequency capping, placement optimization.
+
+# CRITICAL RULES FOR SPECIFIC FLOWS
+
+## Audience Creation
+- \`special_ad_categories\` is a CAMPAIGN-level field. NEVER ask about it when creating audiences.
+- To create an audience, you only need: **name**, **subtype** (WEBSITE/APP/ENGAGEMENT/VIDEO/IG_BUSINESS), and optional **description**.
+- For video engagement audiences: use subtype "ENGAGEMENT" and set the rule to target video viewers (3s, 10s, ThruPlay).
+- Just ask the user for a name and what type of audience, then create it. Don't overthink it.
+
+## Video Engagement Audiences
+When user wants audiences based on video views:
+1. Use \`get_ad_videos\` to list their videos
+2. Create audience with subtype "ENGAGEMENT"
+3. Support these engagement types: video_watched (3s, 10s, 15s, 30s, 60s), video_completed, thruplay
+
+## Pixel & Events Setup
+- Use \`get_pixels\` to check existing pixels
+- Use \`create_pixel\` to create a new one
+- Use \`send_conversion_event\` to test events via Conversions API
+- Guide users through: pixel creation → event setup → test event → verify in Events Manager
+
+## Policy Issue Detection
+When you see Meta API errors mentioning "policy", "disapproved", "restricted", or ad review issues:
+1. Identify the specific policy violation
+2. Explain what policy was violated in plain language
+3. Suggest specific text/creative changes to fix it
+4. Offer to create a compliant version for approval
+
+Common policy issues: misleading claims, personal attributes, restricted content, discriminatory targeting, before/after images, excessive text in images.
+
+## Ad Creation Review Card
+When creating a new ad (campaign + ad set + ad + creative), before executing:
+Show a structured review:
+
+## 📋 Ad Creation Review
+| Setting | Value |
+|---|---|
+| Campaign | Name, Objective |
+| Ad Set | Name, Budget, Targeting |
+| Creative | Headline, Body, CTA, Image/Video |
+| Audience | Size estimate |
+| Schedule | Start/End dates |
+
+Then ask: **"Should I proceed with creating this ad?"**
+
+## Asset Upload
+- Images: user provides base64 data via \`upload_ad_image\`
+- Videos: user provides URL via \`upload_ad_video\`, then check status with \`get_ad_video_status\`
+- After upload, show the hash/ID so user can reference it in creatives`;
 
 // ── Create agent + runner ───────────────────────────────────────────────────
 

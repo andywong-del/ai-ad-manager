@@ -409,13 +409,34 @@ const ModeToggle = ({ mode, setMode }) => (
 );
 
 // ── Main component ────────────────────────────────────────────────────────────
-export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, suggestedActions = [] }) => {
+export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, suggestedActions = [], mode = 'Fast', onModeChange }) => {
   const [input, setInput] = useState('');
-  const [mode, setMode] = useState('Fast');
+  const setMode = onModeChange || (() => {});
   const endRef   = useRef(null);
   const inputRef = useRef(null);
+  const fileRef  = useRef(null);
   const lastId   = messages[messages.length - 1]?.id;
   const isEmptyState = messages.length <= 1;
+
+  const handleFileUpload = useCallback((e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const isImage = file.type.startsWith('image/');
+    const isVideo = file.type.startsWith('video/');
+    if (!isImage && !isVideo) { alert('Please select an image or video file.'); return; }
+
+    if (isImage) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = reader.result.split(',')[1];
+        onSend(`[Uploaded image: ${file.name}] Please upload this image to my ad account using the base64 data: ${base64.slice(0, 100)}...`);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      onSend(`[Uploaded video: ${file.name}] I'd like to upload a video to my ad account. The file is "${file.name}" (${(file.size / 1024 / 1024).toFixed(1)}MB). Please help me upload it — I'll need to provide a URL. What's the best way to proceed?`);
+    }
+    e.target.value = '';
+  }, [onSend]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -462,9 +483,10 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, sugges
               <div className="px-4 pb-3 flex items-center justify-between">
                 <ModeToggle mode={mode} setMode={setMode} />
                 <div className="flex items-center gap-2">
-                  <button className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-300 hover:bg-[#1a2236] transition-colors">
+                  <button onClick={() => fileRef.current?.click()} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-300 hover:bg-[#1a2236] transition-colors">
                     <Paperclip size={16} />
                   </button>
+                  <input ref={fileRef} type="file" accept="image/*,video/*" className="hidden" onChange={handleFileUpload} />
                   <button
                     onClick={() => handleSend()}
                     disabled={!input.trim() || isTyping}
@@ -526,7 +548,7 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, sugges
                   <div className="px-4 pb-2.5 flex items-center justify-between">
                     <ModeToggle mode={mode} setMode={setMode} />
                     <div className="flex items-center gap-2">
-                      <button className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-300 hover:bg-[#1a2236] transition-colors">
+                      <button onClick={() => fileRef.current?.click()} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-300 hover:bg-[#1a2236] transition-colors">
                         <Paperclip size={16} />
                       </button>
                       <button

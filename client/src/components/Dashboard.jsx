@@ -190,7 +190,8 @@ export const Dashboard = ({
 }) => {
   const [activeNav, setActiveNav] = useState('chat');
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const { messages, isTyping, thinkingText, sendMessage, resetChat, notification } = useChatAgent({ token, adAccountId, accountName: selectedAccount?.name });
+  const [chatMode, setChatMode] = useState('Fast');
+  const { messages, isTyping, thinkingText, sendMessage, resetChat, notification } = useChatAgent({ token, adAccountId, accountName: selectedAccount?.name, mode: chatMode });
 
   const handleSend = useCallback((text) => {
     setActiveNav('chat');
@@ -294,6 +295,8 @@ export const Dashboard = ({
           thinkingText={thinkingText}
           onSend={handleSend}
           suggestedActions={SUGGESTED_ACTIONS}
+          mode={chatMode}
+          onModeChange={setChatMode}
         />
       </main>
 

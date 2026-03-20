@@ -11,7 +11,7 @@ const getWelcomeMessage = (accountName) => ({
   timestamp: Date.now(),
 });
 
-export const useChatAgent = ({ token, adAccountId, accountName }) => {
+export const useChatAgent = ({ token, adAccountId, accountName, mode = 'Fast' }) => {
   const [messages, setMessages] = useState([getWelcomeMessage(accountName)]);
   const [isTyping, setIsTyping] = useState(false);
   const [thinkingText, setThinkingText] = useState('');
@@ -61,6 +61,7 @@ export const useChatAgent = ({ token, adAccountId, accountName }) => {
           sessionId: sessionIdRef.current,
           adAccountId,
           token,
+          mode,
         }),
         signal: controller.signal,
       });
@@ -125,11 +126,15 @@ export const useChatAgent = ({ token, adAccountId, accountName }) => {
         ]);
       } else {
         // Detect confirmation prompts in the last portion of the response
-        const tail = fullText.slice(-300);
+        const tail = fullText.slice(-500);
         const confirmPatterns = [
           /should I proceed/i, /shall I go ahead/i, /do you want me to/i,
           /would you like me to/i, /confirm.*\?/i, /ready to (apply|execute|proceed|make)/i,
-          /want me to (pause|activate|delete|update|change|create|remove)/i,
+          /want me to (pause|activate|delete|update|change|create|remove|upload|send)/i,
+          /proceed with (creating|updating|deleting|pausing|activating)/i,
+          /go ahead (and|with)/i, /approve this/i, /confirm (this|the|these)/i,
+          /like to (proceed|continue|go ahead|confirm)/i,
+          /\*\*"?Should I proceed\??"?\*\*/i,
         ];
         if (confirmPatterns.some(p => p.test(tail))) {
           const actions = [
@@ -153,7 +158,7 @@ export const useChatAgent = ({ token, adAccountId, accountName }) => {
       setThinkingText('');
       abortRef.current = null;
     }
-  }, [token, adAccountId, isTyping]);
+  }, [token, adAccountId, isTyping, mode]);
 
   return { messages, isTyping, thinkingText, sendMessage, resetChat, notification };
 };
