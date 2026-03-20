@@ -438,7 +438,9 @@ export const createCustomAudience = async (token, adAccountId, params) => {
   const apiParams = {
     access_token: token,
     name: params.name,
-    subtype,
+    // NOTE: v19.0 does NOT support "subtype" param for WEBSITE/ENGAGEMENT.
+    // Meta infers the type from the rule's event_sources.
+    // Only CUSTOM and LOOKALIKE need subtype.
   };
   if (params.description) apiParams.description = params.description;
 
@@ -453,54 +455,64 @@ export const createCustomAudience = async (token, adAccountId, params) => {
     if (rawRule && typeof rawRule === 'object' && rawRule.inclusions) {
       rule = rawRule;
     } else if (rawRule && typeof rawRule === 'string' && rawRule.includes('event_sources')) {
-      rule = rawRule; // already correct format as string
+      rule = rawRule;
     } else {
-      // Build proper v19+ rule format from simple params
-      // Default: all website visitors from this pixel
-      const filters = [];
-      if (rawRule && typeof rawRule === 'object' && rawRule.url) {
-        // Simple {url: {i_contains: "..."}} → convert to filter
-        const urlVal = rawRule.url.i_contains || rawRule.url.eq || '';
-        if (urlVal) {
-          filters.push({ field: 'url', operator: rawRule.url.eq ? 'eq' : 'i_contains', value: urlVal });
-        }
-      }
+      // Build v19+ rule: always include a URL filter (empty = all visitors)
+      const urlValue = (rawRule && typeof rawRule === 'object' && rawRule.url)
+        ? (rawRule.url.i_contains || rawRule.url.eq || '')
+        : '';
+      const urlOperator = (rawRule?.url?.eq) ? 'eq' : 'i_contains';
+
       rule = {
         inclusions: {
           operator: 'or',
           rules: [{
             event_sources: [{ id: pixelId, type: 'pixel' }],
             retention_seconds: retentionSec,
-            ...(filters.length > 0 && { filter: { operator: 'and', filters } }),
+            filter: {
+              operator: 'and',
+              filters: [{ field: 'url', operator: urlOperator, value: urlValue }]
+            },
           }]
         }
       };
     }
     apiParams.rule = typeof rule === 'string' ? rule : JSON.stringify(rule);
     apiParams.prefill = 1;
+    // Do NOT send subtype for WEBSITE — v19 rejects it
   }
 
   // ── ENGAGEMENT audience (video, IG, page, etc.) ────────────────────
-  if (subtype === 'ENGAGEMENT') {
+  else if (subtype === 'ENGAGEMENT') {
+    // Engagement also uses rule with event_sources — no subtype param
     if (params.rule) {
       apiParams.rule = typeof params.rule === 'string' ? params.rule : JSON.stringify(params.rule);
     }
     if (params.inclusions) {
-      // inclusions goes inside rule for engagement audiences too
       const inclusions = typeof params.inclusions === 'string' ? params.inclusions : JSON.stringify(params.inclusions);
       if (!apiParams.rule) apiParams.rule = inclusions;
     }
     apiParams.prefill = 1;
+    // Do NOT send subtype for ENGAGEMENT — v19 rejects it
   }
 
-  // ── CUSTOM audience (customer list) ────────────────────────────────
-  if (subtype === 'CUSTOM') {
+  // ── CUSTOM audience (customer list) — subtype IS required ──────────
+  else if (subtype === 'CUSTOM') {
+    apiParams.subtype = 'CUSTOM';
     apiParams.customer_file_source = params.customer_file_source || 'USER_PROVIDED_ONLY';
   }
 
-  // ── LOOKALIKE params ───────────────────────────────────────────────
-  if (params.origin_audience_id) apiParams.origin_audience_id = params.origin_audience_id;
-  if (params.lookalike_spec) apiParams.lookalike_spec = typeof params.lookalike_spec === 'string' ? params.lookalike_spec : JSON.stringify(params.lookalike_spec);
+  // ── LOOKALIKE — subtype IS required ────────────────────────────────
+  else if (subtype === 'LOOKALIKE') {
+    apiParams.subtype = 'LOOKALIKE';
+    if (params.origin_audience_id) apiParams.origin_audience_id = params.origin_audience_id;
+    if (params.lookalike_spec) apiParams.lookalike_spec = typeof params.lookalike_spec === 'string' ? params.lookalike_spec : JSON.stringify(params.lookalike_spec);
+  }
+
+  // Fallback: pass subtype for any other type
+  else {
+    apiParams.subtype = subtype;
+  }
 
   // Log what we're sending to Meta for debugging
   const debugParams = { ...apiParams };
