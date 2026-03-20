@@ -17,6 +17,7 @@ import conversionsRouter from './api/conversions.js';
 import leadsRouter from './api/leads.js';
 import catalogsRouter from './api/catalogs.js';
 import previewsRouter from './api/previews.js';
+import chatRouter from './api/chat.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -41,6 +42,7 @@ app.use('/api/conversions', conversionsRouter);
 app.use('/api/leads', leadsRouter);
 app.use('/api/catalogs', catalogsRouter);
 app.use('/api/previews', previewsRouter);
+app.use('/api/chat', chatRouter);
 
 app.use((err, _req, res, _next) => {
   console.error('EXPRESS ERROR:', err?.message, err?.stack);
