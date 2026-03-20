@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { Bot, LayoutDashboard, MessageSquare, BarChart3, CreditCard, Settings, LogOut, ChevronLeft, ChevronDown, Check, ArrowLeftRight, Building2 } from 'lucide-react';
+import { Bot, LayoutDashboard, MessageSquare, BarChart3, CreditCard, Settings, LogOut, ChevronLeft, ChevronRight, ChevronDown, Check, Building2 } from 'lucide-react';
 import { useChatAgent } from '../hooks/useChatAgent.js';
 import { useAdAccounts } from '../hooks/useAdAccounts.js';
 import { useBusinesses } from '../hooks/useBusinesses.js';
@@ -21,71 +21,14 @@ const SUGGESTED_ACTIONS = [
   { label: 'Daily KPI Report',            prompt: "Show today's KPI report" },
 ];
 
-// ── Business Selector Dropdown ────────────────────────────────────────────────
-const BusinessPicker = ({ selectedBusiness, onSelectBusiness }) => {
+// ── Cascading Account Picker ─────────────────────────────────────────────────
+const CascadingAccountPicker = ({ selectedAccount, selectedBusiness, onSelect }) => {
   const [open, setOpen] = useState(false);
+  const [level, setLevel] = useState('business'); // 'business' | 'accounts'
+  const [activeBiz, setActiveBiz] = useState(null);
   const ref = useRef(null);
-  const { businesses, isLoading } = useBusinesses();
-
-  useEffect(() => {
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        onClick={() => setOpen(!open)}
-        className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl bg-[#1a2236] border transition-colors text-left
-          ${selectedBusiness ? 'border-[#1e293b] hover:border-slate-600' : 'border-blue-500/50 hover:border-blue-400'}`}
-      >
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shrink-0">
-          <Building2 size={14} className="text-white" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-white truncate">{selectedBusiness?.name || 'Select Business'}</p>
-          <p className="text-[11px] text-slate-500 truncate">{selectedBusiness ? 'Business Portfolio' : 'Choose a portfolio'}</p>
-        </div>
-        <ChevronDown size={14} className={`text-slate-500 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
-
-      {open && (
-        <div className="absolute bottom-full left-0 right-0 mb-2 bg-[#1a2236] border border-[#1e293b] rounded-xl shadow-xl z-50 overflow-hidden max-h-72 overflow-y-auto">
-          {isLoading ? (
-            <div className="px-3 py-4 text-center text-xs text-slate-500">Loading businesses...</div>
-          ) : businesses.length === 0 ? (
-            <div className="px-3 py-4 text-center text-xs text-slate-500">No businesses found</div>
-          ) : businesses.map((biz) => {
-            const isActive = biz.id === selectedBusiness?.id;
-            return (
-              <button
-                key={biz.id}
-                onClick={() => { onSelectBusiness(biz); setOpen(false); }}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors
-                  ${isActive ? 'bg-blue-900/20' : 'hover:bg-[#232d42]'}`}
-              >
-                <div className="w-7 h-7 rounded-md bg-[#141b2d] flex items-center justify-center shrink-0">
-                  <Building2 size={12} className="text-slate-300" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className={`text-xs font-medium truncate ${isActive ? 'text-blue-400' : 'text-slate-300'}`}>{biz.name}</p>
-                </div>
-                {isActive && <Check size={14} className="text-blue-400 shrink-0" />}
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ── Account Switcher Dropdown ─────────────────────────────────────────────────
-const AccountSwitcher = ({ selectedAccount, selectedBusiness, onSwitchAccount, onSwitchBusiness }) => {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-  const { adAccounts, isLoading } = useAdAccounts(selectedBusiness?.id);
+  const { businesses, isLoading: bizLoading } = useBusinesses();
+  const { adAccounts, isLoading: accLoading } = useAdAccounts(level === 'accounts' ? activeBiz?.id : null);
   const accounts = Array.isArray(adAccounts) ? adAccounts : [];
 
   // Close on outside click
@@ -95,70 +38,137 @@ const AccountSwitcher = ({ selectedAccount, selectedBusiness, onSwitchAccount, o
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  // Reset to business level when opening
+  const toggle = () => {
+    if (!open) {
+      setLevel(selectedBusiness ? 'accounts' : 'business');
+      setActiveBiz(selectedBusiness || null);
+    }
+    setOpen(!open);
+  };
+
+  const handleBizClick = (biz) => {
+    setActiveBiz(biz);
+    setLevel('accounts');
+  };
+
+  const handleAccClick = (account) => {
+    onSelect(activeBiz, account);
+    setOpen(false);
+  };
+
+  const hasSelection = selectedBusiness && selectedAccount;
+
   return (
     <div className="relative" ref={ref}>
+      {/* Trigger Button */}
       <button
-        onClick={() => setOpen(!open)}
-        className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl bg-[#1a2236] border transition-colors text-left
-          ${selectedAccount ? 'border-[#1e293b] hover:border-slate-600' : 'border-blue-500/50 hover:border-blue-400'}`}
+        onClick={toggle}
+        className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl bg-[#1a2236] border transition-all text-left
+          ${hasSelection ? 'border-[#1e293b] hover:border-slate-600' : 'border-blue-500/40 hover:border-blue-400 animate-pulse-subtle'}`}
       >
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shrink-0">
-          <span className="text-white text-xs font-bold">
-            {selectedAccount?.name?.[0]?.toUpperCase() || 'A'}
-          </span>
+        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shrink-0">
+          {selectedAccount
+            ? <span className="text-white text-sm font-bold">{selectedAccount.name?.[0]?.toUpperCase() || 'A'}</span>
+            : <Building2 size={16} className="text-white" />
+          }
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-white truncate">{selectedAccount?.name || 'Select Ad Account'}</p>
-          <p className="text-[11px] text-slate-500 font-mono truncate">
-            {selectedAccount?.account_id ? `act_${selectedAccount.account_id}` : selectedAccount?.id || 'Choose an account'}
-          </p>
+          {hasSelection ? (
+            <>
+              <p className="text-sm font-medium text-white truncate">{selectedAccount.name}</p>
+              <p className="text-[11px] text-slate-500 truncate">{selectedBusiness.name} · <span className="font-mono">act_{selectedAccount.account_id}</span></p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-medium text-slate-300">Select Account</p>
+              <p className="text-[11px] text-slate-500">Choose a business & ad account</p>
+            </>
+          )}
         </div>
         <ChevronDown size={14} className={`text-slate-500 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
+      {/* Dropdown */}
       {open && (
-        <div className="absolute bottom-full left-0 right-0 mb-2 bg-[#1a2236] border border-[#1e293b] rounded-xl shadow-xl z-50 overflow-hidden max-h-72 overflow-y-auto">
-          {/* Account list */}
-          {isLoading ? (
-            <div className="px-3 py-4 text-center text-xs text-slate-500">Loading accounts...</div>
-          ) : accounts.length === 0 ? (
-            <div className="px-3 py-4 text-center text-xs text-slate-500">
-              {selectedBusiness ? 'No accounts found' : 'Select a business first'}
-            </div>
-          ) : accounts.map((account) => {
-            const isActive = account.id === selectedAccount?.id;
-            return (
-              <button
-                key={account.id}
-                onClick={() => {
-                  if (!isActive) onSwitchAccount(account);
-                  setOpen(false);
-                }}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors
-                  ${isActive ? 'bg-blue-900/20' : 'hover:bg-[#232d42]'}`}
-              >
-                <div className="w-7 h-7 rounded-md bg-[#141b2d] flex items-center justify-center shrink-0">
-                  <span className="text-slate-300 text-[10px] font-bold">{account.name?.[0]?.toUpperCase()}</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className={`text-xs font-medium truncate ${isActive ? 'text-blue-400' : 'text-slate-300'}`}>{account.name}</p>
-                  <p className="text-[10px] text-slate-500 font-mono truncate">act_{account.account_id}</p>
-                </div>
-                {isActive && <Check size={14} className="text-blue-400 shrink-0" />}
-              </button>
-            );
-          })}
+        <div className="absolute bottom-full left-0 right-0 mb-2 bg-[#1a2236] border border-[#1e293b] rounded-xl shadow-2xl z-50 overflow-hidden">
 
-          {/* Switch business */}
-          <div className="border-t border-[#1e293b]">
-            <button
-              onClick={() => { setOpen(false); onSwitchBusiness(); }}
-              className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-[#232d42] transition-colors"
-            >
-              <ArrowLeftRight size={14} className="text-slate-400" />
-              <span className="text-xs text-slate-400">Switch Business Portfolio</span>
-            </button>
-          </div>
+          {/* Level: Business list */}
+          {level === 'business' && (
+            <>
+              <div className="px-3 py-2.5 border-b border-[#1e293b]">
+                <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Select Business Portfolio</p>
+              </div>
+              <div className="max-h-64 overflow-y-auto">
+                {bizLoading ? (
+                  <div className="px-3 py-6 text-center text-xs text-slate-500">Loading businesses...</div>
+                ) : businesses.length === 0 ? (
+                  <div className="px-3 py-6 text-center text-xs text-slate-500">No businesses found</div>
+                ) : businesses.map((biz) => {
+                  const isActive = biz.id === selectedBusiness?.id;
+                  return (
+                    <button
+                      key={biz.id}
+                      onClick={() => handleBizClick(biz)}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors
+                        ${isActive ? 'bg-blue-900/20' : 'hover:bg-[#232d42]'}`}
+                    >
+                      <div className="w-7 h-7 rounded-md bg-gradient-to-br from-emerald-600/20 to-teal-600/20 border border-emerald-800/30 flex items-center justify-center shrink-0">
+                        <Building2 size={12} className="text-emerald-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-xs font-medium truncate ${isActive ? 'text-blue-400' : 'text-slate-300'}`}>{biz.name}</p>
+                      </div>
+                      <ChevronRight size={14} className="text-slate-600 shrink-0" />
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {/* Level: Ad accounts for selected business */}
+          {level === 'accounts' && (
+            <>
+              <button
+                onClick={() => setLevel('business')}
+                className="w-full flex items-center gap-2 px-3 py-2.5 border-b border-[#1e293b] hover:bg-[#232d42] transition-colors"
+              >
+                <ChevronLeft size={14} className="text-slate-400" />
+                <Building2 size={12} className="text-emerald-400" />
+                <span className="text-xs font-medium text-slate-400 truncate">{activeBiz?.name}</span>
+              </button>
+              <div className="px-3 py-2 border-b border-[#1e293b]">
+                <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Ad Accounts</p>
+              </div>
+              <div className="max-h-56 overflow-y-auto">
+                {accLoading ? (
+                  <div className="px-3 py-6 text-center text-xs text-slate-500">Loading accounts...</div>
+                ) : accounts.length === 0 ? (
+                  <div className="px-3 py-6 text-center text-xs text-slate-500">No ad accounts found</div>
+                ) : accounts.map((account) => {
+                  const isActive = account.id === selectedAccount?.id;
+                  return (
+                    <button
+                      key={account.id}
+                      onClick={() => handleAccClick(account)}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors
+                        ${isActive ? 'bg-blue-900/20' : 'hover:bg-[#232d42]'}`}
+                    >
+                      <div className="w-7 h-7 rounded-md bg-[#141b2d] flex items-center justify-center shrink-0">
+                        <span className="text-slate-300 text-[10px] font-bold">{account.name?.[0]?.toUpperCase()}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-xs font-medium truncate ${isActive ? 'text-blue-400' : 'text-slate-300'}`}>{account.name}</p>
+                        <p className="text-[10px] text-slate-500 font-mono truncate">act_{account.account_id}</p>
+                      </div>
+                      {isActive && <Check size={14} className="text-blue-400 shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -184,11 +194,12 @@ export const Dashboard = ({
     sendMessage(text);
   }, [sendMessage]);
 
-  // Reset chat when account changes
-  const handleSwitchAccount = useCallback((account) => {
+  // Cascading picker fires both business + account selection
+  const handleAccountSelect = useCallback((business, account) => {
     resetChat();
+    onSwitchBusiness(business);
     onSwitchAccount(account);
-  }, [resetChat, onSwitchAccount]);
+  }, [resetChat, onSwitchBusiness, onSwitchAccount]);
 
   return (
     <div className="flex h-screen bg-[#0f1623]">
@@ -230,24 +241,14 @@ export const Dashboard = ({
           ))}
         </nav>
 
-        {/* Business & Account Selectors */}
-        <div className="px-3 mb-4 space-y-3">
-          <div>
-            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-3 mb-2">Business</p>
-            <BusinessPicker
-              selectedBusiness={selectedBusiness}
-              onSelectBusiness={(biz) => onSwitchBusiness(biz)}
-            />
-          </div>
-          <div>
-            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-3 mb-2">Ad Account</p>
-            <AccountSwitcher
-              selectedAccount={selectedAccount}
-              selectedBusiness={selectedBusiness}
-              onSwitchAccount={handleSwitchAccount}
-              onSwitchBusiness={onSwitchBusiness}
-            />
-          </div>
+        {/* Combined Account Picker */}
+        <div className="px-3 mb-4">
+          <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-3 mb-2">Account</p>
+          <CascadingAccountPicker
+            selectedAccount={selectedAccount}
+            selectedBusiness={selectedBusiness}
+            onSelect={handleAccountSelect}
+          />
         </div>
 
         {/* User Profile */}

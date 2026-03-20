@@ -123,6 +123,23 @@ export const useChatAgent = ({ token, adAccountId, accountName }) => {
           ...prev,
           { id: agentMsgId, role: 'agent', text: "I couldn't generate a response. Please try again.", timestamp: Date.now() },
         ]);
+      } else {
+        // Detect confirmation prompts in the last portion of the response
+        const tail = fullText.slice(-300);
+        const confirmPatterns = [
+          /should I proceed/i, /shall I go ahead/i, /do you want me to/i,
+          /would you like me to/i, /confirm.*\?/i, /ready to (apply|execute|proceed|make)/i,
+          /want me to (pause|activate|delete|update|change|create|remove)/i,
+        ];
+        if (confirmPatterns.some(p => p.test(tail))) {
+          const actions = [
+            { label: 'Confirm', value: 'Yes, proceed with the changes', variant: 'confirm' },
+            { label: 'Cancel',  value: 'No, cancel — do not make any changes', variant: 'danger' },
+          ];
+          setMessages((prev) => prev.map((m) =>
+            m.id === agentMsgId ? { ...m, actions } : m
+          ));
+        }
       }
     } catch (err) {
       if (err.name === 'AbortError') return;

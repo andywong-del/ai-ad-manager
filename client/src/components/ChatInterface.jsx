@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Bot, Send, Paperclip } from 'lucide-react';
+import { Bot, Send, Paperclip, CheckCircle2, XCircle } from 'lucide-react';
 
 // ── Typing indicator ──────────────────────────────────────────────────────────
 const TypingIndicator = ({ thinkingText }) => (
@@ -18,18 +18,132 @@ const TypingIndicator = ({ thinkingText }) => (
   </div>
 );
 
-// ── Inline markdown: **bold** and `code` ─────────────────────────────────────
-const renderText = (text) =>
+// ── Markdown table parser ────────────────────────────────────────────────────
+const isTableRow = (line) => line.trim().startsWith('|') && line.trim().endsWith('|');
+const isSeparator = (line) => /^\|[\s\-:|]+\|$/.test(line.trim());
+const isNumeric = (s) => /^[\s$\-]?[\d,]+\.?\d*[%x]?\s*$/.test(s.trim());
+
+const parseMarkdownTable = (text) => {
+  const lines = text.split('\n');
+  const segments = [];
+  let textBuf = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    // Look for table: header row + separator row
+    if (isTableRow(lines[i]) && i + 1 < lines.length && isSeparator(lines[i + 1])) {
+      // Flush text buffer
+      if (textBuf.length) { segments.push({ type: 'text', content: textBuf.join('\n') }); textBuf = []; }
+
+      const parseCells = (line) => line.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+      const columns = parseCells(lines[i]);
+      i += 2; // skip header + separator
+      const rows = [];
+      while (i < lines.length && isTableRow(lines[i]) && !isSeparator(lines[i])) {
+        const cells = parseCells(lines[i]);
+        // Pad or trim to match column count
+        while (cells.length < columns.length) cells.push('');
+        rows.push(cells.slice(0, columns.length));
+        i++;
+      }
+      segments.push({ type: 'table', columns, rows });
+    } else {
+      textBuf.push(lines[i]);
+      i++;
+    }
+  }
+  if (textBuf.length) segments.push({ type: 'text', content: textBuf.join('\n') });
+  return segments;
+};
+
+// ── Styled table (Ads Manager style) ─────────────────────────────────────────
+const StyledTable = ({ columns, rows }) => (
+  <div className="my-3 overflow-x-auto rounded-xl border border-[#1e293b]">
+    <table className="w-full text-xs border-collapse">
+      <thead>
+        <tr className="bg-[#1a2236] border-b border-[#1e293b]">
+          {columns.map((col, ci) => (
+            <th key={ci} className="px-4 py-2.5 text-left font-semibold text-slate-400 whitespace-nowrap text-[11px] uppercase tracking-wide">{col}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row, ri) => (
+          <tr key={ri} className={`border-b border-[#1e293b] last:border-0 ${ri % 2 === 0 ? 'bg-[#141b2d]' : 'bg-[#161d2f]'} hover:bg-[#1a2540] transition-colors`}>
+            {row.map((cell, ci) => (
+              <td key={ci} className={`px-4 py-2.5 whitespace-nowrap ${isNumeric(cell) ? 'text-right text-slate-200 font-medium tabular-nums' : 'text-left text-slate-300'}`}>{cell}</td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+);
+
+// ── Rich text renderer ───────────────────────────────────────────────────────
+const renderInline = (text) =>
   text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).map((part, i) => {
-    if (part.startsWith('**')) return <strong key={i}>{part.slice(2, -2)}</strong>;
-    if (part.startsWith('`'))  return <code key={i} className="bg-[#1e293b] text-slate-300 px-1 py-0.5 rounded text-xs font-mono">{part.slice(1, -1)}</code>;
+    if (part.startsWith('**')) return <strong key={i} className="text-white font-semibold">{part.slice(2, -2)}</strong>;
+    if (part.startsWith('`'))  return <code key={i} className="bg-[#1e293b] text-blue-300 px-1.5 py-0.5 rounded text-xs font-mono">{part.slice(1, -1)}</code>;
     return <span key={i}>{part}</span>;
   });
+
+const renderRichText = (text) => {
+  const lines = text.split('\n');
+  const elements = [];
+  let listBuf = [];
+  let listType = null;
+
+  const flushList = () => {
+    if (!listBuf.length) return;
+    const Tag = listType === 'ol' ? 'ol' : 'ul';
+    const cls = listType === 'ol'
+      ? 'list-decimal list-inside space-y-1 my-1.5 ml-1 text-slate-300'
+      : 'list-disc list-inside space-y-1 my-1.5 ml-1 text-slate-300';
+    elements.push(<Tag key={`list-${elements.length}`} className={cls}>{listBuf.map((item, i) => <li key={i}>{renderInline(item)}</li>)}</Tag>);
+    listBuf = [];
+    listType = null;
+  };
+
+  for (const line of lines) {
+    // Headings
+    if (line.startsWith('### ')) { flushList(); elements.push(<p key={elements.length} className="text-sm font-bold text-white mt-3 mb-1">{renderInline(line.slice(4))}</p>); continue; }
+    if (line.startsWith('## '))  { flushList(); elements.push(<p key={elements.length} className="text-base font-bold text-white mt-3 mb-1">{renderInline(line.slice(3))}</p>); continue; }
+
+    // Bullet lists
+    const bullet = line.match(/^[\-\*]\s+(.*)/);
+    if (bullet) {
+      if (listType && listType !== 'ul') flushList();
+      listType = 'ul';
+      listBuf.push(bullet[1]);
+      continue;
+    }
+
+    // Numbered lists
+    const numbered = line.match(/^\d+\.\s+(.*)/);
+    if (numbered) {
+      if (listType && listType !== 'ol') flushList();
+      listType = 'ol';
+      listBuf.push(numbered[1]);
+      continue;
+    }
+
+    flushList();
+
+    // Empty line = paragraph break
+    if (!line.trim()) { elements.push(<div key={elements.length} className="h-2" />); continue; }
+
+    // Regular text
+    elements.push(<p key={elements.length}>{renderInline(line)}</p>);
+  }
+  flushList();
+  return elements;
+};
 
 const fmtTime = (date) =>
   new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit' }).format(new Date(date));
 
-// ── Quick reply chips ────────────────────────────────────────────────────────
+// ── Quick reply / Confirm-Reject chips ───────────────────────────────────────
 const QuickReplies = ({ actions, onSend, disabled }) => (
   <div className="flex justify-end flex-wrap gap-2 mt-3 mb-1 pr-1">
     {actions.map(({ label, value, variant = 'default' }) => (
@@ -37,11 +151,13 @@ const QuickReplies = ({ actions, onSend, disabled }) => (
         key={value}
         onClick={() => onSend(value)}
         disabled={disabled}
-        className={`px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all disabled:opacity-40 disabled:cursor-not-allowed
-          ${variant === 'confirm' ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-600 shadow-sm' :
-            variant === 'danger'  ? 'bg-[#1a2236] hover:bg-red-900/30 text-red-400 border-red-800' :
+        className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold border transition-all disabled:opacity-40 disabled:cursor-not-allowed
+          ${variant === 'confirm' ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-900/30' :
+            variant === 'danger'  ? 'bg-red-600/80 hover:bg-red-500 text-white border-red-500 shadow-md shadow-red-900/30' :
             'bg-[#1a2236] hover:bg-blue-900/30 text-blue-400 border-blue-800 shadow-sm'}`}
       >
+        {variant === 'confirm' && <CheckCircle2 size={14} />}
+        {variant === 'danger' && <XCircle size={14} />}
         {label}
       </button>
     ))}
@@ -80,8 +196,6 @@ const ReportMessage = ({ message, timestamp }) => {
       </div>
       <div className="flex-1 min-w-0">
         <div className="bg-[#141b2d] border border-[#1e293b] rounded-2xl rounded-bl-sm overflow-hidden">
-
-          {/* Report header */}
           <div className="bg-[#1a2236] border-b border-[#1e293b] px-4 py-3 flex items-center justify-between">
             <div>
               <p className="text-sm font-bold text-white">Campaign Performance Report</p>
@@ -89,16 +203,12 @@ const ReportMessage = ({ message, timestamp }) => {
             </div>
             <span className="text-xs bg-blue-900/40 text-blue-400 border border-blue-800 px-2 py-0.5 rounded font-medium">Meta Ads API</span>
           </div>
-
-          {/* Summary cards */}
           <div className="px-3 py-3 flex gap-2 border-b border-[#1e293b]">
             <SummaryCard label="Total Spend"   value={fmtUSD(totSpend)}   sub="Last 7 days" />
             <SummaryCard label="Impressions"   value={fmtNum(totImp)}     sub="Last 7 days" />
             <SummaryCard label="Clicks"        value={fmtNum(totClicks)}  sub="Last 7 days" />
             <SummaryCard label="Avg ROAS"      value={avgRoas > 0 ? `${avgRoas.toFixed(1)}x` : '—'} sub="Across campaigns" />
           </div>
-
-          {/* Campaign table */}
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
@@ -123,7 +233,7 @@ const ReportMessage = ({ message, timestamp }) => {
                     <td className="px-3 py-2.5">
                       {c.status === 'ACTIVE'
                         ? <span className="inline-flex items-center gap-1 bg-emerald-900/30 text-emerald-400 border border-emerald-800 px-1.5 py-0.5 rounded-full font-medium text-[10px]"><span className="w-1.5 h-1.5 bg-emerald-400 rounded-full" />Active</span>
-                        : <span className="inline-flex items-center gap-1 bg-slate-800 text-slate-400 border border-slate-700 px-1.5 py-0.5 rounded-full font-medium text-[10px]">⏸ Paused</span>
+                        : <span className="inline-flex items-center gap-1 bg-slate-800 text-slate-400 border border-slate-700 px-1.5 py-0.5 rounded-full font-medium text-[10px]">Paused</span>
                       }
                     </td>
                     <td className="px-3 py-2.5 text-right text-slate-400">${(c.daily_budget / 100).toFixed(0)}/day</td>
@@ -139,8 +249,6 @@ const ReportMessage = ({ message, timestamp }) => {
               </tbody>
             </table>
           </div>
-
-          {/* API source footer */}
           <div className="px-4 py-2.5 border-t border-[#1e293b] bg-[#141b2d] flex items-center gap-1.5">
             <span className="text-slate-500">📡</span>
             <code className="text-[10px] text-slate-500 font-mono">GET /{adAccountId}/insights</code>
@@ -154,7 +262,7 @@ const ReportMessage = ({ message, timestamp }) => {
   );
 };
 
-// ── Table renderer ────────────────────────────────────────────────────────────
+// ── Table renderer (structured) ──────────────────────────────────────────────
 const TableMessage = ({ message }) => (
   <div className="flex items-end gap-3 mb-2">
     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shrink-0 mb-0.5">
@@ -182,7 +290,7 @@ const TableMessage = ({ message }) => (
         </table>
         {message.summary && (
           <div className="px-4 py-2.5 border-t border-[#1e293b] text-xs text-slate-400 italic">
-            {renderText(message.summary)}
+            {renderInline(message.summary)}
           </div>
         )}
       </div>
@@ -216,15 +324,23 @@ const MessageBubble = ({ message, isLatest, onSend, isTyping }) => {
 
   const isAgent = message.role === 'agent';
   if (isAgent) {
+    // Check if message contains markdown tables
+    const segments = parseMarkdownTable(message.text);
+    const hasTables = segments.some(s => s.type === 'table');
+
     return (
       <>
         <div className="flex items-end gap-3 mb-2">
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shrink-0 mb-0.5">
             <Bot size={15} className="text-white" />
           </div>
-          <div className="max-w-[80%]">
-            <div className="bg-[#1a2236] border border-[#1e293b] text-slate-200 rounded-2xl rounded-bl-sm px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap">
-              {renderText(message.text)}
+          <div className={hasTables ? 'max-w-[95%] flex-1 min-w-0' : 'max-w-[80%]'}>
+            <div className="bg-[#1a2236] border border-[#1e293b] text-slate-200 rounded-2xl rounded-bl-sm px-4 py-3 text-sm leading-relaxed">
+              {segments.map((seg, i) =>
+                seg.type === 'table'
+                  ? <StyledTable key={i} columns={seg.columns} rows={seg.rows} />
+                  : <div key={i} className="whitespace-pre-wrap">{renderRichText(seg.content)}</div>
+              )}
             </div>
             <p className="text-xs text-slate-500 mt-1 ml-1">{fmtTime(message.timestamp)}</p>
           </div>
