@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Bot, Send, Paperclip, CheckCircle2, XCircle, ArrowUpRight, BarChart3, Target, TrendingDown, Search, FileText, DollarSign, AlertTriangle, Zap, X, Upload, Image, Film } from 'lucide-react';
+import { Bot, Send, Paperclip, CheckCircle2, XCircle, ArrowUpRight, BarChart3, Target, TrendingDown, Search, FileText, DollarSign, AlertTriangle, Zap, X, Upload, Image, Film, TrendingUp, ChevronRight, Shield, Sparkles } from 'lucide-react';
 
 // ── Typing indicator ──────────────────────────────────────────────────────────
 const TypingIndicator = ({ thinkingText }) => (
@@ -29,14 +29,22 @@ const parseMarkdownTable = (text) => {
   let textBuf = [];
   let i = 0;
 
+  const RICH_BLOCKS = ['adlib', 'metrics', 'options', 'insights', 'score', 'copyvariations', 'steps'];
+
   while (i < lines.length) {
-    if (lines[i].trim() === '```adlib') {
+    const trimmed = lines[i].trim();
+    const blockMatch = trimmed.startsWith('```') && RICH_BLOCKS.find(b => trimmed === '```' + b);
+    if (blockMatch) {
       if (textBuf.length) { segments.push({ type: 'text', content: textBuf.join('\n') }); textBuf = []; }
       i++;
       let jsonBuf = '';
       while (i < lines.length && lines[i].trim() !== '```') { jsonBuf += lines[i] + '\n'; i++; }
       if (i < lines.length) i++;
-      try { const ads = JSON.parse(jsonBuf.trim()); if (Array.isArray(ads)) segments.push({ type: 'adlib', ads }); } catch {}
+      try {
+        const data = JSON.parse(jsonBuf.trim());
+        if (blockMatch === 'adlib' && Array.isArray(data)) segments.push({ type: 'adlib', ads: data });
+        else segments.push({ type: blockMatch, data });
+      } catch {}
       continue;
     }
     if (isTableRow(lines[i]) && i + 1 < lines.length && isSeparator(lines[i + 1])) {
@@ -122,6 +130,190 @@ const AdLibraryCards = ({ ads }) => (
     ))}
   </div>
 );
+
+// ── Metric Cards ─────────────────────────────────────────────────────────────
+const MetricCards = ({ data }) => {
+  if (!Array.isArray(data)) return null;
+  return (
+    <div className="my-3 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+      {data.map((m, i) => {
+        const isUp = m.trend === 'up';
+        const isDown = m.trend === 'down';
+        const trendColor = isUp ? 'text-emerald-600' : isDown ? 'text-red-500' : 'text-slate-400';
+        const bgTint = isUp ? 'bg-emerald-50/50' : isDown ? 'bg-red-50/50' : 'bg-slate-50';
+        return (
+          <div key={i} className={`${bgTint} rounded-xl px-3.5 py-3 border border-slate-100`}>
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">{m.label}</p>
+            <p className="text-xl font-bold text-slate-800 leading-tight">{m.value}</p>
+            {m.change && (
+              <div className={`flex items-center gap-1 mt-1 ${trendColor}`}>
+                {isUp && <TrendingUp size={12} />}
+                {isDown && <TrendingDown size={12} />}
+                <span className="text-xs font-medium">{m.change}</span>
+                {m.vs && <span className="text-[10px] text-slate-400 ml-0.5">{m.vs}</span>}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// ── Option Cards (A/B/C selectable) ──────────────────────────────────────────
+const OptionCards = ({ data, onSend }) => {
+  if (!data?.options) return null;
+  return (
+    <div className="my-3">
+      {data.title && <p className="text-sm font-semibold text-slate-700 mb-2.5">{data.title}</p>}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+        {data.options.map((opt, i) => (
+          <button key={i} onClick={() => onSend?.(`I choose Option ${opt.id}: ${opt.title}`)}
+            className="flex flex-col bg-white border border-slate-200 rounded-xl p-3.5 text-left hover:border-blue-400 hover:shadow-md hover:shadow-blue-50 transition-all group relative">
+            {opt.tag && (
+              <span className="absolute -top-2 right-3 text-[9px] font-bold bg-gradient-to-r from-blue-500 to-violet-500 text-white px-2 py-0.5 rounded-full">{opt.tag}</span>
+            )}
+            <div className="flex items-center gap-2 mb-2">
+              <span className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-xs font-bold shadow-sm">{opt.id}</span>
+              <p className="text-sm font-semibold text-slate-800">{opt.title}</p>
+            </div>
+            <p className="text-xs text-slate-500 leading-relaxed flex-1">{opt.desc}</p>
+            <div className="flex items-center gap-1 mt-2.5 text-blue-600 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+              <span>Select</span><ChevronRight size={12} />
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ── Insight Cards (severity-coded recommendations) ───────────────────────────
+const InsightCards = ({ data, onSend }) => {
+  if (!Array.isArray(data)) return null;
+  const severityConfig = {
+    critical: { border: 'border-l-red-500', bg: 'bg-red-50/60', icon: '🔴', iconCls: 'text-red-500' },
+    warning:  { border: 'border-l-amber-400', bg: 'bg-amber-50/60', icon: '🟡', iconCls: 'text-amber-500' },
+    success:  { border: 'border-l-emerald-500', bg: 'bg-emerald-50/60', icon: '🟢', iconCls: 'text-emerald-500' },
+    info:     { border: 'border-l-blue-400', bg: 'bg-blue-50/60', icon: '🔵', iconCls: 'text-blue-500' },
+  };
+  return (
+    <div className="my-3 space-y-2">
+      {data.map((item, i) => {
+        const cfg = severityConfig[item.severity] || severityConfig.info;
+        return (
+          <div key={i} className={`${cfg.bg} border border-slate-100 border-l-4 ${cfg.border} rounded-xl px-4 py-3 flex items-start gap-3`}>
+            <span className="text-sm mt-0.5">{cfg.icon}</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-slate-800">{item.title}</p>
+              <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{item.desc}</p>
+            </div>
+            {item.action && onSend && (
+              <button onClick={() => onSend(item.action)}
+                className="shrink-0 text-xs font-medium px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:border-blue-300 hover:text-blue-600 transition-colors shadow-sm">
+                {item.action}
+              </button>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// ── Score Card (audit health) ────────────────────────────────────────────────
+const ScoreCard = ({ data }) => {
+  if (!data?.score && data?.score !== 0) return null;
+  const score = data.score;
+  const max = data.max || 10;
+  const pct = (score / max) * 100;
+  const color = pct >= 80 ? 'text-emerald-600' : pct >= 50 ? 'text-amber-500' : 'text-red-500';
+  const ringColor = pct >= 80 ? 'stroke-emerald-500' : pct >= 50 ? 'stroke-amber-400' : 'stroke-red-500';
+  const statusIcon = { good: '✅', warning: '⚠️', bad: '❌' };
+
+  return (
+    <div className="my-3 bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+      <div className="flex items-center gap-5">
+        {/* Score ring */}
+        <div className="relative w-20 h-20 shrink-0">
+          <svg className="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
+            <circle cx="40" cy="40" r="34" fill="none" stroke="#e2e8f0" strokeWidth="6" />
+            <circle cx="40" cy="40" r="34" fill="none" className={ringColor} strokeWidth="6"
+              strokeLinecap="round" strokeDasharray={`${pct * 2.136} 213.6`} />
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span className={`text-2xl font-bold ${color}`}>{score}</span>
+            <span className="text-[9px] text-slate-400">/{max}</span>
+          </div>
+        </div>
+        <div className="flex-1">
+          <p className="text-sm font-bold text-slate-800 mb-2">{data.label || 'Health Score'}</p>
+          {data.items?.map((item, i) => (
+            <div key={i} className="flex items-start gap-2 mb-1.5">
+              <span className="text-sm mt-px">{statusIcon[item.status] || '•'}</span>
+              <p className="text-xs text-slate-600 leading-relaxed">{item.text}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── Copy Variations (A/B selectable ad copy) ─────────────────────────────────
+const CopyVariations = ({ data, onSend }) => {
+  if (!data?.variations) return null;
+  return (
+    <div className="my-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+        {data.variations.map((v, i) => (
+          <div key={i} className="bg-white border border-slate-200 rounded-xl overflow-hidden hover:border-blue-300 transition-all group">
+            <div className="px-3.5 pt-3 pb-2 border-b border-slate-100 flex items-center justify-between">
+              <span className="w-6 h-6 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">{v.id}</span>
+              <span className="text-[10px] font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{v.cta?.replace(/_/g, ' ') || 'CTA'}</span>
+            </div>
+            <div className="px-3.5 py-3">
+              <p className="text-xs text-slate-500 mb-2 leading-relaxed">{v.primary}</p>
+              <p className="text-sm font-semibold text-slate-800">{v.headline}</p>
+            </div>
+            <div className="px-3.5 pb-3">
+              <button onClick={() => onSend?.(`Use copy variation ${v.id}: "${v.headline}"`)}
+                className="w-full text-xs font-medium py-2 rounded-lg bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 transition-colors">
+                Use this copy
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ── Steps List (prioritized actions) ─────────────────────────────────────────
+const StepsList = ({ data }) => {
+  if (!Array.isArray(data)) return null;
+  const priorityDot = { high: 'bg-red-500', medium: 'bg-amber-400', low: 'bg-emerald-500' };
+  const priorityLabel = { high: 'Urgent', medium: 'This week', low: 'Opportunity' };
+  return (
+    <div className="my-3 space-y-2">
+      {data.map((step, i) => (
+        <div key={i} className="flex items-start gap-3 bg-white border border-slate-100 rounded-xl px-4 py-3">
+          <div className="flex items-center gap-2 shrink-0 mt-0.5">
+            <span className="text-sm font-bold text-slate-300 w-5 text-right">{i + 1}</span>
+            <span className={`w-2.5 h-2.5 rounded-full ${priorityDot[step.priority] || 'bg-slate-300'}`} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-semibold text-slate-800">{step.title}</p>
+              {step.priority && <span className="text-[9px] font-medium text-slate-400 uppercase">{priorityLabel[step.priority] || step.priority}</span>}
+            </div>
+            {step.reason && <p className="text-xs text-slate-500 mt-0.5">{step.reason}</p>}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 // ── Rich text renderer ───────────────────────────────────────────────────────
 const renderInline = (text) =>
@@ -367,20 +559,28 @@ const MessageBubble = ({ message, isLatest, onSend, isTyping }) => {
   const isAgent = message.role === 'agent';
   if (isAgent) {
     const segments = parseMarkdownTable(message.text);
-    const hasTables = segments.some(s => s.type === 'table' || s.type === 'adlib');
+    const hasWide = segments.some(s => s.type !== 'text');
     return (
       <>
         <div className="flex items-end gap-3 mb-2">
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shrink-0 mb-0.5">
             <Bot size={15} className="text-white" />
           </div>
-          <div className={hasTables ? 'max-w-[95%] flex-1 min-w-0' : 'max-w-[80%]'}>
+          <div className={hasWide ? 'max-w-[95%] flex-1 min-w-0' : 'max-w-[80%]'}>
             <div className="bg-white/80 backdrop-blur-sm border border-slate-200 text-slate-700 rounded-2xl rounded-bl-sm px-4 py-3 text-sm leading-relaxed shadow-sm">
-              {segments.map((seg, i) =>
-                seg.type === 'table' ? <StyledTable key={i} columns={seg.columns} rows={seg.rows} />
-                  : seg.type === 'adlib' ? <AdLibraryCards key={i} ads={seg.ads} />
-                  : <div key={i} className="whitespace-pre-wrap">{renderRichText(seg.content)}</div>
-              )}
+              {segments.map((seg, i) => {
+                switch (seg.type) {
+                  case 'table': return <StyledTable key={i} columns={seg.columns} rows={seg.rows} />;
+                  case 'adlib': return <AdLibraryCards key={i} ads={seg.ads} />;
+                  case 'metrics': return <MetricCards key={i} data={seg.data} />;
+                  case 'options': return <OptionCards key={i} data={seg.data} onSend={onSend} />;
+                  case 'insights': return <InsightCards key={i} data={seg.data} onSend={onSend} />;
+                  case 'score': return <ScoreCard key={i} data={seg.data} />;
+                  case 'copyvariations': return <CopyVariations key={i} data={seg.data} onSend={onSend} />;
+                  case 'steps': return <StepsList key={i} data={seg.data} />;
+                  default: return <div key={i} className="whitespace-pre-wrap">{renderRichText(seg.content)}</div>;
+                }
+              })}
             </div>
             <p className="text-xs text-slate-400 mt-1 ml-1">{fmtTime(message.timestamp)}</p>
           </div>
