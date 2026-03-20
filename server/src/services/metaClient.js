@@ -433,14 +433,27 @@ export const getCustomAudiences = async (token, adAccountId) => {
 };
 
 export const createCustomAudience = async (token, adAccountId, params) => {
+  const apiParams = {
+    access_token: token,
+    name: params.name,
+    subtype: params.subtype || 'WEBSITE',
+  };
+  if (params.description) apiParams.description = params.description;
+  if (params.retention_days) apiParams.retention_days = params.retention_days;
+  if (params.customer_file_source) apiParams.customer_file_source = params.customer_file_source;
+  // WEBSITE audiences require pixel_id + rule
+  if (params.pixel_id) apiParams.pixel_id = params.pixel_id;
+  if (params.rule) apiParams.rule = typeof params.rule === 'string' ? params.rule : JSON.stringify(params.rule);
+  // ENGAGEMENT audiences (video, lead form, IG, etc.) require rule
+  if (params.prefill) apiParams.prefill = params.prefill;
+  // VIDEO engagement: pass video_id in rule
+  if (params.inclusions) apiParams.inclusions = typeof params.inclusions === 'string' ? params.inclusions : JSON.stringify(params.inclusions);
+  // LOOKALIKE params
+  if (params.origin_audience_id) apiParams.origin_audience_id = params.origin_audience_id;
+  if (params.lookalike_spec) apiParams.lookalike_spec = typeof params.lookalike_spec === 'string' ? params.lookalike_spec : JSON.stringify(params.lookalike_spec);
+
   const { data } = await metaApi.post(`/${adAccountId}/customaudiences`, null, {
-    params: {
-      access_token: token,
-      name: params.name,
-      subtype: params.subtype || 'WEBSITE',
-      description: params.description || '',
-      retention_days: 30
-    }
+    params: apiParams
   });
   return data;
 };
