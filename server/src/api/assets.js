@@ -104,4 +104,66 @@ router.get('/videos/:id/status', async (req, res) => {
   }
 });
 
+// ── Bulk Upload (for chat attachments) ────────────────────────────
+// POST /bulk-upload - Upload multiple images/videos at once
+// Body: { adAccountId, files: [{ name, type, base64 }] }
+router.post('/bulk-upload', async (req, res) => {
+  try {
+    const { adAccountId, files } = req.body;
+    if (!adAccountId) return res.status(400).json({ error: 'adAccountId is required' });
+    if (!files?.length) return res.status(400).json({ error: 'files array is required' });
+
+    const token = getToken();
+    const results = [];
+
+    for (const file of files) {
+      try {
+        if (file.type?.startsWith('image/')) {
+          const data = await metaClient.uploadAdImage(token, adAccountId, {
+            bytes: file.base64,
+            name: file.name,
+          });
+          // Meta returns { images: { [name]: { hash, url, ... } } }
+          const imgKey = Object.keys(data.images || {})[0];
+          const imgData = data.images?.[imgKey] || {};
+          results.push({
+            name: file.name,
+            type: 'image',
+            status: 'success',
+            image_hash: imgData.hash,
+            url: imgData.url,
+            width: imgData.width,
+            height: imgData.height,
+          });
+        } else if (file.type?.startsWith('video/')) {
+          // Videos can't be uploaded via base64 — need file_url
+          // Store a placeholder and tell the agent
+          results.push({
+            name: file.name,
+            type: 'video',
+            status: 'pending',
+            message: 'Video needs file_url for upload. Provide a publicly accessible URL.',
+          });
+        } else {
+          results.push({ name: file.name, type: 'unknown', status: 'error', message: 'Unsupported file type' });
+        }
+      } catch (err) {
+        const metaErr = err.response?.data?.error;
+        console.error(`[assets] bulk-upload error for ${file.name}:`, metaErr || err.message);
+        results.push({
+          name: file.name,
+          type: file.type?.startsWith('image/') ? 'image' : 'video',
+          status: 'error',
+          message: metaErr?.message || err.message,
+        });
+      }
+    }
+
+    res.json({ results });
+  } catch (err) {
+    console.error('[assets] POST /bulk-upload error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

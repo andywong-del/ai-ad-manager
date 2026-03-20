@@ -333,8 +333,14 @@ export const getAdImages = async (token, adAccountId) => {
 };
 
 export const uploadAdImage = async (token, adAccountId, imageData) => {
-  const { data } = await metaApi.post(`/${adAccountId}/adimages`, null, {
-    params: { access_token: token, bytes: imageData }
+  const bytes = typeof imageData === 'string' ? imageData : imageData?.bytes || imageData;
+  const formData = new URLSearchParams();
+  formData.append('access_token', token);
+  formData.append('bytes', bytes);
+  if (imageData?.name) formData.append('name', imageData.name);
+  const { data } = await metaApi.post(`/${adAccountId}/adimages`, formData.toString(), {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    maxBodyLength: Infinity,
   });
   return data;
 };

@@ -297,6 +297,7 @@ export const Dashboard = ({
           suggestedActions={SUGGESTED_ACTIONS}
           mode={chatMode}
           onModeChange={setChatMode}
+          adAccountId={adAccountId}
         />
       </main>
 

@@ -38,11 +38,11 @@ export const useChatAgent = ({ token, adAccountId, accountName, mode = 'Fast' })
     sessionIdRef.current = makeId();
   }, [accountName]);
 
-  const sendMessage = useCallback(async (text) => {
+  const sendMessage = useCallback(async (text, attachments) => {
     if (!text.trim() || isTyping) return;
 
     const now = Date.now();
-    const userMsg = { id: makeId(), role: 'user', text, timestamp: now };
+    const userMsg = { id: makeId(), role: 'user', text, timestamp: now, ...(attachments?.length && { attachments }) };
     const agentMsgId = makeId();
 
     setMessages((prev) => [...prev, userMsg]);
