@@ -7,6 +7,9 @@ export const useAdAccounts = (businessId) => {
   const [error,      setError]      = useState(null);
 
   useEffect(() => {
+    setAdAccounts([]);
+    setIsLoading(true);
+    setError(null);
     const url = businessId
       ? `/meta/businesses/${businessId}/adaccounts`
       : '/meta/adaccounts';
