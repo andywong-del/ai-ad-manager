@@ -12,6 +12,7 @@ const sessionMap = new Map();
 router.post('/', async (req, res) => {
   try {
     const { message, sessionId: clientSessionId, adAccountId, token } = req.body;
+    console.log(`[chat] message="${message?.slice(0, 60)}" adAccountId=${adAccountId} session=${clientSessionId?.slice(0, 8)}`);
 
     if (!message) {
       return res.status(400).json({ error: 'message is required' });

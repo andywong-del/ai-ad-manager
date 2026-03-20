@@ -1,11 +1,26 @@
 import { LlmAgent, FunctionTool, Runner, InMemorySessionService } from '@google/adk';
 import * as meta from './metaClient.js';
 
-// ── Helper: extract token + adAccountId from session state ──────────────────
-const ctx = (context) => context.state;
+// ── Helper: extract token + adAccountId ─────────────────────────────────────
+// Always use META_DEMO_TOKEN for data access (FB Login token is auth-only).
+const ctx = (context) => ({
+  token: process.env.META_DEMO_TOKEN,
+  adAccountId: context.state?.adAccountId,
+});
 
 // ── Tool functions ──────────────────────────────────────────────────────────
-// Organized by category. All read token/adAccountId from session state.
+// Organized by category. All use META_DEMO_TOKEN + adAccountId from session.
+
+// Wrap every tool so thrown errors become { error } objects the LLM can read.
+const safe = (fn) => async (args, c) => {
+  try {
+    return await fn(args, c);
+  } catch (err) {
+    const msg = err.response?.data?.error?.message || err.message || 'Unknown error';
+    console.error(`[tool] ${fn.name} error:`, msg);
+    return { error: msg };
+  }
+};
 
 // ─── Campaigns ──────────────────────────────────────────────────────────────
 function getCampaigns(_, c) {
@@ -287,7 +302,7 @@ function searchAdLibrary(args, c) {
 
 // ─── Build FunctionTool instances ───────────────────────────────────────────
 const T = (name, description, execute, parameters) => {
-  const opts = { name, description, execute };
+  const opts = { name, description, execute: safe(execute) };
   if (parameters) opts.parameters = parameters;
   return new FunctionTool(opts);
 };
