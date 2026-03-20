@@ -433,22 +433,72 @@ export const getCustomAudiences = async (token, adAccountId) => {
 };
 
 export const createCustomAudience = async (token, adAccountId, params) => {
+  const subtype = (params.subtype || 'CUSTOM').toUpperCase();
+  const retentionSec = (Number(params.retention_days) || 30) * 86400;
   const apiParams = {
     access_token: token,
     name: params.name,
-    subtype: params.subtype || 'WEBSITE',
+    subtype,
   };
   if (params.description) apiParams.description = params.description;
-  if (params.retention_days) apiParams.retention_days = params.retention_days;
-  if (params.customer_file_source) apiParams.customer_file_source = params.customer_file_source;
-  // WEBSITE audiences require pixel_id + rule
-  if (params.pixel_id) apiParams.pixel_id = params.pixel_id;
-  if (params.rule) apiParams.rule = typeof params.rule === 'string' ? params.rule : JSON.stringify(params.rule);
-  // ENGAGEMENT audiences (video, lead form, IG, etc.) require rule
-  if (params.prefill) apiParams.prefill = params.prefill;
-  // VIDEO engagement: pass video_id in rule
-  if (params.inclusions) apiParams.inclusions = typeof params.inclusions === 'string' ? params.inclusions : JSON.stringify(params.inclusions);
-  // LOOKALIKE params
+
+  // ── WEBSITE audience: build event_sources rule with pixel_id ────────
+  if (subtype === 'WEBSITE') {
+    const pixelId = params.pixel_id;
+    if (!pixelId) throw new Error('pixel_id is required for WEBSITE audiences');
+
+    // If caller already provided a full rule with event_sources, use it
+    const rawRule = params.rule;
+    let rule;
+    if (rawRule && typeof rawRule === 'object' && rawRule.inclusions) {
+      rule = rawRule;
+    } else if (rawRule && typeof rawRule === 'string' && rawRule.includes('event_sources')) {
+      rule = rawRule; // already correct format as string
+    } else {
+      // Build proper v19+ rule format from simple params
+      // Default: all website visitors from this pixel
+      const filters = [];
+      if (rawRule && typeof rawRule === 'object' && rawRule.url) {
+        // Simple {url: {i_contains: "..."}} → convert to filter
+        const urlVal = rawRule.url.i_contains || rawRule.url.eq || '';
+        if (urlVal) {
+          filters.push({ field: 'url', operator: rawRule.url.eq ? 'eq' : 'i_contains', value: urlVal });
+        }
+      }
+      rule = {
+        inclusions: {
+          operator: 'or',
+          rules: [{
+            event_sources: [{ id: pixelId, type: 'pixel' }],
+            retention_seconds: retentionSec,
+            ...(filters.length > 0 && { filter: { operator: 'and', filters } }),
+          }]
+        }
+      };
+    }
+    apiParams.rule = typeof rule === 'string' ? rule : JSON.stringify(rule);
+    apiParams.prefill = 1;
+  }
+
+  // ── ENGAGEMENT audience (video, IG, page, etc.) ────────────────────
+  if (subtype === 'ENGAGEMENT') {
+    if (params.rule) {
+      apiParams.rule = typeof params.rule === 'string' ? params.rule : JSON.stringify(params.rule);
+    }
+    if (params.inclusions) {
+      // inclusions goes inside rule for engagement audiences too
+      const inclusions = typeof params.inclusions === 'string' ? params.inclusions : JSON.stringify(params.inclusions);
+      if (!apiParams.rule) apiParams.rule = inclusions;
+    }
+    apiParams.prefill = 1;
+  }
+
+  // ── CUSTOM audience (customer list) ────────────────────────────────
+  if (subtype === 'CUSTOM') {
+    apiParams.customer_file_source = params.customer_file_source || 'USER_PROVIDED_ONLY';
+  }
+
+  // ── LOOKALIKE params ───────────────────────────────────────────────
   if (params.origin_audience_id) apiParams.origin_audience_id = params.origin_audience_id;
   if (params.lookalike_spec) apiParams.lookalike_spec = typeof params.lookalike_spec === 'string' ? params.lookalike_spec : JSON.stringify(params.lookalike_spec);
 
@@ -726,9 +776,27 @@ export const getPixelStats = async (token, pixelId) => {
 };
 
 export const sendConversionEvent = async (token, pixelId, eventData) => {
-  const params = { access_token: token, data: JSON.stringify(eventData.data) };
-  if (eventData.test_event_code) params.test_event_code = eventData.test_event_code;
-  const { data } = await metaApi.post(`/${pixelId}/events`, null, { params });
+  // eventData should have { data: [...events], test_event_code? }
+  // Handle both: agent sends data array directly or nested in .data
+  const events = Array.isArray(eventData.data) ? eventData.data : Array.isArray(eventData) ? eventData : [eventData];
+
+  // Add event_time if missing (required by Meta)
+  const now = Math.floor(Date.now() / 1000);
+  const enriched = events.map(e => ({
+    event_time: now,
+    action_source: 'website',
+    ...e,
+  }));
+
+  // Send as form body (not query params) to avoid URL length limits
+  const formData = new URLSearchParams();
+  formData.append('access_token', token);
+  formData.append('data', JSON.stringify(enriched));
+  if (eventData.test_event_code) formData.append('test_event_code', eventData.test_event_code);
+
+  const { data } = await metaApi.post(`/${pixelId}/events`, formData.toString(), {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+  });
   return data;
 };
 

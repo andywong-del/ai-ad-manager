@@ -296,8 +296,24 @@ function createPixel({ name }, c) {
 function updatePixel({ pixel_id, ...updates }, c) {
   return meta.updatePixel(ctx(c).token, pixel_id, updates);
 }
-function sendConversionEvent({ pixel_id, event_data }, c) {
-  return meta.sendConversionEvent(ctx(c).token, pixel_id, event_data);
+function sendConversionEvent({ pixel_id, event_data, event_name, action_source, user_data, custom_data, test_event_code }, c) {
+  // Handle both structured event_data and flat params from Gemini
+  let payload = event_data;
+  if (!payload || (!payload.data && !Array.isArray(payload))) {
+    // Gemini sent flat params instead of nested event_data
+    payload = {
+      data: [{
+        event_name: event_name || 'PageView',
+        action_source: action_source || 'website',
+        event_time: Math.floor(Date.now() / 1000),
+        ...(user_data && { user_data }),
+        ...(custom_data && { custom_data }),
+      }],
+      ...(test_event_code && { test_event_code }),
+    };
+  }
+  if (test_event_code && !payload.test_event_code) payload.test_event_code = test_event_code;
+  return meta.sendConversionEvent(ctx(c).token, pixel_id, payload);
 }
 function getCustomConversions(_, c) {
   const { token, adAccountId } = ctx(c);
@@ -442,17 +458,16 @@ const adTools = [
   T('get_custom_audiences', 'List all custom audiences.', getCustomAudiences),
   T('get_custom_audience', 'Get details of a single audience (size, status, etc).', getCustomAudience,
     obj({ audience_id: str('Audience ID') }, ['audience_id'])),
-  T('create_custom_audience', 'Create a custom audience. Do NOT ask about special_ad_categories (campaign-only). For WEBSITE: pass pixel_id + rule. For ENGAGEMENT (video views): pass rule with video object_id + event_name. For CUSTOM (customer list): just name + subtype.', createCustomAudience,
+  T('create_custom_audience', 'Create a custom audience. Do NOT ask about special_ad_categories (campaign-only). For WEBSITE: pass pixel_id (required) + optional URL rule. For ENGAGEMENT (video views): pass full rule with event_sources. For CUSTOM (customer list): just name + subtype.', createCustomAudience,
     obj({
       name: str('Audience name'),
-      subtype: str('WEBSITE | ENGAGEMENT | CUSTOM | LOOKALIKE | IG_BUSINESS'),
+      subtype: str('WEBSITE | ENGAGEMENT | CUSTOM'),
       description: str('Description'),
-      pixel_id: str('Required for WEBSITE audiences — the pixel ID to track visitors'),
-      rule: { type: 'object', description: 'Audience rule. WEBSITE: {"url":{"i_contains":"example.com"}}. VIDEO: {"event":{"eq":"video_watched"},"video":{"i_contains":"VIDEO_ID"}} or {"inclusions":{"operator":"or","rules":[{"event_sources":[{"id":"PAGE_ID","type":"page"}],"retention_seconds":2592000,"filter":{"operator":"and","filters":[{"field":"event","operator":"eq","value":"video_watched"},{"field":"video.video_id","operator":"is_any","value":["VIDEO_ID"]}]}}]}}' },
-      retention_days: num('Days to retain users (default 30)'),
-      prefill: str('"true" to include past visitors/engagers'),
-      customer_file_source: str('For CUSTOM: USER_PROVIDED_ONLY, PARTNER_PROVIDED_ONLY, or BOTH_USER_AND_PARTNER_PROVIDED'),
-    }, ['name'])),
+      pixel_id: str('REQUIRED for WEBSITE audiences — the pixel ID'),
+      rule: { type: 'object', description: 'For WEBSITE: optional URL filter e.g. {"url":{"i_contains":"/product"}} — system auto-wraps in event_sources format. For ENGAGEMENT: full rule with event_sources e.g. {"inclusions":{"operator":"or","rules":[{"event_sources":[{"id":"PAGE_ID","type":"page"}],"retention_seconds":2592000,"filter":{"operator":"and","filters":[{"field":"event","operator":"eq","value":"video_watched"}]}}]}}' },
+      retention_days: num('Days to retain users in audience (default 30)'),
+      customer_file_source: str('For CUSTOM only: USER_PROVIDED_ONLY (default), PARTNER_PROVIDED_ONLY, BOTH_USER_AND_PARTNER_PROVIDED'),
+    }, ['name', 'subtype'])),
   T('update_custom_audience', 'Update an audience.', updateCustomAudience,
     obj({ audience_id: str('Audience ID'), name: str('New name'), description: str('New description') }, ['audience_id'])),
   T('delete_custom_audience', 'Delete an audience. CONFIRM first.', deleteCustomAudience,
@@ -506,8 +521,16 @@ const adTools = [
     obj({ name: str('Pixel name') }, ['name'])),
   T('update_pixel', 'Update a pixel (name, etc).', updatePixel,
     obj({ pixel_id: str('Pixel ID'), name: str('New name') }, ['pixel_id'])),
-  T('send_conversion_event', 'Send server-side conversion event via Conversions API. Standard events: Purchase, Lead, CompleteRegistration, AddToCart, InitiateCheckout, ViewContent, Search, AddPaymentInfo, AddToWishlist, Subscribe, StartTrial, Contact, PageView. Always include test_event_code for testing.', sendConversionEvent,
-    obj({ pixel_id: str('Pixel ID'), event_data: { type: 'object', description: '{ data: [{ event_name: "Purchase"|"Lead"|etc, event_time: unix_timestamp, action_source: "website"|"app"|"email"|"phone_call", user_data: { em: ["hashed_email"], ph: ["hashed_phone"], client_ip_address, client_user_agent, fbc, fbp }, custom_data: { currency: "USD", value: 99.99, content_name, content_ids, content_type } }], test_event_code: "TEST12345" }' } }, ['pixel_id', 'event_data'])),
+  T('send_conversion_event', 'Send server-side conversion event via Conversions API. Standard events: Purchase, Lead, CompleteRegistration, AddToCart, InitiateCheckout, ViewContent, Search, AddPaymentInfo, AddToWishlist, Subscribe, StartTrial, Contact, PageView. Always include test_event_code for testing. Can use event_data object OR flat params.', sendConversionEvent,
+    obj({
+      pixel_id: str('Pixel ID'),
+      event_name: str('Event name: Purchase, Lead, ViewContent, AddToCart, InitiateCheckout, CompleteRegistration, Search, Subscribe, Contact, PageView'),
+      action_source: str('website, app, email, phone_call, chat, system_generated'),
+      user_data: { type: 'object', description: '{ em: ["hashed_email"], ph: ["hashed_phone"], client_ip_address, client_user_agent, fbc, fbp }' },
+      custom_data: { type: 'object', description: '{ currency: "USD", value: 99.99, content_name, content_ids: ["SKU1"], content_type: "product" }' },
+      test_event_code: str('Test event code e.g. "TEST12345" — use this for testing before going live'),
+      event_data: { type: 'object', description: 'Alternative: full event payload { data: [{event_name, event_time, action_source, user_data, custom_data}], test_event_code }' },
+    }, ['pixel_id'])),
   T('get_custom_conversions', 'List all custom conversions.', getCustomConversions),
   T('create_custom_conversion', 'Create a custom conversion event.', createCustomConversion,
     obj({ name: str('Conversion name'), pixel_id: str('Pixel ID'), custom_event_type: str('Event type'), rule: str('URL rule') }, ['name'])),
@@ -612,25 +635,26 @@ Meta auction mechanics, CBO vs ABO, bidding strategies, audience segmentation, l
 
 ### WEBSITE audience (pixel-based retargeting):
 1. Call \`get_pixels\` to list available pixels
-2. If multiple pixels, ask which one (show table with names)
-3. Ask what visitors to target (all visitors, specific URL, time spent)
-4. Call \`create_custom_audience\` with: name, subtype="WEBSITE", pixel_id, rule, retention_days
-5. Example rule for all visitors: \`{"url":{"i_contains":""}}\`
-6. Example rule for specific page: \`{"url":{"i_contains":"/product"}}\`
-7. Example rule for URL + time: \`{"and":[{"url":{"i_contains":"/checkout"}},{"time_spent":{"gt":30}}]}\`
+2. If multiple pixels, show a table and ask which one
+3. Ask: all visitors or specific pages? And how many days to retain (default 30)?
+4. Call \`create_custom_audience\` with: name, subtype="WEBSITE", pixel_id=PIXEL_ID, retention_days=30
+5. For specific pages, also pass rule: \`{"url":{"i_contains":"/product"}}\`
+6. The system auto-builds the correct Meta v19 event_sources format — you just pass pixel_id and optionally a simple URL rule
+7. Do NOT build event_sources/inclusions yourself for WEBSITE — the system handles it
 
 ### ENGAGEMENT audience (video viewers):
 1. Call \`get_ad_videos\` to list their videos
-2. Call \`get_pages\` to get the Page ID (required as event source)
-3. Call \`create_custom_audience\` with: name, subtype="ENGAGEMENT", rule with video engagement filter
-4. Example for 3-second video views:
+2. Call \`get_pages\` to get the Page ID (needed as event source)
+3. Call \`create_custom_audience\` with: name, subtype="ENGAGEMENT", rule containing event_sources
+4. You MUST build the full rule for engagement audiences:
 \`\`\`json
 {"inclusions":{"operator":"or","rules":[{"event_sources":[{"id":"PAGE_ID","type":"page"}],"retention_seconds":2592000,"filter":{"operator":"and","filters":[{"field":"event","operator":"eq","value":"video_watched"},{"field":"video.video_id","operator":"is_any","value":["VIDEO_ID"]}]}}]}}
 \`\`\`
 5. For ThruPlay, change event value to "video_completed"
 
 ### CUSTOM audience (customer list):
-- Just needs name, subtype="CUSTOM", customer_file_source="USER_PROVIDED_ONLY"
+- Just needs name, subtype="CUSTOM"
+- customer_file_source auto-defaults to "USER_PROVIDED_ONLY"
 - Then use \`add_users_to_audience\` to upload hashed data
 
 ## Pixel & Events Setup
