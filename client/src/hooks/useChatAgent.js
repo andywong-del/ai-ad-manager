@@ -1,29 +1,42 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 
 const makeId = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
 
-const WELCOME_MESSAGE = {
+const getWelcomeMessage = (accountName) => ({
   id: 'welcome',
   role: 'agent',
-  text: "Hi! I'm your **AI Ad Consultant**. I can audit your campaigns, spot optimization opportunities, manage budgets, build audiences, and help you scale what's working.\n\nSelect a **business portfolio** and **ad account** from the sidebar to get started.",
+  text: accountName
+    ? `Hi! I'm your **AI Ad Consultant**. I'm connected to **${accountName}** and ready to help.\n\nAsk me to audit your campaigns, analyze performance, manage budgets, or find optimization opportunities.`
+    : "Hi! I'm your **AI Ad Consultant**. I can audit your campaigns, spot optimization opportunities, manage budgets, build audiences, and help you scale what's working.\n\nSelect a **business portfolio** and **ad account** from the sidebar to get started.",
   timestamp: Date.now(),
-};
+});
 
-export const useChatAgent = ({ token, adAccountId }) => {
-  const [messages, setMessages] = useState([WELCOME_MESSAGE]);
+export const useChatAgent = ({ token, adAccountId, accountName }) => {
+  const [messages, setMessages] = useState([getWelcomeMessage(accountName)]);
   const [isTyping, setIsTyping] = useState(false);
   const [thinkingText, setThinkingText] = useState('');
   const [notification, setNotification] = useState(null);
   const sessionIdRef = useRef(makeId());
   const abortRef = useRef(null);
 
+  // Update welcome message when account changes
+  useEffect(() => {
+    setMessages((prev) => {
+      // Only update if the first message is the welcome message and no conversation yet
+      if (prev.length === 1 && prev[0].id === 'welcome') {
+        return [getWelcomeMessage(accountName)];
+      }
+      return prev;
+    });
+  }, [accountName]);
+
   const resetChat = useCallback(() => {
     if (abortRef.current) abortRef.current.abort();
-    setMessages([{ ...WELCOME_MESSAGE, timestamp: Date.now() }]);
+    setMessages([getWelcomeMessage(accountName)]);
     setIsTyping(false);
     setThinkingText('');
     sessionIdRef.current = makeId();
-  }, []);
+  }, [accountName]);
 
   const sendMessage = useCallback(async (text) => {
     if (!text.trim() || isTyping) return;
