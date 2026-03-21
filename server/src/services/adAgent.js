@@ -360,10 +360,123 @@ function getCatalogs({ business_id }, c) {
 function getCatalogProducts({ catalog_id }, c) {
   return meta.getCatalogProducts(ctx(c).token, catalog_id);
 }
+function getCatalogProductSets({ catalog_id }, c) {
+  return meta.getCatalogProductSets(ctx(c).token, catalog_id);
+}
+function getCatalogDiagnostics({ catalog_id }, c) {
+  return meta.getCatalogDiagnostics(ctx(c).token, catalog_id);
+}
+
+// ─── Lead Forms ─────────────────────────────────────────────────────────────
+function createLeadForm({ page_id, ...args }, c) {
+  return meta.createLeadForm(ctx(c).token, page_id, args);
+}
+
+// ─── Saved Audiences ────────────────────────────────────────────────────────
+function createSavedAudience(args, c) {
+  return meta.createSavedAudience(ctx(c).token, ctx(c).adAccountId, args);
+}
+function deleteSavedAudience({ audience_id }, c) {
+  return meta.deleteSavedAudience(ctx(c).token, audience_id);
+}
+
+// ─── Instagram ──────────────────────────────────────────────────────────────
+function getConnectedInstagramAccounts(_, c) {
+  return meta.getConnectedInstagramAccounts(ctx(c).token, ctx(c).adAccountId);
+}
 
 // ─── Ad Library ─────────────────────────────────────────────────────────────
 function searchAdLibrary(args, c) {
   return meta.searchAdLibrary(ctx(c).token, args);
+}
+
+// ─── A/B Test Setup ─────────────────────────────────────────────────────────
+async function setupAbTest({ campaign_id, test_variable, variant_b_changes }, c) {
+  const { token } = ctx(c);
+  if (!campaign_id) return { error: 'campaign_id is required' };
+  if (!test_variable) return { error: 'test_variable is required (e.g. "audience", "creative", "budget")' };
+
+  // Step 1: Copy the campaign (deep copy includes ad sets and ads)
+  const copy = await meta.copyCampaign(token, campaign_id, {
+    deep_copy: true,
+    rename_strategy: 'DEEP_RENAME',
+    status_option: 'PAUSED',
+  });
+
+  // Step 2: Get the original campaign name for labeling
+  const original = await meta.getCampaign(token, campaign_id);
+  const origName = original.name || 'Campaign';
+
+  // Step 3: Rename the copy to indicate it's the B variant
+  const newName = `[A/B Test] ${origName} — Variant B (${test_variable})`;
+  await meta.updateCampaign(token, copy.copied_campaign_id || copy.id, { name: newName });
+
+  return {
+    status: 'success',
+    original_campaign_id: campaign_id,
+    variant_b_campaign_id: copy.copied_campaign_id || copy.id,
+    variant_b_name: newName,
+    test_variable,
+    next_steps: `Variant B campaign created in PAUSED state. Now modify the ${test_variable} on the variant B campaign/ad sets, then activate both campaigns with equal budgets to start the test.`,
+  };
+}
+
+// ─── Campaign Templates (in-memory store) ───────────────────────────────────
+const templateStore = new Map();
+
+function saveTemplate({ name, description, config }, c) {
+  if (!name) return { error: 'name is required' };
+  if (!config) return { error: 'config is required — include objective, targeting, budget, optimization_goal, etc.' };
+  const id = `tpl_${Date.now()}`;
+  const template = { id, name, description: description || '', config: typeof config === 'string' ? JSON.parse(config) : config, created_at: new Date().toISOString() };
+  templateStore.set(id, template);
+  return { status: 'saved', template };
+}
+
+function listTemplates() {
+  const templates = Array.from(templateStore.values());
+  if (!templates.length) return { templates: [], message: 'No templates saved yet. Use save_campaign_template to save one.' };
+  return { templates };
+}
+
+function getTemplate({ template_id }) {
+  const tpl = templateStore.get(template_id);
+  if (!tpl) return { error: `Template ${template_id} not found` };
+  return tpl;
+}
+
+function deleteTemplate({ template_id }) {
+  if (!templateStore.has(template_id)) return { error: `Template ${template_id} not found` };
+  templateStore.delete(template_id);
+  return { status: 'deleted', template_id };
+}
+
+async function applyTemplate({ template_id, campaign_name, daily_budget }, c) {
+  const tpl = templateStore.get(template_id);
+  if (!tpl) return { error: `Template ${template_id} not found` };
+  const { token, adAccountId } = ctx(c);
+  if (!adAccountId) return { error: 'No ad account selected.' };
+
+  const cfg = tpl.config;
+  // Create campaign from template
+  const campaignParams = {
+    name: campaign_name || `${tpl.name} — ${new Date().toLocaleDateString()}`,
+    objective: cfg.objective || 'OUTCOME_TRAFFIC',
+    status: 'PAUSED',
+    special_ad_categories: cfg.special_ad_categories || '[]',
+  };
+  if (daily_budget) campaignParams.daily_budget = String(Math.round(daily_budget * 100));
+  else if (cfg.daily_budget) campaignParams.daily_budget = String(cfg.daily_budget);
+
+  const campaign = await meta.createCampaign(token, adAccountId, campaignParams);
+
+  return {
+    status: 'success',
+    campaign_id: campaign.id,
+    template_used: tpl.name,
+    config_applied: cfg,
+    next_steps: 'Campaign created in PAUSED state from template. Now create ad sets and ads, then activate when ready.',
+  };
 }
 
 // ─── Build FunctionTool instances ───────────────────────────────────────────
@@ -565,10 +678,42 @@ const adTools = [
     obj({ business_id: str('Business ID') }, ['business_id'])),
   T('get_catalog_products', 'List products in a catalog.', getCatalogProducts,
     obj({ catalog_id: str('Catalog ID') }, ['catalog_id'])),
+  T('get_catalog_product_sets', 'List product sets (dynamic collections) in a catalog.', getCatalogProductSets,
+    obj({ catalog_id: str('Catalog ID') }, ['catalog_id'])),
+  T('get_catalog_diagnostics', 'Get catalog health diagnostics — missing fields, errors, warnings.', getCatalogDiagnostics,
+    obj({ catalog_id: str('Catalog ID') }, ['catalog_id'])),
+
+  // ── Lead Forms ────────────────────────────────────────────────────────
+  T('create_lead_form', 'Create a lead generation form for a Facebook page. CONFIRM with user first.', createLeadForm,
+    obj({ page_id: str('Facebook Page ID'), name: str('Form name'), questions: { type: 'array', items: { type: 'object' }, description: 'Array of question objects, e.g. [{"type":"EMAIL"},{"type":"FULL_NAME"},{"type":"PHONE"}]' }, privacy_policy: { type: 'object', description: '{"url":"https://...","link_text":"Privacy Policy"}' }, thank_you_page: { type: 'object', description: '{"title":"Thanks!","body":"We will be in touch."}' } }, ['page_id', 'name'])),
+
+  // ── Saved Audiences ───────────────────────────────────────────────────
+  T('create_saved_audience', 'Save a targeting spec as a reusable audience. Use for frequently used targeting combinations.', createSavedAudience,
+    obj({ name: str('Audience name'), targeting: { type: 'object', description: 'Targeting spec to save' } }, ['name', 'targeting'])),
+  T('delete_saved_audience', 'Delete a saved audience. CONFIRM first.', deleteSavedAudience,
+    obj({ audience_id: str('Saved audience ID') }, ['audience_id'])),
+
+  // ── Instagram ─────────────────────────────────────────────────────────
+  T('get_connected_instagram_accounts', 'List Instagram accounts connected to the ad account. Needed for IG-specific ad placements.', getConnectedInstagramAccounts),
 
   // ── Ad Library ────────────────────────────────────────────────────────
   T('search_ad_library', 'Search the Meta Ad Library for competitor ads. Returns page_name, headlines, body text, ad_snapshot_url. Format results as ```adlib JSON for rich card rendering.', searchAdLibrary,
     obj({ search_terms: str('Keywords to search'), ad_reached_countries: { type: 'array', items: { type: 'string' }, description: 'Country codes e.g. ["US","GB","HK"]' }, ad_type: str('ALL, POLITICAL_AND_ISSUE_ADS'), limit: { type: 'number', description: 'Max results (default 12)' } }, ['ad_reached_countries'])),
+
+  // ── A/B Testing ─────────────────────────────────────────────────────
+  T('setup_ab_test', 'Set up an A/B test by deep-copying a campaign as Variant B. CONFIRM with user before executing. After creation, modify the test variable on Variant B, then activate both.', setupAbTest,
+    obj({ campaign_id: str('Campaign ID to duplicate as control (Variant A)'), test_variable: str('What to test: audience, creative, copy, budget, placement, bid_strategy') }, ['campaign_id', 'test_variable'])),
+
+  // ── Campaign Templates ──────────────────────────────────────────────
+  T('save_campaign_template', 'Save a campaign configuration as a reusable template. Include objective, targeting, budget, optimization_goal, and any other settings.', saveTemplate,
+    obj({ name: str('Template name'), description: str('What this template is for'), config: { type: 'object', description: 'Campaign config: { objective, targeting, daily_budget, optimization_goal, billing_event, bid_strategy, special_ad_categories, ... }' } }, ['name', 'config'])),
+  T('list_campaign_templates', 'List all saved campaign templates.', listTemplates),
+  T('get_campaign_template', 'Get details of a saved template.', getTemplate,
+    obj({ template_id: str('Template ID') }, ['template_id'])),
+  T('delete_campaign_template', 'Delete a saved template.', deleteTemplate,
+    obj({ template_id: str('Template ID') }, ['template_id'])),
+  T('apply_campaign_template', 'Create a new campaign from a saved template. CONFIRM with user first.', applyTemplate,
+    obj({ template_id: str('Template ID to use'), campaign_name: str('Name for the new campaign (optional)'), daily_budget: num('Daily budget in dollars (optional, overrides template)') }, ['template_id'])),
 ];
 
 // ── System instruction ──────────────────────────────────────────────────────
@@ -679,12 +824,32 @@ Use for next steps and action plans. Shows colored priority dots.
 \`\`\`
 
 ## 5. When to use which format
-- **Performance review**: headline → \`\`\`metrics → table → \`\`\`insights → \`\`\`steps
-- **Audit**: headline → \`\`\`score → \`\`\`insights → \`\`\`steps
+- **Performance review**: headline → \`\`\`metrics → table → \`\`\`insights → \`\`\`steps → \`\`\`quickreplies
+- **Audit**: headline → \`\`\`score → \`\`\`insights → \`\`\`steps → \`\`\`quickreplies
 - **Strategy/recommendation**: headline → \`\`\`options (let user choose)
 - **Ad copy generation**: headline → \`\`\`copyvariations (let user pick)
-- **Single question**: Direct answer → supporting data → one \`\`\`steps if needed
+- **Campaign creation done**: headline → \`\`\`metrics (preview) → \`\`\`quickreplies with next actions
+- **Single question**: Direct answer → supporting data → \`\`\`quickreplies
 - Always prefer structured blocks over plain text bullets/lists
+
+## 6. ALWAYS end with quick replies
+Every response MUST end with a \`\`\`quickreplies block — 2-4 clickable follow-up actions so the user never has to think about what to type next. These appear as tappable chips.
+\`\`\`quickreplies
+["Scale top performer +20%", "Pause worst campaigns", "Show creative breakdown", "Run full audit"]
+\`\`\`
+
+Quick reply rules:
+- 2-4 options, short text (under 40 chars each)
+- Context-aware: after performance data → optimization actions; after audit → fix actions; after campaign creation → launch/edit/preview
+- NEVER skip the quickreplies block — it is mandatory on every response
+- This is the single most important UX feature: users click instead of type
+
+### Auto-chain: don't wait to be asked
+When you show data, immediately follow it with analysis:
+- Show campaigns → immediately add insights about which to pause/scale
+- Show audience → immediately estimate reach and suggest targeting tweaks
+- Show creatives → immediately flag fatigue and suggest refresh
+- Never end with just data. Always add: what it means + what to do + quick replies
 
 ## 7. Confirmations for changes
 Before any write operation (pause, delete, update budget, create):
@@ -703,6 +868,13 @@ Meta auction mechanics, CBO vs ABO, bidding strategies, audience segmentation, l
 ## Audience Creation
 - \`special_ad_categories\` is a CAMPAIGN-level field. NEVER ask about it when creating audiences.
 - Do NOT ask unnecessary questions. Ask for name and type, then create.
+
+### IMPORTANT: API-created audiences & Meta Ads Manager UI
+Audiences created via API do NOT appear in Meta Ads Manager's audience dropdown picker. This is a known Meta limitation. You MUST:
+1. **Always explain this** when creating an audience: "Note: This audience was created via API. It won't appear in Meta Ads Manager's audience picker, but it works perfectly when used through this tool."
+2. **Immediately offer to use it** — after creating an audience, always ask: "Want me to create an ad set using this audience right now?" Present as an \`\`\`options card.
+3. **Provide a deep link** so users can verify: \`https://business.facebook.com/latest/audiences/detail/AUDIENCE_ID\` — it IS visible in Business Suite, just not in the Ads Manager targeting dropdown.
+4. **Never leave the user stranded** — always follow audience creation with next actions via \`\`\`quickreplies: ["Create ad set with this audience", "Create lookalike from this", "Show all my audiences"]
 
 ### WEBSITE audience (pixel-based retargeting):
 1. Call \`get_pixels\` to list available pixels
@@ -728,15 +900,34 @@ Meta auction mechanics, CBO vs ABO, bidding strategies, audience segmentation, l
 - customer_file_source auto-defaults to "USER_PROVIDED_ONLY"
 - Then use \`add_users_to_audience\` to upload hashed data
 
-## Pixel & Events Setup
-When user asks about pixels or events:
-1. Call \`get_pixels\` FIRST to see what exists
-2. If they need a new pixel: \`create_pixel\` with a name
-3. Show the pixel ID and explain how to install the base code
-4. To send/test events, use \`send_conversion_event\` with:
-   - pixel_id: the pixel to send to
-   - event_data with test_event_code for testing
-5. Example test Purchase event:
+## Pixel & Events Setup — Guided Wizard
+When user asks about pixels, tracking, events, or CAPI, run this guided flow automatically:
+
+### Step 1: Check existing setup
+Call \`get_pixels\` FIRST. Show results as a table:
+| Pixel | ID | Status |
+If no pixels exist, offer to create one immediately.
+
+### Step 2: Create pixel (if needed)
+Call \`create_pixel\` → show the pixel ID and provide the base code snippet:
+\`\`\`
+<!-- Meta Pixel Code -->
+<script>
+!function(f,b,e,v,n,t,s){...}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');
+fbq('init', 'PIXEL_ID');
+fbq('track', 'PageView');
+</script>
+\`\`\`
+
+### Step 3: Offer event setup via options card
+Show \`\`\`options with common events:
+- A: "Track Purchases" (e-commerce)
+- B: "Track Leads" (lead gen)
+- C: "Track Page Views only" (awareness)
+- D: "Custom event"
+
+### Step 4: Send test event
+Use \`send_conversion_event\` with test_event_code. Example:
 \`\`\`json
 {
   "data": [{
@@ -749,8 +940,18 @@ When user asks about pixels or events:
   "test_event_code": "TEST12345"
 }
 \`\`\`
-6. Standard events: PageView, ViewContent, AddToCart, InitiateCheckout, Purchase, Lead, CompleteRegistration, Subscribe, Contact, Search
-7. After sending test event, tell user to check Events Manager > Test Events to verify
+### Step 5: Verify and next steps
+Standard events: PageView, ViewContent, AddToCart, InitiateCheckout, Purchase, Lead, CompleteRegistration, Subscribe, Contact, Search
+After sending test event, tell user: "Check Events Manager > Test Events to verify the event fired."
+
+### Step 6: Create custom conversion (optional)
+If user tracks purchases or leads, offer to create a custom conversion:
+Call \`create_custom_conversion\` to define value-based rules (e.g., "High-value purchase > $100").
+
+### Step 7: Always end with next actions
+\`\`\`quickreplies
+["Send another test event", "Create custom conversion", "Create website audience from pixel", "Set up campaign with this pixel"]
+\`\`\`
 
 ## Policy Issue Detection
 When you see Meta API errors mentioning "policy", "disapproved", "restricted", or ad review issues:

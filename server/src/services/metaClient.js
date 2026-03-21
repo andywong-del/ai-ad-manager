@@ -100,6 +100,13 @@ export const getCampaigns = async (token, adAccountId) => {
   return data.data;
 };
 
+export const getCampaign = async (token, campaignId) => {
+  const { data } = await metaApi.get(`/${campaignId}`, {
+    params: { access_token: token, fields: 'id,name,status,objective,daily_budget,lifetime_budget' }
+  });
+  return data;
+};
+
 export const createCampaign = async (token, adAccountId, params) => {
   const { data } = await metaApi.post(`/${adAccountId}/campaigns`, null, {
     params: { access_token: token, ...params }
@@ -365,6 +372,23 @@ export const getAdVideos = async (token, adAccountId) => {
 };
 
 export const uploadAdVideo = async (token, adAccountId, params) => {
+  // If a Buffer is provided as 'source', use multipart/form-data for binary upload
+  if (params.source && Buffer.isBuffer(params.source)) {
+    const FormData = (await import('form-data')).default;
+    const form = new FormData();
+    form.append('access_token', token);
+    form.append('source', params.source, { filename: params.title || 'video.mp4', contentType: 'video/mp4' });
+    if (params.title) form.append('title', params.title);
+    if (params.description) form.append('description', params.description);
+    const { data } = await metaApi.post(`/${adAccountId}/advideos`, form, {
+      headers: form.getHeaders(),
+      timeout: 120000, // 2 min for video uploads
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity,
+    });
+    return data;
+  }
+  // Otherwise use file_url (URL-based upload)
   const { data } = await metaApi.post(`/${adAccountId}/advideos`, null, {
     params: { access_token: token, ...params }
   });

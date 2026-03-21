@@ -1,5 +1,33 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Bot, Send, Paperclip, CheckCircle2, XCircle, ArrowUpRight, BarChart3, Target, TrendingDown, Search, FileText, DollarSign, AlertTriangle, Zap, X, Upload, Image, Film, TrendingUp, ChevronRight, Shield, Sparkles } from 'lucide-react';
+import { Bot, Send, Paperclip, CheckCircle2, XCircle, ArrowUpRight, BarChart3, Target, TrendingDown, Search, FileText, DollarSign, AlertTriangle, Zap, X, Upload, Image, Film, TrendingUp, ChevronRight, Shield, Sparkles, Download, Bookmark } from 'lucide-react';
+
+// ── Export utilities ─────────────────────────────────────────────────────────
+const downloadCSV = (title, rows) => {
+  if (!rows?.length) return;
+  const headers = Object.keys(rows[0]);
+  const csv = [headers.join(','), ...rows.map(r => headers.map(h => `"${String(r[h] ?? '').replace(/"/g, '""')}"`).join(','))].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `${title.replace(/\s+/g, '_')}.csv`; a.click();
+  URL.revokeObjectURL(url);
+};
+
+const downloadCardAsImage = async (cardEl, title) => {
+  // Use html2canvas if available, otherwise fallback to print
+  if (typeof window.html2canvas === 'function') {
+    const canvas = await window.html2canvas(cardEl, { backgroundColor: '#fff', scale: 2 });
+    const url = canvas.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = url; a.download = `${title.replace(/\s+/g, '_')}.png`; a.click();
+  } else {
+    // Fallback: copy card HTML to print window
+    const w = window.open('', '_blank', 'width=800,height=600');
+    w.document.write(`<html><head><title>${title}</title><link rel="stylesheet" href="${document.querySelector('link[rel=stylesheet]')?.href || ''}"></head><body style="padding:24px;background:#fff">${cardEl.outerHTML}</body></html>`);
+    w.document.close();
+    setTimeout(() => { w.print(); }, 500);
+  }
+};
 
 // ── Typing indicator ──────────────────────────────────────────────────────────
 const TypingIndicator = ({ thinkingText }) => (
@@ -29,7 +57,7 @@ const parseMarkdownTable = (text) => {
   let textBuf = [];
   let i = 0;
 
-  const RICH_BLOCKS = ['adlib', 'metrics', 'options', 'insights', 'score', 'copyvariations', 'steps'];
+  const RICH_BLOCKS = ['adlib', 'metrics', 'options', 'insights', 'score', 'copyvariations', 'steps', 'quickreplies', 'funnel', 'comparison', 'budget'];
 
   while (i < lines.length) {
     const trimmed = lines[i].trim();
@@ -67,28 +95,38 @@ const parseMarkdownTable = (text) => {
 };
 
 // ── Styled table ─────────────────────────────────────────────────────────────
-const StyledTable = ({ columns, rows }) => (
-  <div className="my-3 overflow-x-auto rounded-xl border border-slate-200 shadow-sm">
-    <table className="w-full text-xs border-collapse">
-      <thead>
-        <tr className="bg-slate-50 border-b border-slate-200">
-          {columns.map((col, ci) => (
-            <th key={ci} className="px-4 py-2.5 text-left font-semibold text-slate-500 whitespace-nowrap text-[11px] uppercase tracking-wide">{col}</th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row, ri) => (
-          <tr key={ri} className={`border-b border-slate-100 last:border-0 ${ri % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'} hover:bg-blue-50/50 transition-colors`}>
-            {row.map((cell, ci) => (
-              <td key={ci} className={`px-4 py-2.5 whitespace-nowrap ${isNumeric(cell) ? 'text-right text-slate-800 font-medium tabular-nums' : 'text-left text-slate-600'}`}>{cell}</td>
+const StyledTable = ({ columns, rows }) => {
+  const tableRef = useRef(null);
+  const csvRows = rows.map(row => Object.fromEntries(columns.map((col, i) => [col, row[i] || ''])));
+  return (
+    <div ref={tableRef} className="my-3 overflow-x-auto rounded-xl border border-slate-200 shadow-sm">
+      <div className="flex items-center justify-end gap-1 px-3 py-1.5 bg-slate-50 border-b border-slate-100">
+        <button onClick={() => downloadCSV('Table_Export', csvRows)} title="Download CSV"
+          className="flex items-center gap-1 text-[10px] font-medium text-slate-400 hover:text-blue-500 px-2 py-1 rounded hover:bg-blue-50 transition-colors">
+          <Download size={11} /> CSV
+        </button>
+      </div>
+      <table className="w-full text-xs border-collapse">
+        <thead>
+          <tr className="bg-slate-50 border-b border-slate-200">
+            {columns.map((col, ci) => (
+              <th key={ci} className="px-4 py-2.5 text-left font-semibold text-slate-500 whitespace-nowrap text-[11px] uppercase tracking-wide">{col}</th>
             ))}
           </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-);
+        </thead>
+        <tbody>
+          {rows.map((row, ri) => (
+            <tr key={ri} className={`border-b border-slate-100 last:border-0 ${ri % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'} hover:bg-blue-50/50 transition-colors`}>
+              {row.map((cell, ci) => (
+                <td key={ci} className={`px-4 py-2.5 whitespace-nowrap ${isNumeric(cell) ? 'text-right text-slate-800 font-medium tabular-nums' : 'text-left text-slate-600'}`}>{cell}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
 
 // ── Ad Library Cards ─────────────────────────────────────────────────────────
 const platformIcon = (p) => {
@@ -131,32 +169,67 @@ const AdLibraryCards = ({ ads }) => (
   </div>
 );
 
+// ── Meta-style Report Card wrapper ──────────────────────────────────────────
+const MetaCard = ({ title, subtitle, children, badge, csvData }) => {
+  const cardRef = useRef(null);
+  return (
+    <div ref={cardRef} className="my-3 bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+      <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <MetaLogo height={18} />
+          <div>
+            <p className="text-sm font-semibold text-slate-800">{title}</p>
+            {subtitle && <p className="text-[11px] text-slate-400">{subtitle}</p>}
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5">
+          {badge && <span className="text-[10px] font-medium bg-blue-50 text-blue-600 border border-blue-100 px-2 py-0.5 rounded-full">{badge}</span>}
+          {csvData && (
+            <button onClick={() => downloadCSV(title, csvData)} title="Download CSV"
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-blue-500 hover:bg-blue-50 transition-colors">
+              <Download size={13} />
+            </button>
+          )}
+          <button onClick={() => downloadCardAsImage(cardRef.current, title)} title="Save as image"
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-blue-500 hover:bg-blue-50 transition-colors">
+            <Image size={13} />
+          </button>
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+};
+
 // ── Metric Cards ─────────────────────────────────────────────────────────────
 const MetricCards = ({ data }) => {
   if (!Array.isArray(data)) return null;
   return (
-    <div className="my-3 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-      {data.map((m, i) => {
-        const isUp = m.trend === 'up';
-        const isDown = m.trend === 'down';
-        const trendColor = isUp ? 'text-emerald-600' : isDown ? 'text-red-500' : 'text-slate-400';
-        const bgTint = isUp ? 'bg-emerald-50/50' : isDown ? 'bg-red-50/50' : 'bg-slate-50';
-        return (
-          <div key={i} className={`${bgTint} rounded-xl px-3.5 py-3 border border-slate-100`}>
-            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">{m.label}</p>
-            <p className="text-xl font-bold text-slate-800 leading-tight">{m.value}</p>
-            {m.change && (
-              <div className={`flex items-center gap-1 mt-1 ${trendColor}`}>
-                {isUp && <TrendingUp size={12} />}
-                {isDown && <TrendingDown size={12} />}
-                <span className="text-xs font-medium">{m.change}</span>
-                {m.vs && <span className="text-[10px] text-slate-400 ml-0.5">{m.vs}</span>}
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
+    <MetaCard title="Performance Overview" subtitle="Key metrics at a glance" badge="Meta Ads"
+      csvData={data.map(m => ({ Metric: m.label, Value: m.value, Change: m.change || '', Trend: m.trend || '' }))}>
+      <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-slate-100">
+        {data.map((m, i) => {
+          const isUp = m.trend === 'up';
+          const isDown = m.trend === 'down';
+          const trendColor = isUp ? 'text-emerald-600' : isDown ? 'text-red-500' : 'text-slate-400';
+          return (
+            <div key={i} className="px-4 py-3.5">
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">{m.label}</p>
+              <p className="text-2xl font-bold text-slate-900 leading-tight tracking-tight">{m.value}</p>
+              {m.change && (
+                <div className={`flex items-center gap-1 mt-1.5 ${trendColor}`}>
+                  {isUp && <TrendingUp size={11} />}
+                  {isDown && <TrendingDown size={11} />}
+                  <span className="text-[11px] font-semibold">{m.change}</span>
+                  {m.vs && <span className="text-[10px] text-slate-400 ml-0.5">{m.vs}</span>}
+                </div>
+              )}
+              {m.desc && <p className="text-[10px] text-slate-400 mt-1 leading-snug">{m.desc}</p>}
+            </div>
+          );
+        })}
+      </div>
+    </MetaCard>
   );
 };
 
@@ -164,27 +237,26 @@ const MetricCards = ({ data }) => {
 const OptionCards = ({ data, onSend }) => {
   if (!data?.options) return null;
   return (
-    <div className="my-3">
-      {data.title && <p className="text-sm font-semibold text-slate-700 mb-2.5">{data.title}</p>}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+    <MetaCard title={data.title || 'Choose Your Approach'} subtitle="Select a strategy to proceed" badge="Action Required">
+      <div className="grid grid-cols-1 sm:grid-cols-3 divide-x divide-slate-100">
         {data.options.map((opt, i) => (
           <button key={i} onClick={() => onSend?.(`I choose Option ${opt.id}: ${opt.title}`)}
-            className="flex flex-col bg-white border border-slate-200 rounded-xl p-3.5 text-left hover:border-blue-400 hover:shadow-md hover:shadow-blue-50 transition-all group relative">
+            className="flex flex-col px-4 py-4 text-left hover:bg-blue-50/50 transition-all group relative">
             {opt.tag && (
-              <span className="absolute -top-2 right-3 text-[9px] font-bold bg-gradient-to-r from-blue-500 to-violet-500 text-white px-2 py-0.5 rounded-full">{opt.tag}</span>
+              <span className="absolute top-2 right-3 text-[9px] font-bold bg-slate-900 text-white px-2 py-0.5 rounded-full">{opt.tag}</span>
             )}
-            <div className="flex items-center gap-2 mb-2">
-              <span className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-xs font-bold shadow-sm">{opt.id}</span>
-              <p className="text-sm font-semibold text-slate-800">{opt.title}</p>
+            <div className="flex items-center gap-2.5 mb-2">
+              <span className="w-7 h-7 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 text-xs font-bold group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-600 transition-colors">{opt.id}</span>
+              <p className="text-[13px] font-semibold text-slate-800">{opt.title}</p>
             </div>
             <p className="text-xs text-slate-500 leading-relaxed flex-1">{opt.desc}</p>
-            <div className="flex items-center gap-1 mt-2.5 text-blue-600 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-              <span>Select</span><ChevronRight size={12} />
+            <div className="flex items-center gap-1 mt-3 text-blue-600 text-[11px] font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
+              <span>Select this option</span><ArrowUpRight size={11} />
             </div>
           </button>
         ))}
       </div>
-    </div>
+    </MetaCard>
   );
 };
 
@@ -192,32 +264,37 @@ const OptionCards = ({ data, onSend }) => {
 const InsightCards = ({ data, onSend }) => {
   if (!Array.isArray(data)) return null;
   const severityConfig = {
-    critical: { border: 'border-l-red-500', bg: 'bg-red-50/60', icon: '🔴', iconCls: 'text-red-500' },
-    warning:  { border: 'border-l-amber-400', bg: 'bg-amber-50/60', icon: '🟡', iconCls: 'text-amber-500' },
-    success:  { border: 'border-l-emerald-500', bg: 'bg-emerald-50/60', icon: '🟢', iconCls: 'text-emerald-500' },
-    info:     { border: 'border-l-blue-400', bg: 'bg-blue-50/60', icon: '🔵', iconCls: 'text-blue-500' },
+    critical: { border: 'border-l-red-500', bg: 'bg-white', dot: 'bg-red-500', label: 'Critical', labelCls: 'text-red-600 bg-red-50 border-red-100' },
+    warning:  { border: 'border-l-amber-400', bg: 'bg-white', dot: 'bg-amber-400', label: 'Warning', labelCls: 'text-amber-600 bg-amber-50 border-amber-100' },
+    success:  { border: 'border-l-emerald-500', bg: 'bg-white', dot: 'bg-emerald-500', label: 'Opportunity', labelCls: 'text-emerald-600 bg-emerald-50 border-emerald-100' },
+    info:     { border: 'border-l-blue-400', bg: 'bg-white', dot: 'bg-blue-400', label: 'Info', labelCls: 'text-blue-600 bg-blue-50 border-blue-100' },
   };
   return (
-    <div className="my-3 space-y-2">
-      {data.map((item, i) => {
-        const cfg = severityConfig[item.severity] || severityConfig.info;
-        return (
-          <div key={i} className={`${cfg.bg} border border-slate-100 border-l-4 ${cfg.border} rounded-xl px-4 py-3 flex items-start gap-3`}>
-            <span className="text-sm mt-0.5">{cfg.icon}</span>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-slate-800">{item.title}</p>
-              <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{item.desc}</p>
+    <MetaCard title="Insights" subtitle="Ranked by revenue impact" badge="AI Analysis">
+      <div className="divide-y divide-slate-100">
+        {data.map((item, i) => {
+          const cfg = severityConfig[item.severity] || severityConfig.info;
+          return (
+            <div key={i} className={`${cfg.bg} border-l-4 ${cfg.border} px-4 py-3.5 flex items-start gap-3`}>
+              <span className={`w-2 h-2 rounded-full ${cfg.dot} mt-1.5 shrink-0`} />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <p className="text-[13px] font-semibold text-slate-800">{item.title}</p>
+                  <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${cfg.labelCls}`}>{cfg.label}</span>
+                </div>
+                <p className="text-xs text-slate-500 leading-relaxed">{item.desc}</p>
+              </div>
+              {item.action && onSend && (
+                <button onClick={() => onSend(item.action)}
+                  className="shrink-0 text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-700 transition-colors">
+                  {item.action}
+                </button>
+              )}
             </div>
-            {item.action && onSend && (
-              <button onClick={() => onSend(item.action)}
-                className="shrink-0 text-xs font-medium px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:border-blue-300 hover:text-blue-600 transition-colors shadow-sm">
-                {item.action}
-              </button>
-            )}
-          </div>
-        );
-      })}
-    </div>
+          );
+        })}
+      </div>
+    </MetaCard>
   );
 };
 
@@ -229,34 +306,40 @@ const ScoreCard = ({ data }) => {
   const pct = (score / max) * 100;
   const color = pct >= 80 ? 'text-emerald-600' : pct >= 50 ? 'text-amber-500' : 'text-red-500';
   const ringColor = pct >= 80 ? 'stroke-emerald-500' : pct >= 50 ? 'stroke-amber-400' : 'stroke-red-500';
-  const statusIcon = { good: '✅', warning: '⚠️', bad: '❌' };
+  const statusConfig = {
+    good:    { icon: <CheckCircle2 size={14} className="text-emerald-500" />, bg: 'bg-emerald-50' },
+    warning: { icon: <AlertTriangle size={14} className="text-amber-500" />, bg: 'bg-amber-50' },
+    bad:     { icon: <XCircle size={14} className="text-red-500" />, bg: 'bg-red-50' },
+  };
 
   return (
-    <div className="my-3 bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-      <div className="flex items-center gap-5">
+    <MetaCard title={data.label || 'Account Audit'} subtitle="Validate pixel, CAPI, structure, exclusions, and scaling constraints." badge="Audit">
+      <div className="flex items-center gap-6 px-4 py-4">
         {/* Score ring */}
-        <div className="relative w-20 h-20 shrink-0">
-          <svg className="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
-            <circle cx="40" cy="40" r="34" fill="none" stroke="#e2e8f0" strokeWidth="6" />
-            <circle cx="40" cy="40" r="34" fill="none" className={ringColor} strokeWidth="6"
-              strokeLinecap="round" strokeDasharray={`${pct * 2.136} 213.6`} />
+        <div className="relative w-24 h-24 shrink-0">
+          <svg className="w-24 h-24 -rotate-90" viewBox="0 0 96 96">
+            <circle cx="48" cy="48" r="40" fill="none" stroke="#f1f5f9" strokeWidth="7" />
+            <circle cx="48" cy="48" r="40" fill="none" className={ringColor} strokeWidth="7"
+              strokeLinecap="round" strokeDasharray={`${pct * 2.513} 251.3`} />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className={`text-2xl font-bold ${color}`}>{score}</span>
-            <span className="text-[9px] text-slate-400">/{max}</span>
+            <span className={`text-3xl font-bold ${color} tracking-tight`}>{score}</span>
+            <span className="text-[10px] text-slate-400 font-medium">/ {max}</span>
           </div>
         </div>
-        <div className="flex-1">
-          <p className="text-sm font-bold text-slate-800 mb-2">{data.label || 'Health Score'}</p>
-          {data.items?.map((item, i) => (
-            <div key={i} className="flex items-start gap-2 mb-1.5">
-              <span className="text-sm mt-px">{statusIcon[item.status] || '•'}</span>
-              <p className="text-xs text-slate-600 leading-relaxed">{item.text}</p>
-            </div>
-          ))}
+        <div className="flex-1 space-y-2">
+          {data.items?.map((item, i) => {
+            const cfg = statusConfig[item.status] || { icon: <span className="w-3.5 h-3.5 rounded-full bg-slate-300 inline-block" />, bg: 'bg-slate-50' };
+            return (
+              <div key={i} className={`flex items-start gap-2.5 ${cfg.bg} rounded-lg px-3 py-2`}>
+                <span className="mt-0.5 shrink-0">{cfg.icon}</span>
+                <p className="text-xs text-slate-700 leading-relaxed">{item.text}</p>
+              </div>
+            );
+          })}
         </div>
       </div>
-    </div>
+    </MetaCard>
   );
 };
 
@@ -264,54 +347,195 @@ const ScoreCard = ({ data }) => {
 const CopyVariations = ({ data, onSend }) => {
   if (!data?.variations) return null;
   return (
-    <div className="my-3">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+    <MetaCard title="Ad Copy Variations" subtitle={`${data.variations.length} options`} badge="Creative">
+      <div className="divide-y divide-slate-100">
         {data.variations.map((v, i) => (
-          <div key={i} className="bg-white border border-slate-200 rounded-xl overflow-hidden hover:border-blue-300 transition-all group">
-            <div className="px-3.5 pt-3 pb-2 border-b border-slate-100 flex items-center justify-between">
-              <span className="w-6 h-6 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">{v.id}</span>
-              <span className="text-[10px] font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{v.cta?.replace(/_/g, ' ') || 'CTA'}</span>
+          <div key={i} className="flex items-start gap-4 px-4 py-3.5 hover:bg-slate-50/50 transition-colors">
+            <span className="w-7 h-7 rounded-full bg-[#1877F2] flex items-center justify-center text-white text-xs font-bold shrink-0 mt-0.5">{v.id}</span>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <p className="text-[13px] font-semibold text-slate-800">{v.headline}</p>
+                <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-500 uppercase tracking-wide">{v.cta?.replace(/_/g, ' ') || 'CTA'}</span>
+              </div>
+              <p className="text-xs text-slate-500 leading-relaxed">{v.primary}</p>
             </div>
-            <div className="px-3.5 py-3">
-              <p className="text-xs text-slate-500 mb-2 leading-relaxed">{v.primary}</p>
-              <p className="text-sm font-semibold text-slate-800">{v.headline}</p>
-            </div>
-            <div className="px-3.5 pb-3">
-              <button onClick={() => onSend?.(`Use copy variation ${v.id}: "${v.headline}"`)}
-                className="w-full text-xs font-medium py-2 rounded-lg bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 transition-colors">
-                Use this copy
-              </button>
-            </div>
+            <button onClick={() => onSend?.(`Use copy variation ${v.id}: "${v.headline}"`)}
+              className="shrink-0 text-xs font-semibold px-3.5 py-1.5 rounded-lg bg-[#1877F2] text-white hover:bg-[#1565C0] transition-colors mt-0.5">
+              Use this
+            </button>
           </div>
         ))}
       </div>
-    </div>
+    </MetaCard>
   );
 };
 
 // ── Steps List (prioritized actions) ─────────────────────────────────────────
 const StepsList = ({ data }) => {
   if (!Array.isArray(data)) return null;
-  const priorityDot = { high: 'bg-red-500', medium: 'bg-amber-400', low: 'bg-emerald-500' };
-  const priorityLabel = { high: 'Urgent', medium: 'This week', low: 'Opportunity' };
+  const priorityConfig = {
+    high:   { dot: 'bg-red-500', label: 'Urgent', labelCls: 'text-red-600 bg-red-50 border-red-100' },
+    medium: { dot: 'bg-amber-400', label: 'This week', labelCls: 'text-amber-600 bg-amber-50 border-amber-100' },
+    low:    { dot: 'bg-emerald-500', label: 'Opportunity', labelCls: 'text-emerald-600 bg-emerald-50 border-emerald-100' },
+  };
   return (
-    <div className="my-3 space-y-2">
-      {data.map((step, i) => (
-        <div key={i} className="flex items-start gap-3 bg-white border border-slate-100 rounded-xl px-4 py-3">
-          <div className="flex items-center gap-2 shrink-0 mt-0.5">
-            <span className="text-sm font-bold text-slate-300 w-5 text-right">{i + 1}</span>
-            <span className={`w-2.5 h-2.5 rounded-full ${priorityDot[step.priority] || 'bg-slate-300'}`} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-semibold text-slate-800">{step.title}</p>
-              {step.priority && <span className="text-[9px] font-medium text-slate-400 uppercase">{priorityLabel[step.priority] || step.priority}</span>}
+    <MetaCard title="Recommended Actions" subtitle="Prioritized by impact" badge="Action Plan">
+      <div className="divide-y divide-slate-100">
+        {data.map((step, i) => {
+          const cfg = priorityConfig[step.priority] || { dot: 'bg-slate-300', label: step.priority, labelCls: 'text-slate-500 bg-slate-50 border-slate-200' };
+          return (
+            <div key={i} className="flex items-start gap-3.5 px-4 py-3.5">
+              <div className="flex items-center gap-2 shrink-0 mt-0.5">
+                <span className="text-sm font-bold text-slate-300 w-5 text-right tabular-nums">{i + 1}</span>
+                <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-[13px] font-semibold text-slate-800">{step.title}</p>
+                  <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${cfg.labelCls}`}>{cfg.label}</span>
+                </div>
+                {step.reason && <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{step.reason}</p>}
+              </div>
             </div>
-            {step.reason && <p className="text-xs text-slate-500 mt-0.5">{step.reason}</p>}
-          </div>
-        </div>
+          );
+        })}
+    </div>
+    </MetaCard>
+  );
+};
+
+// ── Quick Replies (clickable follow-up chips) ────────────────────────────────
+const QuickRepliesCard = ({ data, onSend }) => {
+  if (!Array.isArray(data) || !data.length) return null;
+  return (
+    <div className="flex flex-wrap gap-2 mt-3 mb-1">
+      {data.map((text, i) => (
+        <button key={i} onClick={() => onSend?.(text)}
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border border-blue-200 bg-blue-50/60 text-[13px] font-medium text-blue-700 hover:bg-blue-100 hover:border-blue-300 transition-all hover:-translate-y-0.5 active:translate-y-0">
+          {text}
+          <ArrowUpRight size={12} className="opacity-50" />
+        </button>
       ))}
     </div>
+  );
+};
+
+// ── Funnel Card ──────────────────────────────────────────────────────────────
+// Data: { title, stages: [{ label, value, color? }] }
+const FunnelCard = ({ data }) => {
+  if (!data?.stages?.length) return null;
+  const max = Math.max(...data.stages.map(s => parseFloat(s.value) || 0));
+  const colors = ['bg-blue-500', 'bg-indigo-500', 'bg-violet-500', 'bg-purple-500', 'bg-fuchsia-500', 'bg-pink-500'];
+  return (
+    <MetaCard title={data.title || 'Conversion Funnel'}>
+      <div className="space-y-2">
+        {data.stages.map((stage, i) => {
+          const val = parseFloat(stage.value) || 0;
+          const pct = max > 0 ? (val / max) * 100 : 0;
+          const dropoff = i > 0 ? (((parseFloat(data.stages[i-1].value) || 0) - val) / (parseFloat(data.stages[i-1].value) || 1) * 100).toFixed(1) : null;
+          return (
+            <div key={i}>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-medium text-slate-700">{stage.label}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-900">{typeof stage.value === 'number' ? stage.value.toLocaleString() : stage.value}</span>
+                  {dropoff !== null && <span className="text-[10px] text-red-400">-{dropoff}%</span>}
+                </div>
+              </div>
+              <div className="w-full h-6 bg-slate-100 rounded-md overflow-hidden">
+                <div className={`h-full ${stage.color || colors[i % colors.length]} rounded-md transition-all`} style={{ width: `${Math.max(pct, 2)}%` }} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </MetaCard>
+  );
+};
+
+// ── Comparison Card ──────────────────────────────────────────────────────────
+// Data: { title, items: [{ label, metrics: { [key]: { a, b } } }] } OR { title, a_label, b_label, metrics: [{ label, a, b }] }
+const ComparisonCard = ({ data }) => {
+  if (!data?.metrics?.length) return null;
+  return (
+    <MetaCard title={data.title || 'Comparison'}>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b border-slate-200">
+              <th className="text-left py-2 px-2 text-[11px] font-semibold text-slate-500 uppercase">Metric</th>
+              <th className="text-right py-2 px-2 text-[11px] font-semibold text-blue-600 uppercase">{data.a_label || 'Period A'}</th>
+              <th className="text-right py-2 px-2 text-[11px] font-semibold text-violet-600 uppercase">{data.b_label || 'Period B'}</th>
+              <th className="text-right py-2 px-2 text-[11px] font-semibold text-slate-500 uppercase">Change</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.metrics.map((m, i) => {
+              const a = parseFloat(m.a) || 0;
+              const b = parseFloat(m.b) || 0;
+              const delta = a !== 0 ? ((b - a) / a * 100).toFixed(1) : '—';
+              const isPositive = typeof delta === 'string' && delta !== '—' ? parseFloat(delta) > 0 : false;
+              const isNegative = typeof delta === 'string' && delta !== '—' ? parseFloat(delta) < 0 : false;
+              return (
+                <tr key={i} className="border-b border-slate-50">
+                  <td className="py-2 px-2 font-medium text-slate-700">{m.label}</td>
+                  <td className="py-2 px-2 text-right text-slate-600">{m.a}</td>
+                  <td className="py-2 px-2 text-right text-slate-600">{m.b}</td>
+                  <td className={`py-2 px-2 text-right font-semibold ${isPositive ? 'text-emerald-600' : isNegative ? 'text-red-500' : 'text-slate-400'}`}>
+                    {delta !== '—' ? `${isPositive ? '+' : ''}${delta}%` : '—'}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </MetaCard>
+  );
+};
+
+// ── Budget Card ──────────────────────────────────────────────────────────────
+// Data: { title, total_budget, items: [{ name, spend, percentage, roas? }] }
+const BudgetCard = ({ data }) => {
+  if (!data?.items?.length) return null;
+  const total = parseFloat(data.total_budget) || data.items.reduce((s, it) => s + (parseFloat(it.spend) || 0), 0);
+  const colors = ['bg-blue-500', 'bg-emerald-500', 'bg-violet-500', 'bg-amber-500', 'bg-rose-500', 'bg-cyan-500', 'bg-indigo-500', 'bg-orange-500'];
+  return (
+    <MetaCard title={data.title || 'Budget Allocation'}>
+      {/* Stacked bar */}
+      <div className="flex h-5 rounded-full overflow-hidden mb-4 bg-slate-100">
+        {data.items.map((item, i) => {
+          const pct = total > 0 ? ((parseFloat(item.spend) || 0) / total * 100) : 0;
+          return <div key={i} className={`${colors[i % colors.length]} transition-all`} style={{ width: `${Math.max(pct, 1)}%` }} title={`${item.name}: ${pct.toFixed(1)}%`} />;
+        })}
+      </div>
+      {/* Legend */}
+      <div className="space-y-2">
+        {data.items.map((item, i) => {
+          const spend = parseFloat(item.spend) || 0;
+          const pct = total > 0 ? (spend / total * 100).toFixed(1) : '0';
+          return (
+            <div key={i} className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className={`w-3 h-3 rounded-sm ${colors[i % colors.length]}`} />
+                <span className="text-xs font-medium text-slate-700 truncate max-w-[180px]">{item.name}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-slate-500">{pct}%</span>
+                <span className="text-xs font-semibold text-slate-800">${spend.toLocaleString()}</span>
+                {item.roas && <span className="text-[10px] font-medium text-emerald-600">{item.roas}x ROAS</span>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {total > 0 && (
+        <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
+          <span className="text-xs font-medium text-slate-500">Total</span>
+          <span className="text-sm font-bold text-slate-900">${total.toLocaleString()}</span>
+        </div>
+      )}
+    </MetaCard>
   );
 };
 
@@ -475,6 +699,7 @@ const TableMessage = ({ message }) => (
 // ── Attachment thumbnail chip ────────────────────────────────────────────────
 const AttachmentChip = ({ attachment, onRemove }) => {
   const isImage = attachment.file?.type?.startsWith('image/');
+  const isDoc = attachment.isDoc || attachment.file?.name?.match(/\.(pdf|txt|doc|docx)$/i);
   return (
     <div className="relative group flex-shrink-0">
       <div className={`w-20 h-20 rounded-xl border overflow-hidden flex items-center justify-center
@@ -483,6 +708,11 @@ const AttachmentChip = ({ attachment, onRemove }) => {
           'border-slate-200 bg-slate-50'}`}>
         {attachment.preview ? (
           <img src={attachment.preview} alt={attachment.file.name} className="w-full h-full object-cover" />
+        ) : isDoc ? (
+          <div className="flex flex-col items-center">
+            <FileText size={22} className="text-blue-400" />
+            <span className="text-[8px] text-slate-400 mt-0.5 truncate max-w-[60px]">{attachment.file.name.split('.').pop()?.toUpperCase()}</span>
+          </div>
         ) : (
           <Film size={24} className="text-slate-400" />
         )}
@@ -551,8 +781,51 @@ const MessageAttachments = ({ attachments }) => {
   );
 };
 
+// ── Save menu for agent messages ─────────────────────────────────────────────
+const SaveMenu = ({ messageId, onSave }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-blue-500 hover:bg-blue-50 transition-colors opacity-0 group-hover:opacity-100"
+        title="Save this message"
+      >
+        <Bookmark size={14} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-20 py-1 w-44">
+          <button
+            onClick={() => { onSave(messageId, 'report'); setOpen(false); }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+          >
+            <FileText size={13} className="text-blue-400" />
+            Save as Report
+          </button>
+          <button
+            onClick={() => { onSave(messageId, 'strategy'); setOpen(false); }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-amber-50 hover:text-amber-600 transition-colors"
+          >
+            <Sparkles size={13} className="text-amber-400" />
+            Save as Strategy
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ── Message bubble ────────────────────────────────────────────────────────────
-const MessageBubble = ({ message, isLatest, onSend, isTyping }) => {
+const MessageBubble = ({ message, isLatest, onSend, isTyping, onSaveItem }) => {
   if (message.type === 'report') return (<><ReportMessage message={message} timestamp={message.timestamp} /><div className="mb-2" /></>);
   if (message.type === 'table') return (<><TableMessage message={message} />{isLatest && message.actions?.length > 0 && <QuickReplies actions={message.actions} onSend={onSend} disabled={isTyping} />}<div className="mb-6" /></>);
 
@@ -562,12 +835,17 @@ const MessageBubble = ({ message, isLatest, onSend, isTyping }) => {
     const hasWide = segments.some(s => s.type !== 'text');
     return (
       <>
-        <div className="flex items-end gap-3 mb-2">
+        <div className="flex items-end gap-3 mb-2 group">
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shrink-0 mb-0.5">
             <Bot size={15} className="text-white" />
           </div>
           <div className={hasWide ? 'max-w-[95%] flex-1 min-w-0' : 'max-w-[80%]'}>
-            <div className="bg-white/80 backdrop-blur-sm border border-slate-200 text-slate-700 rounded-2xl rounded-bl-sm px-4 py-3 text-sm leading-relaxed shadow-sm">
+            <div className="bg-white/80 backdrop-blur-sm border border-slate-200 text-slate-700 rounded-2xl rounded-bl-sm px-4 py-3 text-sm leading-relaxed shadow-sm relative">
+              {onSaveItem && message.id !== 'welcome' && (
+                <div className="absolute top-2 right-2 z-10">
+                  <SaveMenu messageId={message.id} onSave={onSaveItem} />
+                </div>
+              )}
               {segments.map((seg, i) => {
                 switch (seg.type) {
                   case 'table': return <StyledTable key={i} columns={seg.columns} rows={seg.rows} />;
@@ -578,6 +856,10 @@ const MessageBubble = ({ message, isLatest, onSend, isTyping }) => {
                   case 'score': return <ScoreCard key={i} data={seg.data} />;
                   case 'copyvariations': return <CopyVariations key={i} data={seg.data} onSend={onSend} />;
                   case 'steps': return <StepsList key={i} data={seg.data} />;
+                  case 'quickreplies': return <QuickRepliesCard key={i} data={seg.data} onSend={onSend} />;
+                  case 'funnel': return <FunnelCard key={i} data={seg.data} />;
+                  case 'comparison': return <ComparisonCard key={i} data={seg.data} />;
+                  case 'budget': return <BudgetCard key={i} data={seg.data} />;
                   default: return <div key={i} className="whitespace-pre-wrap">{renderRichText(seg.content)}</div>;
                 }
               })}
@@ -607,18 +889,106 @@ const MessageBubble = ({ message, isLatest, onSend, isTyping }) => {
 
 // ── Icon map for action cards ────────────────────────────────────────────────
 const ICON_MAP = { BarChart3, Target, TrendingDown, Search, FileText, DollarSign, AlertTriangle, Zap };
+const ICON_BG = {
+  BarChart3: 'bg-[#4F6BED]', Target: 'bg-[#00A67E]', TrendingDown: 'bg-[#E8453C]', Search: 'bg-[#8B5CF6]',
+  FileText: 'bg-[#F59E0B]', DollarSign: 'bg-[#0891B2]', AlertTriangle: 'bg-[#F97316]', Zap: 'bg-[#EAB308]',
+};
 
-const ActionCard = ({ icon, color, label, desc, prompt, onSend, disabled }) => {
+// Meta logo — uses official lockup from /public
+const MetaLogo = ({ height = 16 }) => (
+  <img src="/meta-logo.svg" alt="Meta" style={{ height }} className="shrink-0" />
+);
+
+// Realistic report preview — mimics actual Meta Ads report with metric columns
+const ReportPreview = ({ metrics }) => (
+  <div className="w-full h-full flex flex-col justify-end">
+    <div className="grid grid-cols-4 gap-px bg-slate-100 border-t border-slate-200 rounded-b">
+      {metrics.map((m, i) => (
+        <div key={i} className="bg-white px-2 py-1.5 first:rounded-bl last:rounded-br">
+          <p className="text-[6px] font-medium text-slate-400 uppercase tracking-wider leading-none mb-0.5 truncate">{m.label}</p>
+          <p className={`text-[11px] font-bold leading-tight ${m.color || 'text-slate-800'}`}>{m.value}</p>
+          {m.sub && <p className="text-[5.5px] text-slate-400 leading-tight mt-px truncate">{m.sub}</p>}
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+const CARD_PREVIEWS = {
+  BarChart3: () => <ReportPreview metrics={[
+    { label: 'Spend', value: '$3.2K', sub: '78% of budget', color: 'text-slate-900' },
+    { label: 'ROAS', value: '2.8x', sub: 'vs 2.1x prev', color: 'text-emerald-600' },
+    { label: 'CTR', value: '1.84%', sub: '+0.3% WoW', color: 'text-blue-600' },
+    { label: 'CPA', value: '$12.40', sub: 'target $15', color: 'text-emerald-600' },
+  ]} />,
+  Target: () => <ReportPreview metrics={[
+    { label: 'Audiences', value: '12', sub: '3 lookalikes', color: 'text-slate-900' },
+    { label: 'Reach', value: '840K', sub: 'FB & IG combined', color: 'text-slate-900' },
+    { label: 'Overlap', value: '18%', sub: 'across ad sets', color: 'text-amber-600' },
+    { label: 'Top Seg.', value: 'LLA 1%', sub: '3.4x ROAS', color: 'text-emerald-600' },
+  ]} />,
+  TrendingDown: () => <ReportPreview metrics={[
+    { label: 'CPM Change', value: '+34%', sub: '7d vs 7d', color: 'text-red-500' },
+    { label: 'CTR Drop', value: '-0.6%', sub: '1.8% → 1.2%', color: 'text-red-500' },
+    { label: 'ROAS', value: '-14%', sub: '$4.2 → $3.6', color: 'text-red-500' },
+    { label: 'Flagged', value: '3', sub: 'campaigns', color: 'text-amber-600' },
+  ]} />,
+  Search: () => <ReportPreview metrics={[
+    { label: 'Creatives', value: '24', sub: 'across 6 sets', color: 'text-slate-900' },
+    { label: 'Top CTR', value: '3.2%', sub: 'video_v3.mp4', color: 'text-emerald-600' },
+    { label: 'Fatigue', value: '5 ads', sub: 'freq > 4.0', color: 'text-red-500' },
+    { label: 'Winner', value: 'Ad #12', sub: '$8.20 CPA', color: 'text-blue-600' },
+  ]} />,
+  FileText: () => <ReportPreview metrics={[
+    { label: 'Today Spend', value: '$1.4K', sub: '52% of daily', color: 'text-slate-900' },
+    { label: 'Conversions', value: '89', sub: '+12 vs yesterday', color: 'text-emerald-600' },
+    { label: 'CPA', value: '$15.73', sub: 'target $18', color: 'text-emerald-600' },
+    { label: 'ROAS', value: '3.1x', sub: 'above target', color: 'text-emerald-600' },
+  ]} />,
+  DollarSign: () => <ReportPreview metrics={[
+    { label: 'Total Budget', value: '$8.5K', sub: 'monthly cap', color: 'text-slate-900' },
+    { label: 'Utilized', value: '62%', sub: '$5.3K spent', color: 'text-blue-600' },
+    { label: 'Wasted', value: '$820', sub: '2 low-ROAS sets', color: 'text-red-500' },
+    { label: 'Realloc.', value: '+$400', sub: 'to top performer', color: 'text-emerald-600' },
+  ]} />,
+  AlertTriangle: () => <ReportPreview metrics={[
+    { label: 'Ad Sets', value: '18', sub: 'active total', color: 'text-slate-900' },
+    { label: 'High Freq.', value: '4', sub: 'freq > 3.5', color: 'text-amber-600' },
+    { label: 'Low Delivery', value: '2', sub: '< 100 impr/day', color: 'text-red-500' },
+    { label: 'Healthy', value: '12', sub: '67% of ad sets', color: 'text-emerald-600' },
+  ]} />,
+  Zap: () => <ReportPreview metrics={[
+    { label: 'Quick Wins', value: '5', sub: 'found today', color: 'text-slate-900' },
+    { label: 'Est. Savings', value: '$340', sub: 'per week', color: 'text-emerald-600' },
+    { label: 'ROAS Lift', value: '+0.4x', sub: 'projected', color: 'text-emerald-600' },
+    { label: 'Priority', value: '2 high', sub: '3 medium', color: 'text-amber-600' },
+  ]} />,
+};
+
+const ActionCard = ({ icon, label, desc, prompt, onSend, disabled }) => {
   const Icon = ICON_MAP[icon] || Zap;
+  const bg = ICON_BG[icon] || 'bg-slate-500';
+  const Preview = CARD_PREVIEWS[icon] || CARD_PREVIEWS.Zap;
   return (
     <button onClick={() => onSend(prompt)} disabled={disabled}
-      className="flex flex-col bg-white/80 backdrop-blur-sm border border-slate-200 rounded-xl p-4 text-left hover:border-blue-300 hover:shadow-md hover:shadow-blue-50 transition-all disabled:opacity-40 group">
-      <div className="flex items-start justify-between mb-3">
-        <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${color} flex items-center justify-center shadow-sm`}><Icon size={18} className="text-white" /></div>
-        <ArrowUpRight size={14} className="text-slate-300 group-hover:text-slate-500 transition-colors mt-1" />
+      className="flex flex-col bg-white border border-slate-100 rounded-2xl overflow-hidden text-left shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:-translate-y-1 transition-all duration-200 disabled:opacity-40 group">
+      {/* Header — Meta logo + title + arrow */}
+      <div className="px-4 pt-4 pb-0">
+        <div className="flex items-center mb-3">
+          <MetaLogo height={24} />
+        </div>
+        <div className="flex items-start justify-between">
+          <p className="text-[15px] font-bold text-slate-900 leading-snug pr-2">{label}</p>
+          <ArrowUpRight size={14} className="text-slate-200 group-hover:text-slate-400 transition-colors shrink-0 mt-0.5" />
+        </div>
+        <p className="text-[12px] text-slate-400 leading-relaxed mt-1 mb-3">{desc}</p>
       </div>
-      <p className="text-sm font-semibold text-slate-800 mb-1">{label}</p>
-      <p className="text-xs text-slate-400 leading-relaxed">{desc}</p>
+      {/* Report metrics preview */}
+      <div className="mt-auto px-3 pb-3">
+        <div className="bg-slate-50 rounded-lg overflow-hidden border border-slate-100">
+          <Preview />
+        </div>
+      </div>
     </button>
   );
 };
@@ -636,7 +1006,7 @@ const ModeToggle = ({ mode, setMode }) => (
 );
 
 // ── Input box with drag & drop ───────────────────────────────────────────────
-const ChatInput = ({ input, setInput, onKeyDown, onSend, onFilesAdded, attachments, onRemoveAttachment, fileRef, mode, setMode, isTyping, handleFileUpload, isOver }) => (
+const ChatInput = ({ input, setInput, onKeyDown, onSend, onFilesAdded, attachments, onRemoveAttachment, fileRef, mode, setMode, isTyping, handleFileUpload, isOver, accountChip }) => (
   <div className={`bg-white/80 backdrop-blur-xl border rounded-2xl overflow-hidden shadow-lg shadow-slate-200/50 transition-all
     ${isOver ? 'border-blue-400 ring-2 ring-blue-100' : 'border-slate-200'}`}>
     <AttachmentBar attachments={attachments} onRemove={onRemoveAttachment} />
@@ -652,13 +1022,19 @@ const ChatInput = ({ input, setInput, onKeyDown, onSend, onFilesAdded, attachmen
         style={{ lineHeight: '1.5' }}
       />
     </div>
+    {/* Context chips row */}
+    {accountChip && (
+      <div className="px-4 pb-2 flex items-center gap-2 flex-wrap">
+        {accountChip}
+      </div>
+    )}
     <div className="px-4 pb-3 flex items-center justify-between">
       <ModeToggle mode={mode} setMode={setMode} />
       <div className="flex items-center gap-2">
         <button onClick={() => fileRef.current?.click()} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
           <Paperclip size={16} />
         </button>
-        <input ref={fileRef} type="file" accept="image/*,video/*" multiple className="hidden" onChange={handleFileUpload} />
+        <input ref={fileRef} type="file" accept="image/*,video/*,.pdf,.txt,.doc,.docx" multiple className="hidden" onChange={handleFileUpload} />
         <button onClick={onSend} disabled={(!input.trim() && !attachments.length) || isTyping}
           className="w-8 h-8 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:bg-slate-200 disabled:text-slate-400 text-white flex items-center justify-center transition-colors shadow-sm">
           <Send size={14} />
@@ -669,7 +1045,7 @@ const ChatInput = ({ input, setInput, onKeyDown, onSend, onFilesAdded, attachmen
 );
 
 // ── Main component ────────────────────────────────────────────────────────────
-export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, suggestedActions = [], mode = 'Fast', onModeChange, adAccountId }) => {
+export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, suggestedActions = [], mode = 'Fast', onModeChange, adAccountId, onSaveItem, accountChip }) => {
   const [input, setInput] = useState('');
   const [attachments, setAttachments] = useState([]); // { id, file, preview, status, progress, result }
   const [isDragOver, setIsDragOver] = useState(false);
@@ -728,18 +1104,51 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, sugges
 
   // Add files from input or drag & drop
   const addFiles = useCallback((fileList) => {
-    const newAttachments = Array.from(fileList)
-      .filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'))
-      .map(file => {
-        const id = Date.now().toString(36) + Math.random().toString(36).slice(2);
-        const preview = file.type.startsWith('image/') ? URL.createObjectURL(file) : null;
-        return { id, file, preview, status: 'queued', progress: 0, result: null };
-      });
+    const files = Array.from(fileList);
+    const isDoc = (f) => f.name.match(/\.(pdf|txt|doc|docx)$/i);
 
-    setAttachments(prev => [...prev, ...newAttachments]);
+    // Media files — upload to Meta
+    const mediaFiles = files.filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'));
+    const mediaAttachments = mediaFiles.map(file => {
+      const id = Date.now().toString(36) + Math.random().toString(36).slice(2);
+      const preview = file.type.startsWith('image/') ? URL.createObjectURL(file) : null;
+      return { id, file, preview, status: 'queued', progress: 0, result: null };
+    });
+    if (mediaAttachments.length) {
+      setAttachments(prev => [...prev, ...mediaAttachments]);
+      mediaAttachments.forEach(a => uploadFile(a));
+    }
 
-    // Start uploading each
-    newAttachments.forEach(a => uploadFile(a));
+    // Document files — parse text and add as attachment with extracted content
+    const docFiles = files.filter(isDoc);
+    docFiles.forEach(async (file) => {
+      const id = Date.now().toString(36) + Math.random().toString(36).slice(2);
+      setAttachments(prev => [...prev, { id, file, preview: null, status: 'uploading', progress: 30, result: null, isDoc: true }]);
+
+      try {
+        const base64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result.split(',')[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+        const res = await fetch('/api/chat/parse-doc', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ base64, type: file.type, name: file.name }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+
+        setAttachments(prev => prev.map(a => a.id === id ? {
+          ...a, status: 'done', progress: 100,
+          result: { type: 'document', text: data.text, charCount: data.charCount, truncated: data.truncated },
+        } : a));
+      } catch (err) {
+        setAttachments(prev => prev.map(a => a.id === id ? { ...a, status: 'error', error: err.message } : a));
+      }
+    });
   }, [uploadFile]);
 
   const handleFileInput = useCallback((e) => {
@@ -796,13 +1205,30 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, sugges
 
     // Build message text with asset info
     let msgText = t;
-    if (doneAttachments.length) {
-      const assetLines = doneAttachments.map(a => {
-        if (a.result?.image_hash) return `[Uploaded image: ${a.file.name}, image_hash: ${a.result.image_hash}]`;
-        if (a.result?.type === 'video') return `[Attached video: ${a.file.name} — needs file_url for upload]`;
-        return `[Attached file: ${a.file.name}]`;
+    const mediaAttachments = doneAttachments.filter(a => !a.isDoc);
+    const docAttachments = doneAttachments.filter(a => a.isDoc && a.result?.text);
+
+    if (mediaAttachments.length || docAttachments.length) {
+      const lines = [];
+
+      // Document context — inject extracted text
+      docAttachments.forEach(a => {
+        lines.push(`[Document: ${a.file.name} (${a.result.charCount} chars${a.result.truncated ? ', truncated' : ''})]\n${a.result.text}`);
       });
-      msgText = assetLines.join('\n') + (t ? '\n\n' + t : '\n\nI\'ve uploaded these creatives to the ad account. What would you like to do with them?');
+
+      // Media assets
+      mediaAttachments.forEach(a => {
+        if (a.result?.image_hash) lines.push(`[Uploaded image: ${a.file.name}, image_hash: ${a.result.image_hash}]`);
+        else if (a.result?.video_id) lines.push(`[Uploaded video: ${a.file.name}, video_id: ${a.result.video_id}]`);
+        else if (a.result?.type === 'video') lines.push(`[Attached video: ${a.file.name} — upload failed]`);
+        else lines.push(`[Attached file: ${a.file.name}]`);
+      });
+
+      const defaultPrompt = docAttachments.length
+        ? `\n\nI've uploaded a strategy/brand document. Please analyze it and suggest a campaign plan based on its content.`
+        : `\n\nI've uploaded these creatives to the ad account. What would you like to do with them?`;
+
+      msgText = lines.join('\n') + (t ? '\n\n' + t : defaultPrompt);
     }
 
     // Pass attachment previews so user message shows thumbnails
@@ -811,6 +1237,7 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, sugges
       preview: a.preview,
       type: a.file.type,
       image_hash: a.result?.image_hash,
+      video_id: a.result?.video_id,
     }));
 
     onSend(msgText, msgAttachments);
@@ -841,27 +1268,25 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, sugges
 
       {/* Empty State */}
       {isEmptyState && (
-        <div className="flex-1 flex flex-col items-center justify-center px-6">
-          <h1 className="text-3xl font-bold text-slate-800 mb-10 text-center">
+        <div className="flex-1 flex flex-col items-center justify-center px-8">
+          <h1 className="text-3xl font-extrabold text-slate-900 mb-8 text-center tracking-tight">
             Ask anything about your ads
           </h1>
 
-          <div className="w-full max-w-4xl">
-            <div className="max-w-2xl mx-auto">
-              <ChatInput
-                input={input} setInput={setInput} onKeyDown={handleKeyDown}
-                onSend={() => handleSend()} onFilesAdded={addFiles}
-                attachments={attachments} onRemoveAttachment={removeAttachment}
-                fileRef={fileRef} mode={mode} setMode={setMode} isTyping={isTyping}
-                handleFileUpload={handleFileInput} isOver={isDragOver}
-              />
-            </div>
+          <div className="w-full max-w-2xl mx-auto">
+            <ChatInput
+              input={input} setInput={setInput} onKeyDown={handleKeyDown}
+              onSend={() => handleSend()} onFilesAdded={addFiles}
+              attachments={attachments} onRemoveAttachment={removeAttachment}
+              fileRef={fileRef} mode={mode} setMode={setMode} isTyping={isTyping}
+              handleFileUpload={handleFileInput} isOver={isDragOver} accountChip={accountChip}
+            />
+          </div>
 
-            <div className="grid grid-cols-4 gap-3 mt-6">
-              {suggestedActions.map((action) => (
-                <ActionCard key={action.label} {...action} onSend={onSend} disabled={isTyping} />
-              ))}
-            </div>
+          <div className="w-full max-w-[1200px] mx-auto grid grid-cols-4 gap-4 mt-8">
+            {suggestedActions.map((action) => (
+              <ActionCard key={action.label} {...action} onSend={onSend} disabled={isTyping} />
+            ))}
           </div>
         </div>
       )}
@@ -872,7 +1297,7 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, sugges
           <div className="flex-1 overflow-y-auto">
             <div className="max-w-3xl mx-auto px-4 pt-6 pb-2">
               {messages.map((msg) => (
-                <MessageBubble key={msg.id} message={msg} isLatest={msg.id === lastId} onSend={handleSend} isTyping={isTyping} />
+                <MessageBubble key={msg.id} message={msg} isLatest={msg.id === lastId} onSend={handleSend} isTyping={isTyping} onSaveItem={onSaveItem} />
               ))}
               {isTyping && <TypingIndicator thinkingText={thinkingText} />}
               <div ref={endRef} />

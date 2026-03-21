@@ -2,27 +2,28 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 
 const makeId = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
 
-const getWelcomeMessage = (accountName) => ({
+export const getWelcomeMessage = (accountName) => ({
   id: 'welcome',
   role: 'agent',
   text: accountName
-    ? `Hi! I'm your **AI Ad Consultant**. I'm connected to **${accountName}** and ready to help.\n\nAsk me to audit your campaigns, analyze performance, manage budgets, or find optimization opportunities.`
-    : "Hi! I'm your **AI Ad Consultant**. I can audit your campaigns, spot optimization opportunities, manage budgets, build audiences, and help you scale what's working.\n\nSelect a **business portfolio** and **ad account** from the sidebar to get started.",
+    ? `Hi! I'm your **AI Ad Consultant**. I'm connected to **${accountName}** and ready to help.\n\nAsk me anything — audit campaigns, analyze performance, manage budgets, or find optimization opportunities.`
+    : "Hi! I'm your **AI Ad Consultant**. Connect an ad account below to get started, or ask me a general question about Meta advertising.",
   timestamp: Date.now(),
 });
 
-export const useChatAgent = ({ token, adAccountId, accountName, mode = 'Fast' }) => {
-  const [messages, setMessages] = useState([getWelcomeMessage(accountName)]);
+export { makeId };
+
+export const useChatAgent = ({ token, adAccountId, accountName, mode = 'Fast', initialMessages, externalSessionId }) => {
+  const [messages, setMessages] = useState(initialMessages || [getWelcomeMessage(accountName)]);
   const [isTyping, setIsTyping] = useState(false);
   const [thinkingText, setThinkingText] = useState('');
   const [notification, setNotification] = useState(null);
-  const sessionIdRef = useRef(makeId());
+  const sessionIdRef = useRef(externalSessionId || makeId());
   const abortRef = useRef(null);
 
-  // Update welcome message when account changes
+  // Update welcome message when account changes (only if chat is empty)
   useEffect(() => {
     setMessages((prev) => {
-      // Only update if the first message is the welcome message and no conversation yet
       if (prev.length === 1 && prev[0].id === 'welcome') {
         return [getWelcomeMessage(accountName)];
       }
@@ -30,12 +31,23 @@ export const useChatAgent = ({ token, adAccountId, accountName, mode = 'Fast' })
     });
   }, [accountName]);
 
+  // Allow external session switching
+  const loadSession = useCallback((newSessionId, newMessages) => {
+    if (abortRef.current) abortRef.current.abort();
+    sessionIdRef.current = newSessionId;
+    setMessages(newMessages || [getWelcomeMessage(accountName)]);
+    setIsTyping(false);
+    setThinkingText('');
+  }, [accountName]);
+
   const resetChat = useCallback(() => {
     if (abortRef.current) abortRef.current.abort();
+    const newId = makeId();
+    sessionIdRef.current = newId;
     setMessages([getWelcomeMessage(accountName)]);
     setIsTyping(false);
     setThinkingText('');
-    sessionIdRef.current = makeId();
+    return newId;
   }, [accountName]);
 
   const sendMessage = useCallback(async (text, attachments) => {
@@ -71,7 +83,6 @@ export const useChatAgent = ({ token, adAccountId, accountName, mode = 'Fast' })
         throw new Error(err.error || `HTTP ${response.status}`);
       }
 
-      // Parse SSE stream
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
@@ -125,7 +136,6 @@ export const useChatAgent = ({ token, adAccountId, accountName, mode = 'Fast' })
           { id: agentMsgId, role: 'agent', text: "I couldn't generate a response. Please try again.", timestamp: Date.now() },
         ]);
       } else {
-        // Detect confirmation prompts in the last portion of the response
         const tail = fullText.slice(-500);
         const confirmPatterns = [
           /should I proceed/i, /shall I go ahead/i, /do you want me to/i,
@@ -160,5 +170,14 @@ export const useChatAgent = ({ token, adAccountId, accountName, mode = 'Fast' })
     }
   }, [token, adAccountId, isTyping, mode]);
 
-  return { messages, isTyping, thinkingText, sendMessage, resetChat, notification };
+  return {
+    messages,
+    isTyping,
+    thinkingText,
+    sendMessage,
+    resetChat,
+    loadSession,
+    notification,
+    sessionId: sessionIdRef.current,
+  };
 };

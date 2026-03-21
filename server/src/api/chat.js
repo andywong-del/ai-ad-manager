@@ -1,7 +1,41 @@
 import { Router } from 'express';
 import { runner, sessionService } from '../services/adAgent.js';
+import pdfParse from 'pdf-parse';
 
 const router = Router();
+
+// POST /api/chat/parse-doc — extract text from uploaded PDF/TXT
+router.post('/parse-doc', async (req, res) => {
+  try {
+    const { base64, type, name } = req.body;
+    if (!base64) return res.status(400).json({ error: 'No file data provided' });
+
+    const buffer = Buffer.from(base64, 'base64');
+    let text = '';
+
+    if (type === 'application/pdf' || name?.endsWith('.pdf')) {
+      const pdf = await pdfParse(buffer);
+      text = pdf.text;
+    } else {
+      // TXT, DOCX (plain text extraction), or fallback
+      text = buffer.toString('utf-8');
+    }
+
+    // Truncate to ~8000 chars to avoid overwhelming agent context
+    const truncated = text.slice(0, 8000);
+    const wasTruncated = text.length > 8000;
+
+    res.json({
+      text: truncated,
+      charCount: text.length,
+      truncated: wasTruncated,
+      name,
+    });
+  } catch (err) {
+    console.error('[parse-doc] error:', err.message);
+    res.status(500).json({ error: 'Failed to parse document: ' + err.message });
+  }
+});
 
 // In-memory map: chatSessionId → ADK sessionId
 const sessionMap = new Map();

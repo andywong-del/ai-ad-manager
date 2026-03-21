@@ -136,13 +136,17 @@ router.post('/bulk-upload', async (req, res) => {
             height: imgData.height,
           });
         } else if (file.type?.startsWith('video/')) {
-          // Videos can't be uploaded via base64 — need file_url
-          // Store a placeholder and tell the agent
+          // Convert base64 to Buffer and upload via multipart/form-data
+          const videoBuffer = Buffer.from(file.base64, 'base64');
+          const data = await metaClient.uploadAdVideo(token, adAccountId, {
+            source: videoBuffer,
+            title: file.name,
+          });
           results.push({
             name: file.name,
             type: 'video',
-            status: 'pending',
-            message: 'Video needs file_url for upload. Provide a publicly accessible URL.',
+            status: 'success',
+            video_id: data.id,
           });
         } else {
           results.push({ name: file.name, type: 'unknown', status: 'error', message: 'Unsupported file type' });

@@ -20,13 +20,16 @@ import { useAuth } from './hooks/useAuth.js';
 import { LoginPage } from './components/LoginPage.jsx';
 import { Dashboard } from './components/Dashboard.jsx';
 
+// Local dev bypass — skip login and go straight to dashboard
+const DEV_BYPASS = import.meta.env.DEV && import.meta.env.VITE_DEV_BYPASS === 'true';
+
 export default function App() {
   const { longLivedToken, isLoading, error, login, logout } = useAuth();
   const [selectedBusiness, setSelectedBusiness] = useState(null);
   const [selectedAccount,  setSelectedAccount]  = useState(null);
 
-  // Step 1: Facebook login
-  if (!longLivedToken) {
+  // Step 1: Facebook login (skip in dev bypass mode)
+  if (!longLivedToken && !DEV_BYPASS) {
     return <LoginPage onLogin={login} isLoading={isLoading} error={error} />;
   }
 
