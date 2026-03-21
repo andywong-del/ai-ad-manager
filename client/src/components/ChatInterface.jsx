@@ -1237,27 +1237,47 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, onStop
       {/* Empty State */}
       {isEmptyState && (
         <div className="flex-1 flex flex-col px-8 overflow-y-auto">
-          {/* Spacer to push content to ~20% from top */}
+          {/* Spacer to push content up */}
           <div className="flex-[0_0_18%]" />
 
-          <div className="w-full max-w-2xl mx-auto">
-            <h1 className="text-3xl font-extrabold text-slate-900 mb-6 text-center tracking-tight">
-              What would you like to know?
-            </h1>
-            <ChatInput
-              input={input} setInput={setInput} onKeyDown={handleKeyDown}
-              onSend={() => handleSend()} onStop={onStop} onFilesAdded={addFiles}
-              attachments={attachments} onRemoveAttachment={removeAttachment}
-              fileRef={fileRef} isTyping={isTyping}
-              handleFileUpload={handleFileInput} isOver={isDragOver}
-            />
-          </div>
+          {!adAccountId ? (
+            /* No account selected — tutorial / onboarding guide */
+            <div className="w-full max-w-md mx-auto text-center">
+              <img src="/meta-icon.svg" alt="Meta" className="w-12 h-12 mx-auto mb-4 opacity-60" />
+              <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight mb-2">
+                Welcome to AI Ad Manager
+              </h1>
+              <p className="text-sm text-slate-500 leading-relaxed mb-6">
+                Select an ad account from <strong className="text-slate-700">Meta Ads</strong> in the sidebar to get started.
+              </p>
+              <div className="inline-flex items-center gap-2 text-xs text-amber-600 bg-amber-50 border border-amber-200 px-4 py-2 rounded-full font-medium">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                Waiting for account connection
+              </div>
+            </div>
+          ) : (
+            /* Account selected — normal empty state with input + cards */
+            <>
+              <div className="w-full max-w-2xl mx-auto">
+                <h1 className="text-3xl font-extrabold text-slate-900 mb-6 text-center tracking-tight">
+                  What would you like to know?
+                </h1>
+                <ChatInput
+                  input={input} setInput={setInput} onKeyDown={handleKeyDown}
+                  onSend={() => handleSend()} onStop={onStop} onFilesAdded={addFiles}
+                  attachments={attachments} onRemoveAttachment={removeAttachment}
+                  fileRef={fileRef} isTyping={isTyping}
+                  handleFileUpload={handleFileInput} isOver={isDragOver}
+                />
+              </div>
 
-          <div className="w-full max-w-3xl mx-auto grid grid-cols-2 lg:grid-cols-3 gap-3 mt-8 pb-8">
-            {suggestedActions.map((action) => (
-              <ActionCard key={action.label} {...action} onSend={handleSend} disabled={isTyping} />
-            ))}
-          </div>
+              <div className="w-full max-w-3xl mx-auto grid grid-cols-2 lg:grid-cols-3 gap-3 mt-8 pb-8">
+                {suggestedActions.map((action) => (
+                  <ActionCard key={action.label} {...action} onSend={handleSend} disabled={isTyping} />
+                ))}
+              </div>
+            </>
+          )}
         </div>
       )}
 

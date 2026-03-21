@@ -285,13 +285,12 @@ export const Sidebar = ({
                 onDragEnd={handleFolderDragEnd}
                 className={`mb-0.5 transition-all ${dragOverFolderId === folder.id && dragFolderId !== folder.id ? 'border-t-2 border-blue-400' : 'border-t-2 border-transparent'} ${dragFolderId === folder.id ? 'opacity-40' : ''}`}
               >
-                <div className="flex items-center gap-0.5 group">
-                  <GripVertical size={10} className="text-slate-200 cursor-grab opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-1" />
+                <div className="flex items-center gap-1.5 group px-1">
+                  <GripVertical size={14} className="text-slate-300 cursor-grab shrink-0 hover:text-slate-500 transition-colors" />
                   <button
                     onClick={() => setOpenFolders(prev => ({ ...prev, [folder.id]: !isOpen }))}
-                    className="flex-1 flex items-center gap-2 px-2 py-1.5 text-[12px] font-medium text-slate-500 hover:text-slate-700 transition-colors min-w-0"
+                    className="flex-1 flex items-center gap-2 px-2 py-2 text-[12px] font-medium text-slate-500 hover:text-slate-700 transition-colors min-w-0"
                   >
-                    {isOpen ? <ChevronDown size={12} className="shrink-0" /> : <ChevronRight size={12} className="shrink-0" />}
                     {folderIcon}
                     {editingFolderId === folder.id ? (
                       <input
@@ -304,14 +303,15 @@ export const Sidebar = ({
                         onClick={(e) => e.stopPropagation()}
                       />
                     ) : (
-                      <span className="truncate" onDoubleClick={(e) => { e.stopPropagation(); startRenaming(folder); }}>
+                      <span className="flex-1 truncate text-left" onDoubleClick={(e) => { e.stopPropagation(); startRenaming(folder); }}>
                         {folder.name} ({folderItems.length})
                       </span>
                     )}
+                    {isOpen ? <ChevronDown size={12} className="shrink-0 text-slate-300" /> : <ChevronRight size={12} className="shrink-0 text-slate-300" />}
                   </button>
                   {!isDefault && editingFolderId !== folder.id && (
                     <button onClick={() => onDeleteFolder?.(folder.id)}
-                      className="text-slate-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all p-1 mr-1 shrink-0"
+                      className="text-slate-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all p-1 shrink-0"
                       title="Delete folder">
                       <X size={10} />
                     </button>

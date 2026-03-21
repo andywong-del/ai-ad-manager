@@ -77,7 +77,7 @@ export const useChatSessions = ({ token, adAccountId, accountName, language = 'e
   const [sessions, setSessions] = useState([]);
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [savedItems, setSavedItemsState] = useState([]);
-  const [folders, setFoldersState] = useState([]);
+  const [folders, setFoldersState] = useState([...DEFAULT_FOLDERS]);
   const prevTypingRef = useRef(false);
 
   // Load initial session from last session or create new
