@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { runner, sessionService } from '../services/adAgent.js';
-import pdfParse from 'pdf-parse';
 
 const router = Router();
 
@@ -14,6 +13,7 @@ router.post('/parse-doc', async (req, res) => {
     let text = '';
 
     if (type === 'application/pdf' || name?.endsWith('.pdf')) {
+      const pdfParse = (await import('pdf-parse')).default;
       const pdf = await pdfParse(buffer);
       text = pdf.text;
     } else {
