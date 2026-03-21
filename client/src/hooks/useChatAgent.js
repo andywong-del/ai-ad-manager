@@ -21,6 +21,17 @@ export const useChatAgent = ({ token, adAccountId, accountName, mode = 'Fast', i
   const sessionIdRef = useRef(externalSessionId || makeId());
   const abortRef = useRef(null);
 
+  // Sync when external session ID changes (e.g. account switch triggers new session)
+  useEffect(() => {
+    if (externalSessionId && externalSessionId !== sessionIdRef.current) {
+      if (abortRef.current) abortRef.current.abort();
+      sessionIdRef.current = externalSessionId;
+      setMessages(initialMessages || [getWelcomeMessage(accountName)]);
+      setIsTyping(false);
+      setThinkingText('');
+    }
+  }, [externalSessionId, initialMessages, accountName]);
+
   // Update welcome message when account changes (only if chat is empty)
   useEffect(() => {
     setMessages((prev) => {
@@ -65,9 +76,13 @@ export const useChatAgent = ({ token, adAccountId, accountName, mode = 'Fast', i
     abortRef.current = controller;
 
     try {
+      const bearerToken = token || localStorage.getItem('fb_long_lived_token');
       const response = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(bearerToken && { Authorization: `Bearer ${bearerToken}` }),
+        },
         body: JSON.stringify({
           message: text,
           sessionId: sessionIdRef.current,

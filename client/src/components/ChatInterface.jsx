@@ -1006,7 +1006,7 @@ const ModeToggle = ({ mode, setMode }) => (
 );
 
 // ── Input box with drag & drop ───────────────────────────────────────────────
-const ChatInput = ({ input, setInput, onKeyDown, onSend, onFilesAdded, attachments, onRemoveAttachment, fileRef, mode, setMode, isTyping, handleFileUpload, isOver, accountChip }) => (
+const ChatInput = ({ input, setInput, onKeyDown, onSend, onFilesAdded, attachments, onRemoveAttachment, fileRef, mode, setMode, isTyping, handleFileUpload, isOver }) => (
   <div className={`bg-white/80 backdrop-blur-xl border rounded-2xl overflow-hidden shadow-lg shadow-slate-200/50 transition-all
     ${isOver ? 'border-blue-400 ring-2 ring-blue-100' : 'border-slate-200'}`}>
     <AttachmentBar attachments={attachments} onRemove={onRemoveAttachment} />
@@ -1022,12 +1022,6 @@ const ChatInput = ({ input, setInput, onKeyDown, onSend, onFilesAdded, attachmen
         style={{ lineHeight: '1.5' }}
       />
     </div>
-    {/* Context chips row */}
-    {accountChip && (
-      <div className="px-4 pb-2 flex items-center gap-2 flex-wrap">
-        {accountChip}
-      </div>
-    )}
     <div className="px-4 pb-3 flex items-center justify-between">
       <ModeToggle mode={mode} setMode={setMode} />
       <div className="flex items-center gap-2">
@@ -1045,7 +1039,7 @@ const ChatInput = ({ input, setInput, onKeyDown, onSend, onFilesAdded, attachmen
 );
 
 // ── Main component ────────────────────────────────────────────────────────────
-export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, suggestedActions = [], mode = 'Fast', onModeChange, adAccountId, onSaveItem, accountChip }) => {
+export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, suggestedActions = [], mode = 'Fast', onModeChange, adAccountId, onSaveItem }) => {
   const [input, setInput] = useState('');
   const [attachments, setAttachments] = useState([]); // { id, file, preview, status, progress, result }
   const [isDragOver, setIsDragOver] = useState(false);
@@ -1077,9 +1071,13 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, sugges
 
       setAttachments(prev => prev.map(a => a.id === attachment.id ? { ...a, progress: 40 } : a));
 
+      const bearerToken = localStorage.getItem('fb_long_lived_token');
       const res = await fetch('/api/assets/bulk-upload', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(bearerToken && { Authorization: `Bearer ${bearerToken}` }),
+        },
         body: JSON.stringify({
           adAccountId,
           files: [{ name: attachment.file.name, type: attachment.file.type, base64 }],
@@ -1133,9 +1131,13 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, sugges
           reader.readAsDataURL(file);
         });
 
+        const docBearerToken = localStorage.getItem('fb_long_lived_token');
         const res = await fetch('/api/chat/parse-doc', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(docBearerToken && { Authorization: `Bearer ${docBearerToken}` }),
+          },
           body: JSON.stringify({ base64, type: file.type, name: file.name }),
         });
         const data = await res.json();
@@ -1279,7 +1281,7 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, sugges
               onSend={() => handleSend()} onFilesAdded={addFiles}
               attachments={attachments} onRemoveAttachment={removeAttachment}
               fileRef={fileRef} mode={mode} setMode={setMode} isTyping={isTyping}
-              handleFileUpload={handleFileInput} isOver={isDragOver} accountChip={accountChip}
+              handleFileUpload={handleFileInput} isOver={isDragOver}
             />
           </div>
 

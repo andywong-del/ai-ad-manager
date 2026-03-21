@@ -1,8 +1,120 @@
-import { useState } from 'react';
-import { Bot, Plus, MessageSquare, Trash2, Sparkles, ChevronDown, ChevronLeft, ChevronRight, LogOut, FileText, Lightbulb, FolderOpen } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Bot, Plus, MessageSquare, Trash2, Sparkles, ChevronDown, ChevronLeft, ChevronRight, LogOut, FileText, Lightbulb, FolderOpen, Building2, Check } from 'lucide-react';
 import { groupSessionsByDate } from '../hooks/useChatSessions.js';
+import { useAdAccounts } from '../hooks/useAdAccounts.js';
+import { useBusinesses } from '../hooks/useBusinesses.js';
 
 const DATE_GROUP_ORDER = ['Today', 'Yesterday', 'Previous 7 Days', 'Previous 30 Days', 'Older'];
+
+// ── Account Picker for Sidebar ───────────────────────────────────────────────
+const SidebarAccountPicker = ({ selectedAccount, selectedBusiness, onSelect }) => {
+  const [open, setOpen] = useState(false);
+  const [level, setLevel] = useState('business');
+  const [activeBiz, setActiveBiz] = useState(null);
+  const ref = useRef(null);
+  const { businesses, isLoading: bizLoading } = useBusinesses();
+  const { adAccounts, isLoading: accLoading } = useAdAccounts(level === 'accounts' ? activeBiz?.id : null);
+  const accounts = Array.isArray(adAccounts) ? adAccounts : [];
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const toggle = () => {
+    if (!open) {
+      setLevel(selectedBusiness ? 'accounts' : 'business');
+      setActiveBiz(selectedBusiness || null);
+    }
+    setOpen(!open);
+  };
+
+  const handleBizClick = (biz) => { setActiveBiz(biz); setLevel('accounts'); };
+  const handleAccClick = (account) => { onSelect(activeBiz, account); setOpen(false); };
+
+  const hasSelection = selectedBusiness && selectedAccount;
+
+  return (
+    <div className="relative px-3 mb-2" ref={ref}>
+      <button onClick={toggle}
+        className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-[13px] font-medium transition-all border
+          ${hasSelection
+            ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
+            : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 animate-pulse-subtle'
+          }`}>
+        <Building2 size={15} className={hasSelection ? 'text-blue-500' : 'text-amber-500'} />
+        <span className="flex-1 text-left truncate">
+          {hasSelection
+            ? `${selectedBusiness.name} · act_${selectedAccount.account_id}`
+            : 'Select Ad Account'
+          }
+        </span>
+        <ChevronDown size={12} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute left-3 right-3 top-full mt-1 bg-white/95 backdrop-blur-xl border border-slate-200 rounded-xl shadow-xl shadow-slate-200/50 z-50 overflow-hidden">
+          {level === 'business' && (
+            <>
+              <div className="px-3 py-2.5 border-b border-slate-100">
+                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Select Business</p>
+              </div>
+              <div className="max-h-64 overflow-y-auto">
+                {bizLoading ? (
+                  <div className="px-3 py-6 text-center text-xs text-slate-400">Loading...</div>
+                ) : businesses.length === 0 ? (
+                  <div className="px-3 py-6 text-center text-xs text-slate-400">No businesses found</div>
+                ) : businesses.map((biz) => (
+                  <button key={biz.id} onClick={() => handleBizClick(biz)}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors
+                      ${biz.id === selectedBusiness?.id ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
+                    <Building2 size={12} className="text-emerald-600 shrink-0" />
+                    <span className="text-xs font-medium text-slate-700 truncate flex-1">{biz.name}</span>
+                    <ChevronRight size={14} className="text-slate-300 shrink-0" />
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+          {level === 'accounts' && (
+            <>
+              <button onClick={() => setLevel('business')}
+                className="w-full flex items-center gap-2 px-3 py-2.5 border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                <ChevronLeft size={14} className="text-slate-400" />
+                <Building2 size={12} className="text-emerald-600" />
+                <span className="text-xs font-medium text-slate-500 truncate">{activeBiz?.name}</span>
+              </button>
+              <div className="px-3 py-2 border-b border-slate-100">
+                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Ad Accounts</p>
+              </div>
+              <div className="max-h-56 overflow-y-auto">
+                {accLoading ? (
+                  <div className="px-3 py-6 text-center text-xs text-slate-400">Loading...</div>
+                ) : accounts.length === 0 ? (
+                  <div className="px-3 py-6 text-center text-xs text-slate-400">No accounts found</div>
+                ) : accounts.map((account) => (
+                  <button key={account.id} onClick={() => handleAccClick(account)}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors
+                      ${account.id === selectedAccount?.id ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
+                    <span className="w-6 h-6 rounded-md bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-600 shrink-0">
+                      {account.name?.[0]?.toUpperCase()}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-xs font-medium truncate ${account.id === selectedAccount?.id ? 'text-blue-600' : 'text-slate-700'}`}>{account.name}</p>
+                      <p className="text-[10px] text-slate-400 font-mono">act_{account.account_id}</p>
+                    </div>
+                    {account.id === selectedAccount?.id && <Check size={14} className="text-blue-600 shrink-0" />}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const Sidebar = ({
   open,
@@ -18,6 +130,9 @@ export const Sidebar = ({
   onNavigateFunnel,
   activeView,
   onLogout,
+  selectedAccount,
+  selectedBusiness,
+  onSelectAccount,
 }) => {
   const [reportsOpen, setReportsOpen] = useState(true);
   const [strategiesOpen, setStrategiesOpen] = useState(true);
@@ -63,6 +178,13 @@ export const Sidebar = ({
           My Strategist
         </button>
       </div>
+
+      {/* Account Picker */}
+      <SidebarAccountPicker
+        selectedAccount={selectedAccount}
+        selectedBusiness={selectedBusiness}
+        onSelect={onSelectAccount}
+      />
 
       {/* Scrollable area: Folders first, then Chat History */}
       <div className="flex-1 overflow-y-auto px-2 pb-2">
