@@ -13,7 +13,7 @@ export const getWelcomeMessage = (accountName) => ({
 
 export { makeId };
 
-export const useChatAgent = ({ token, adAccountId, accountName, mode = 'Fast', language = 'en', initialMessages, externalSessionId }) => {
+export const useChatAgent = ({ token, adAccountId, accountName, language = 'en', initialMessages, externalSessionId }) => {
   const [messages, setMessages] = useState(initialMessages || [getWelcomeMessage(accountName)]);
   const [isTyping, setIsTyping] = useState(false);
   const [thinkingText, setThinkingText] = useState('');
@@ -50,6 +50,15 @@ export const useChatAgent = ({ token, adAccountId, accountName, mode = 'Fast', l
     setIsTyping(false);
     setThinkingText('');
   }, [accountName]);
+
+  const stopGeneration = useCallback(() => {
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+    }
+    setIsTyping(false);
+    setThinkingText('');
+  }, []);
 
   const resetChat = useCallback(() => {
     if (abortRef.current) abortRef.current.abort();
@@ -88,7 +97,6 @@ export const useChatAgent = ({ token, adAccountId, accountName, mode = 'Fast', l
           sessionId: sessionIdRef.current,
           adAccountId,
           token,
-          mode,
           language,
         }),
         signal: controller.signal,
@@ -184,13 +192,14 @@ export const useChatAgent = ({ token, adAccountId, accountName, mode = 'Fast', l
       setThinkingText('');
       abortRef.current = null;
     }
-  }, [token, adAccountId, isTyping, mode, language]);
+  }, [token, adAccountId, isTyping, language]);
 
   return {
     messages,
     isTyping,
     thinkingText,
     sendMessage,
+    stopGeneration,
     resetChat,
     loadSession,
     notification,

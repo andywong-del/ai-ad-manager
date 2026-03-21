@@ -7,24 +7,18 @@ import { SavedItemView } from './SavedItemView.jsx';
 import { DashboardPage } from './DashboardPage.jsx';
 
 const SUGGESTED_ACTIONS = [
-  // ── Performance & Reporting ────────────────────────────────────────────────
-  { icon: 'BarChart3',     category: 'Performance', label: 'How are my ads doing?',         desc: 'See spend, CTR, ROAS, and what needs attention.',          prompt: 'Show all my active campaigns with their performance metrics from the last 7 days' },
-  { icon: 'FileText',      category: 'Performance', label: "Show today's results",          desc: "Today's spend, conversions, CPA, and ROAS.",              prompt: "Show today's KPI report — spend, impressions, clicks, conversions, CPA, and ROAS" },
-  { icon: 'TrendingDown',  category: 'Performance', label: 'Any problems I should know?',   desc: 'Flag rising costs or declining performance.',              prompt: 'Which campaigns have declining performance? Compare last 7 days vs previous 7 days' },
-  { icon: 'Search',        category: 'Performance', label: "What's working best?",          desc: 'Find top creatives and winning strategies.',               prompt: 'Analyze my ad creatives — which ones are performing best and which show fatigue signals?' },
-  // ── Budget & Optimization ──────────────────────────────────────────────────
-  { icon: 'DollarSign',    category: 'Budget',      label: 'Find ways to save money',       desc: 'Reallocate budget to top performers.',                     prompt: 'Analyze my budget allocation across campaigns and ad sets — where should I shift spend?' },
-  { icon: 'AlertTriangle', category: 'Budget',      label: 'Quick wins I can do now',        desc: 'Actionable changes you can apply right now.',              prompt: 'Give me quick wins for my Meta ad account — what can I change today to improve results?' },
-  // ── Audiences & Targeting ──────────────────────────────────────────────────
-  { icon: 'Target',        category: 'Audiences',   label: 'Help me reach new people',       desc: 'Audiences, lookalikes, and expansion ideas.',              prompt: 'Show me all my custom audiences and their sizes, plus any targeting overlap between ad sets' },
-  // ── Competitive & Creative ─────────────────────────────────────────────────
-  { icon: 'Zap',           category: 'Creative',    label: 'What are competitors doing?',    desc: 'Check the Ad Library for competitor activity.',            prompt: 'Search the Meta Ad Library for ads from my competitors in my industry. What can I learn from them?' },
-  // ── Account Management ─────────────────────────────────────────────────────
-  { icon: 'BarChart3',     category: 'Account',     label: 'Full account audit',             desc: 'Pixel, CAPI, structure, exclusions health check.',         prompt: 'Run a full account audit — check my pixel setup, CAPI integration, campaign structure, audience exclusions, and give me a health score' },
-  { icon: 'Target',        category: 'Account',     label: 'Show all my campaigns',          desc: 'List every campaign with status and budget.',              prompt: 'List all my campaigns with their status, objective, daily budget, and lifetime spend' },
-  // ── Create & Manage ───────────────────────────────────────────────────────
-  { icon: 'Zap',           category: 'Create',      label: 'Create a new campaign',          desc: 'Set up a campaign with AI guidance step by step.',         prompt: 'Help me create a new campaign. Ask me about my goal, budget, audience, and creatives — then set it up.' },
-  { icon: 'Search',        category: 'Create',      label: 'Write ad copy for me',           desc: 'Generate headlines, body text, and CTAs.',                 prompt: 'Write 3 ad copy variations for my best-performing campaign — include headlines, primary text, and CTA recommendations' },
+  { icon: 'BarChart3',     label: 'Weekly Performance Report',      desc: 'Spend, ROAS, CTR, CPA across all campaigns — with trends vs last week.',
+    prompt: 'Generate a full weekly performance report: show all active campaigns with spend, ROAS, CTR, CPA, and impressions for the last 7 days. Compare each metric to the previous 7 days. Highlight which campaigns improved and which declined. Include a budget allocation breakdown and top 3 recommendations.' },
+  { icon: 'AlertTriangle', label: 'Problems & Quick Wins',          desc: 'Find issues, wasted spend, and actionable fixes you can apply today.',
+    prompt: 'Analyze my ad account for problems and quick wins: flag campaigns with rising CPA or declining ROAS (compare last 7d vs previous 7d), find ad sets with audience overlap or high frequency, identify wasted budget on low performers, and give me a prioritized action plan of changes I can make right now.' },
+  { icon: 'Search',        label: 'Creative Performance Analysis',  desc: 'Which ads are winning, which show fatigue — with copy recommendations.',
+    prompt: 'Do a full creative performance analysis: show all my ads with their CTR, CPA, ROAS, and frequency. Flag creatives showing fatigue (frequency > 3 or declining CTR). Identify my top 3 best-performing ads and explain why they work. Then write 3 new ad copy variations based on the winning patterns.' },
+  { icon: 'DollarSign',    label: 'Budget Optimization Plan',       desc: 'Where to shift spend for maximum ROAS — with specific reallocation amounts.',
+    prompt: 'Create a budget optimization plan: analyze spend vs ROAS across all campaigns and ad sets. Show which ones are overspending relative to their returns and which deserve more budget. Give me specific dollar amounts to reallocate, the expected ROAS impact, and step-by-step instructions to make the changes.' },
+  { icon: 'Target',        label: 'Audience & Targeting Review',    desc: 'Audience sizes, overlap issues, and expansion opportunities.',
+    prompt: 'Review my audiences and targeting: show all custom audiences with their sizes, find overlap between ad sets that\'s wasting budget, check if any audiences are too narrow or too broad, and suggest new lookalike or interest-based audiences I should test based on my best-performing segments.' },
+  { icon: 'BarChart3',     label: 'Full Account Health Audit',      desc: 'Pixel, CAPI, campaign structure, exclusions — scored with fix priorities.',
+    prompt: 'Run a comprehensive account health audit: check my pixel setup and CAPI integration, review campaign structure and naming conventions, verify audience exclusions are in place, analyze budget distribution, check for overlapping ad sets, and give me a health score out of 10 with a prioritized list of fixes.' },
 ];
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
@@ -38,15 +32,14 @@ export const Dashboard = ({
   onLogout,
 }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [chatMode, setChatMode] = useState('Fast');
   const [chatLanguage, setChatLanguage] = useState(() => localStorage.getItem('aam_language') || 'en');
   const [activeView, setActiveView] = useState({ type: 'chat' });
 
   const {
     sessions, activeSessionId, createNewChat, switchSession, deleteSession,
-    messages, isTyping, thinkingText, sendMessage, notification,
+    messages, isTyping, thinkingText, sendMessage, stopGeneration, notification,
     savedItems, saveItem, deleteSavedItem,
-  } = useChatSessions({ token, adAccountId, accountName: selectedAccount?.name, mode: chatMode, language: chatLanguage });
+  } = useChatSessions({ token, adAccountId, accountName: selectedAccount?.name, language: chatLanguage });
 
   const handleLanguageChange = useCallback((lang) => {
     setChatLanguage(lang);
@@ -153,9 +146,8 @@ export const Dashboard = ({
             isTyping={isTyping}
             thinkingText={thinkingText}
             onSend={handleSend}
+            onStop={stopGeneration}
             suggestedActions={SUGGESTED_ACTIONS}
-            mode={chatMode}
-            onModeChange={setChatMode}
             adAccountId={adAccountId}
             onSaveItem={saveItem}
           />

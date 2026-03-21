@@ -52,7 +52,7 @@ export const groupSessionsByDate = (sessions) => {
 };
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
-export const useChatSessions = ({ token, adAccountId, accountName, mode = 'Fast', language = 'en' }) => {
+export const useChatSessions = ({ token, adAccountId, accountName, language = 'en' }) => {
   const [sessions, setSessions] = useState([]);
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [savedItems, setSavedItemsState] = useState([]);
@@ -97,7 +97,6 @@ export const useChatSessions = ({ token, adAccountId, accountName, mode = 'Fast'
     token,
     adAccountId,
     accountName,
-    mode,
     language,
     initialMessages,
     externalSessionId: initialSessionId,
@@ -251,6 +250,7 @@ export const useChatSessions = ({ token, adAccountId, accountName, mode = 'Fast'
     isTyping: agent.isTyping,
     thinkingText: agent.thinkingText,
     sendMessage,
+    stopGeneration: agent.stopGeneration,
     notification: agent.notification,
     // Saved items
     savedItems,

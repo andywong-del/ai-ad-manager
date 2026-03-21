@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Bot, Send, Paperclip, CheckCircle2, XCircle, ArrowUpRight, BarChart3, Target, TrendingDown, Search, FileText, DollarSign, AlertTriangle, Zap, X, Upload, Image, Film, TrendingUp, ChevronRight, Shield, Sparkles, Download, Bookmark } from 'lucide-react';
+import { Bot, Send, Square, Paperclip, CheckCircle2, XCircle, ArrowUpRight, BarChart3, Target, TrendingDown, Search, FileText, DollarSign, AlertTriangle, Zap, X, Upload, Image, Film, TrendingUp, ChevronRight, Shield, Sparkles, Download, Bookmark } from 'lucide-react';
 
 // ── Export utilities ─────────────────────────────────────────────────────────
 const downloadCSV = (title, rows) => {
@@ -899,114 +899,29 @@ const MetaLogo = ({ height = 16 }) => (
   <img src="/meta-logo.svg" alt="Meta" style={{ height }} className="shrink-0" />
 );
 
-// Realistic report preview — mimics actual Meta Ads report with metric columns
-const ReportPreview = ({ metrics }) => (
-  <div className="w-full h-full flex flex-col justify-end">
-    <div className="grid grid-cols-4 gap-px bg-slate-100 border-t border-slate-200 rounded-b">
-      {metrics.map((m, i) => (
-        <div key={i} className="bg-white px-2 py-1.5 first:rounded-bl last:rounded-br">
-          <p className="text-[6px] font-medium text-slate-400 uppercase tracking-wider leading-none mb-0.5 truncate">{m.label}</p>
-          <p className={`text-[11px] font-bold leading-tight ${m.color || 'text-slate-800'}`}>{m.value}</p>
-          {m.sub && <p className="text-[5.5px] text-slate-400 leading-tight mt-px truncate">{m.sub}</p>}
-        </div>
-      ))}
-    </div>
-  </div>
-);
-
-const CARD_PREVIEWS = {
-  BarChart3: () => <ReportPreview metrics={[
-    { label: 'Spend', value: '$3.2K', sub: '78% of budget', color: 'text-slate-900' },
-    { label: 'ROAS', value: '2.8x', sub: 'vs 2.1x prev', color: 'text-emerald-600' },
-    { label: 'CTR', value: '1.84%', sub: '+0.3% WoW', color: 'text-blue-600' },
-    { label: 'CPA', value: '$12.40', sub: 'target $15', color: 'text-emerald-600' },
-  ]} />,
-  Target: () => <ReportPreview metrics={[
-    { label: 'Audiences', value: '12', sub: '3 lookalikes', color: 'text-slate-900' },
-    { label: 'Reach', value: '840K', sub: 'FB & IG combined', color: 'text-slate-900' },
-    { label: 'Overlap', value: '18%', sub: 'across ad sets', color: 'text-amber-600' },
-    { label: 'Top Seg.', value: 'LLA 1%', sub: '3.4x ROAS', color: 'text-emerald-600' },
-  ]} />,
-  TrendingDown: () => <ReportPreview metrics={[
-    { label: 'CPM Change', value: '+34%', sub: '7d vs 7d', color: 'text-red-500' },
-    { label: 'CTR Drop', value: '-0.6%', sub: '1.8% → 1.2%', color: 'text-red-500' },
-    { label: 'ROAS', value: '-14%', sub: '$4.2 → $3.6', color: 'text-red-500' },
-    { label: 'Flagged', value: '3', sub: 'campaigns', color: 'text-amber-600' },
-  ]} />,
-  Search: () => <ReportPreview metrics={[
-    { label: 'Creatives', value: '24', sub: 'across 6 sets', color: 'text-slate-900' },
-    { label: 'Top CTR', value: '3.2%', sub: 'video_v3.mp4', color: 'text-emerald-600' },
-    { label: 'Fatigue', value: '5 ads', sub: 'freq > 4.0', color: 'text-red-500' },
-    { label: 'Winner', value: 'Ad #12', sub: '$8.20 CPA', color: 'text-blue-600' },
-  ]} />,
-  FileText: () => <ReportPreview metrics={[
-    { label: 'Today Spend', value: '$1.4K', sub: '52% of daily', color: 'text-slate-900' },
-    { label: 'Conversions', value: '89', sub: '+12 vs yesterday', color: 'text-emerald-600' },
-    { label: 'CPA', value: '$15.73', sub: 'target $18', color: 'text-emerald-600' },
-    { label: 'ROAS', value: '3.1x', sub: 'above target', color: 'text-emerald-600' },
-  ]} />,
-  DollarSign: () => <ReportPreview metrics={[
-    { label: 'Total Budget', value: '$8.5K', sub: 'monthly cap', color: 'text-slate-900' },
-    { label: 'Utilized', value: '62%', sub: '$5.3K spent', color: 'text-blue-600' },
-    { label: 'Wasted', value: '$820', sub: '2 low-ROAS sets', color: 'text-red-500' },
-    { label: 'Realloc.', value: '+$400', sub: 'to top performer', color: 'text-emerald-600' },
-  ]} />,
-  AlertTriangle: () => <ReportPreview metrics={[
-    { label: 'Ad Sets', value: '18', sub: 'active total', color: 'text-slate-900' },
-    { label: 'High Freq.', value: '4', sub: 'freq > 3.5', color: 'text-amber-600' },
-    { label: 'Low Delivery', value: '2', sub: '< 100 impr/day', color: 'text-red-500' },
-    { label: 'Healthy', value: '12', sub: '67% of ad sets', color: 'text-emerald-600' },
-  ]} />,
-  Zap: () => <ReportPreview metrics={[
-    { label: 'Quick Wins', value: '5', sub: 'found today', color: 'text-slate-900' },
-    { label: 'Est. Savings', value: '$340', sub: 'per week', color: 'text-emerald-600' },
-    { label: 'ROAS Lift', value: '+0.4x', sub: 'projected', color: 'text-emerald-600' },
-    { label: 'Priority', value: '2 high', sub: '3 medium', color: 'text-amber-600' },
-  ]} />,
-};
-
 const ActionCard = ({ icon, label, desc, prompt, onSend, disabled }) => {
   const Icon = ICON_MAP[icon] || Zap;
   const bg = ICON_BG[icon] || 'bg-slate-500';
-  const Preview = CARD_PREVIEWS[icon] || CARD_PREVIEWS.Zap;
   return (
     <button onClick={() => onSend(prompt)} disabled={disabled}
-      className="flex flex-col bg-white border border-slate-100 rounded-2xl overflow-hidden text-left shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:-translate-y-1 transition-all duration-200 disabled:opacity-40 group">
-      {/* Header — Meta logo + title + arrow */}
-      <div className="px-4 pt-4 pb-0">
-        <div className="flex items-center mb-3">
-          <MetaLogo height={24} />
-        </div>
-        <div className="flex items-start justify-between">
-          <p className="text-[15px] font-bold text-slate-900 leading-snug pr-2">{label}</p>
-          <ArrowUpRight size={14} className="text-slate-200 group-hover:text-slate-400 transition-colors shrink-0 mt-0.5" />
-        </div>
-        <p className="text-[12px] text-slate-400 leading-relaxed mt-1 mb-3">{desc}</p>
+      className="flex items-start gap-3 bg-white border border-slate-200/80 rounded-xl px-4 py-3.5 text-left hover:border-blue-200 hover:bg-blue-50/30 hover:shadow-sm transition-all duration-150 disabled:opacity-40 group">
+      <div className={`w-8 h-8 rounded-lg ${bg} flex items-center justify-center shrink-0 mt-0.5`}>
+        <Icon size={15} className="text-white" />
       </div>
-      {/* Report metrics preview */}
-      <div className="mt-auto px-3 pb-3">
-        <div className="bg-slate-50 rounded-lg overflow-hidden border border-slate-100">
-          <Preview />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 mb-0.5">
+          <MetaLogo height={12} />
         </div>
+        <p className="text-[13px] font-semibold text-slate-800 leading-snug">{label}</p>
+        <p className="text-[11px] text-slate-400 leading-relaxed mt-0.5">{desc}</p>
       </div>
+      <ArrowUpRight size={13} className="text-slate-200 group-hover:text-blue-400 transition-colors shrink-0 mt-1" />
     </button>
   );
 };
 
-// ── Mode toggle ──────────────────────────────────────────────────────────────
-const ModeToggle = ({ mode, setMode }) => (
-  <div className="flex items-center gap-1 bg-slate-100 rounded-full p-0.5">
-    {['Fast', 'Deep Research'].map((m) => (
-      <button key={m} onClick={() => setMode(m)}
-        className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${mode === m ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
-        {m}
-      </button>
-    ))}
-  </div>
-);
-
 // ── Input box with drag & drop ───────────────────────────────────────────────
-const ChatInput = ({ input, setInput, onKeyDown, onSend, onFilesAdded, attachments, onRemoveAttachment, fileRef, mode, setMode, isTyping, handleFileUpload, isOver }) => (
+const ChatInput = ({ input, setInput, onKeyDown, onSend, onStop, onFilesAdded, attachments, onRemoveAttachment, fileRef, isTyping, handleFileUpload, isOver }) => (
   <div className={`bg-white/80 backdrop-blur-xl border rounded-2xl overflow-hidden shadow-lg shadow-slate-200/50 transition-all
     ${isOver ? 'border-blue-400 ring-2 ring-blue-100' : 'border-slate-200'}`}>
     <AttachmentBar attachments={attachments} onRemove={onRemoveAttachment} />
@@ -1015,35 +930,41 @@ const ChatInput = ({ input, setInput, onKeyDown, onSend, onFilesAdded, attachmen
         value={input}
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={onKeyDown}
-        placeholder={attachments.length ? 'Describe what to do with these files...' : 'Ask anything about your ads'}
+        placeholder={attachments.length ? 'Describe what to do with these files...' : 'Ask anything about your ads...'}
         rows={1}
         disabled={isTyping}
         className="w-full resize-none text-sm bg-transparent text-slate-800 placeholder:text-slate-400 focus:outline-none disabled:text-slate-400 max-h-32 overflow-y-auto"
         style={{ lineHeight: '1.5' }}
       />
     </div>
-    <div className="px-4 pb-3 flex items-center justify-between">
-      <ModeToggle mode={mode} setMode={setMode} />
+    <div className="px-4 pb-3 flex items-center justify-end">
       <div className="flex items-center gap-2">
         <button onClick={() => fileRef.current?.click()} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
           <Paperclip size={16} />
         </button>
         <input ref={fileRef} type="file" accept="image/*,video/*,.pdf,.txt,.doc,.docx" multiple className="hidden" onChange={handleFileUpload} />
-        <button onClick={onSend} disabled={(!input.trim() && !attachments.length) || isTyping}
-          className="w-8 h-8 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:bg-slate-200 disabled:text-slate-400 text-white flex items-center justify-center transition-colors shadow-sm">
-          <Send size={14} />
-        </button>
+        {isTyping ? (
+          <button onClick={onStop}
+            className="w-8 h-8 rounded-lg bg-red-500 hover:bg-red-400 text-white flex items-center justify-center transition-colors shadow-sm"
+            title="Stop generating">
+            <Square size={12} fill="currentColor" />
+          </button>
+        ) : (
+          <button onClick={onSend} disabled={!input.trim() && !attachments.length}
+            className="w-8 h-8 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:bg-slate-200 disabled:text-slate-400 text-white flex items-center justify-center transition-colors shadow-sm">
+            <Send size={14} />
+          </button>
+        )}
       </div>
     </div>
   </div>
 );
 
 // ── Main component ────────────────────────────────────────────────────────────
-export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, suggestedActions = [], mode = 'Fast', onModeChange, adAccountId, onSaveItem }) => {
+export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, onStop, suggestedActions = [], adAccountId, onSaveItem }) => {
   const [input, setInput] = useState('');
   const [attachments, setAttachments] = useState([]); // { id, file, preview, status, progress, result }
   const [isDragOver, setIsDragOver] = useState(false);
-  const setMode = onModeChange || (() => {});
   const endRef   = useRef(null);
   const inputRef = useRef(null);
   const fileRef  = useRef(null);
@@ -1203,7 +1124,11 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, sugges
     const doneAttachments = attachments.filter(a => a.status === 'done');
 
     if (!t && !doneAttachments.length) return;
-    if (isTyping) return;
+    if (isTyping) {
+      // If typing and user clicks a suggested action card, stop first then send
+      if (typeof text === 'string' && onStop) { onStop(); }
+      else return;
+    }
 
     // Build message text with asset info
     let msgText = t;
@@ -1270,24 +1195,26 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, sugges
 
       {/* Empty State */}
       {isEmptyState && (
-        <div className="flex-1 flex flex-col items-center justify-center px-8">
-          <h1 className="text-3xl font-extrabold text-slate-900 mb-8 text-center tracking-tight">
-            Ask anything about your ads
-          </h1>
+        <div className="flex-1 flex flex-col px-8 overflow-y-auto">
+          {/* Spacer to push content to ~38% from top */}
+          <div className="flex-[0_0_32%]" />
 
           <div className="w-full max-w-2xl mx-auto">
+            <h1 className="text-3xl font-extrabold text-slate-900 mb-6 text-center tracking-tight">
+              What would you like to know?
+            </h1>
             <ChatInput
               input={input} setInput={setInput} onKeyDown={handleKeyDown}
-              onSend={() => handleSend()} onFilesAdded={addFiles}
+              onSend={() => handleSend()} onStop={onStop} onFilesAdded={addFiles}
               attachments={attachments} onRemoveAttachment={removeAttachment}
-              fileRef={fileRef} mode={mode} setMode={setMode} isTyping={isTyping}
+              fileRef={fileRef} isTyping={isTyping}
               handleFileUpload={handleFileInput} isOver={isDragOver}
             />
           </div>
 
-          <div className="w-full max-w-[1200px] mx-auto grid grid-cols-4 gap-4 mt-8">
+          <div className="w-full max-w-3xl mx-auto grid grid-cols-2 md:grid-cols-3 gap-3 mt-8 pb-8">
             {suggestedActions.map((action) => (
-              <ActionCard key={action.label} {...action} onSend={onSend} disabled={isTyping} />
+              <ActionCard key={action.label} {...action} onSend={handleSend} disabled={isTyping} />
             ))}
           </div>
         </div>
@@ -1310,9 +1237,9 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, sugges
             <div className="max-w-3xl mx-auto">
               <ChatInput
                 input={input} setInput={setInput} onKeyDown={handleKeyDown}
-                onSend={() => handleSend()} onFilesAdded={addFiles}
+                onSend={() => handleSend()} onStop={onStop} onFilesAdded={addFiles}
                 attachments={attachments} onRemoveAttachment={removeAttachment}
-                fileRef={fileRef} mode={mode} setMode={setMode} isTyping={isTyping}
+                fileRef={fileRef} isTyping={isTyping}
                 handleFileUpload={handleFileInput} isOver={isDragOver}
               />
             </div>
