@@ -40,63 +40,21 @@ const fmtSize = (lower, upper) => {
   return fmt(lower || upper || 0);
 };
 
-// ── Audience Row (compact single-line) ──────────────────────────────────────
-const AudienceRow = ({ audience, onUse, onCreateLookalike, onDelete }) => {
+// ── Audience Table Row ──────────────────────────────────────────────────────
+const CopyableId = ({ id }) => {
   const [copied, setCopied] = useState(false);
-  const subtype = audience.subtype || 'CUSTOM';
-  const colorCls = SUBTYPE_COLORS[subtype] || 'bg-slate-100 text-slate-600';
-  const size = fmtSize(audience.approximate_count_lower_bound, audience.approximate_count_upper_bound);
-
   const copyId = (e) => {
     e.stopPropagation();
-    navigator.clipboard.writeText(audience.id);
+    navigator.clipboard.writeText(id);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
-
   return (
-    <div className="grid grid-cols-[1fr_90px_130px_90px_auto] items-center gap-x-3 px-4 py-2 bg-white border border-slate-200 rounded-lg hover:border-slate-300 transition-all group">
-      {/* Name + ID */}
-      <div className="min-w-0">
-        <p className="text-[12px] font-semibold text-slate-800 truncate">{audience.name}</p>
-        <button onClick={copyId} title="Copy audience ID"
-          className="text-[10px] font-mono text-slate-400 hover:text-slate-600 transition-colors flex items-center gap-1 mt-0.5">
-          <ClipboardCopy size={9} />
-          {copied ? 'Copied!' : audience.id}
-        </button>
-      </div>
-
-      {/* Type badge */}
-      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md text-center whitespace-nowrap ${colorCls}`}>
-        {SUBTYPE_LABELS[subtype] || subtype}
-      </span>
-
-      {/* Size */}
-      <p className="text-[12px] font-bold text-slate-900 text-right tabular-nums whitespace-nowrap">{size || '—'}</p>
-
-      {/* Date */}
-      <span className="text-[10px] text-slate-400 text-right whitespace-nowrap">
-        {fmtDate(audience.time_created)}
-      </span>
-
-      {/* Actions */}
-      <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity min-w-[100px]">
-        <button onClick={() => onUse(audience)} title="Use in campaign"
-          className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold bg-blue-600 text-white hover:bg-blue-500 transition-colors">
-          <Target size={10} /> Use
-        </button>
-        {subtype !== 'LOOKALIKE' && (
-          <button onClick={() => onCreateLookalike(audience)} title="Create lookalike"
-            className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors border border-emerald-200">
-            <Copy size={10} /> LAL
-          </button>
-        )}
-        <button onClick={() => onDelete(audience)} title="Delete"
-          className="p-1 rounded-md text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors">
-          <Trash2 size={11} />
-        </button>
-      </div>
-    </div>
+    <button onClick={copyId} title="Copy audience ID"
+      className="text-[10px] font-mono text-slate-400 hover:text-slate-600 transition-colors inline-flex items-center gap-1">
+      <ClipboardCopy size={9} />
+      {copied ? 'Copied!' : id}
+    </button>
   );
 };
 
@@ -451,20 +409,61 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack }) => {
         )}
 
         {filtered.length > 0 && (
-          <div className="space-y-1">
-            {/* Header */}
-            <div className="grid grid-cols-[1fr_90px_130px_90px_auto] items-center gap-x-3 px-4 py-1.5">
-              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Name</span>
-              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-center">Type</span>
-              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right">Size</span>
-              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right">Created</span>
-              <span className="min-w-[100px]" />
-            </div>
-            {filtered.map(aud => (
-              <AudienceRow key={aud.id} audience={aud}
-                onUse={handleUse} onCreateLookalike={handleCreateLookalike} onDelete={handleDelete} />
-            ))}
-          </div>
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                <th className="text-left py-1.5 px-4 font-semibold">Name</th>
+                <th className="text-center py-1.5 px-2 font-semibold w-[100px]">Type</th>
+                <th className="text-right py-1.5 px-2 font-semibold w-[80px]">Size</th>
+                <th className="text-right py-1.5 px-2 font-semibold w-[90px]">Created</th>
+                <th className="w-[110px]"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(aud => {
+                const subtype = aud.subtype || 'CUSTOM';
+                const colorCls = SUBTYPE_COLORS[subtype] || 'bg-slate-100 text-slate-600';
+                const size = fmtSize(aud.approximate_count_lower_bound, aud.approximate_count_upper_bound);
+                return (
+                  <tr key={aud.id} className="group border-t border-slate-100 hover:bg-blue-50/30 transition-colors">
+                    <td className="py-2 px-4">
+                      <p className="text-[12px] font-semibold text-slate-800 truncate max-w-[500px]">{aud.name}</p>
+                      <CopyableId id={aud.id} />
+                    </td>
+                    <td className="py-2 px-2 text-center">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap ${colorCls}`}>
+                        {SUBTYPE_LABELS[subtype] || subtype}
+                      </span>
+                    </td>
+                    <td className="py-2 px-2 text-right">
+                      <span className="text-[12px] font-bold text-slate-900 tabular-nums whitespace-nowrap">{size || '—'}</span>
+                    </td>
+                    <td className="py-2 px-2 text-right">
+                      <span className="text-[10px] text-slate-400 whitespace-nowrap">{fmtDate(aud.time_created)}</span>
+                    </td>
+                    <td className="py-2 px-2 text-right">
+                      <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => handleUse(aud)} title="Use in campaign"
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold bg-blue-600 text-white hover:bg-blue-500 transition-colors">
+                          <Target size={10} /> Use
+                        </button>
+                        {subtype !== 'LOOKALIKE' && (
+                          <button onClick={() => handleCreateLookalike(aud)} title="Create lookalike"
+                            className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors border border-emerald-200">
+                            <Copy size={10} /> LAL
+                          </button>
+                        )}
+                        <button onClick={() => handleDelete(aud)} title="Delete"
+                          className="p-1 rounded-md text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors">
+                          <Trash2 size={11} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         )}
 
         {audiences.length > 0 && filtered.length === 0 && (
