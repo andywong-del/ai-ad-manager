@@ -3,7 +3,7 @@ import axios from 'axios';
 const BASE_URL = process.env.META_BASE_URL || 'https://graph.facebook.com';
 const API_VERSION = process.env.FB_API_VERSION || 'v19.0';
 
-const metaApi = axios.create({ baseURL: `${BASE_URL}/${API_VERSION}`, timeout: 30000 });
+const metaApi = axios.create({ baseURL: `${BASE_URL}/${API_VERSION}`, timeout: 60000 });
 
 // ─── Pagination Helper ───────────────────────────────────────────────
 
@@ -91,13 +91,11 @@ export const getMinimumBudgets = async (token, adAccountId) => {
 // ─── Campaigns ───────────────────────────────────────────────────────
 
 export const getCampaigns = async (token, adAccountId) => {
-  const { data } = await metaApi.get(`/${adAccountId}/campaigns`, {
-    params: {
-      access_token: token,
-      fields: 'id,name,status,daily_budget,insights.date_preset(last_7d){spend,impressions,clicks,actions,action_values}'
-    }
+  // Use fetchAll to paginate through ALL campaigns (accounts can have 300+)
+  return fetchAll(`/${adAccountId}/campaigns`, token, {
+    limit: 200,
+    fields: 'id,name,status,daily_budget,insights.date_preset(last_7d){spend,impressions,clicks,actions,action_values}',
   });
-  return data.data;
 };
 
 export const getCampaign = async (token, campaignId) => {
@@ -136,23 +134,17 @@ export const copyCampaign = async (token, campaignId, params = {}) => {
 };
 
 export const getCampaignAdSets = async (token, campaignId) => {
-  const { data } = await metaApi.get(`/${campaignId}/adsets`, {
-    params: {
-      access_token: token,
-      fields: 'id,name,status,daily_budget,targeting,optimization_goal,billing_event,bid_amount'
-    }
+  return fetchAll(`/${campaignId}/adsets`, token, {
+    limit: 200,
+    fields: 'id,name,status,daily_budget,targeting,optimization_goal,billing_event,bid_amount',
   });
-  return data.data;
 };
 
 export const getCampaignAds = async (token, campaignId) => {
-  const { data } = await metaApi.get(`/${campaignId}/ads`, {
-    params: {
-      access_token: token,
-      fields: 'id,name,status,effective_status,creative'
-    }
+  return fetchAll(`/${campaignId}/ads`, token, {
+    limit: 200,
+    fields: 'id,name,status,effective_status,creative',
   });
-  return data.data;
 };
 
 // ─── Ad Sets ─────────────────────────────────────────────────────────
@@ -160,13 +152,10 @@ export const getCampaignAds = async (token, campaignId) => {
 const AD_SET_FIELDS = 'id,name,campaign_id,status,effective_status,daily_budget,lifetime_budget,budget_remaining,bid_amount,bid_strategy,billing_event,optimization_goal,start_time,end_time,targeting,promoted_object,created_time,updated_time,learning_stage_info,adset_schedule';
 
 export const getAdSets = async (token, adAccountId) => {
-  const { data } = await metaApi.get(`/${adAccountId}/adsets`, {
-    params: {
-      access_token: token,
-      fields: AD_SET_FIELDS
-    }
+  return fetchAll(`/${adAccountId}/adsets`, token, {
+    limit: 200,
+    fields: AD_SET_FIELDS,
   });
-  return data.data;
 };
 
 export const getAdSet = async (token, adSetId) => {
@@ -208,13 +197,10 @@ export const copyAdSet = async (token, adSetId, params = {}) => {
 };
 
 export const getAdSetAds = async (token, adSetId) => {
-  const { data } = await metaApi.get(`/${adSetId}/ads`, {
-    params: {
-      access_token: token,
-      fields: 'id,name,status,effective_status,creative'
-    }
+  return fetchAll(`/${adSetId}/ads`, token, {
+    limit: 200,
+    fields: 'id,name,status,effective_status,creative',
   });
-  return data.data;
 };
 
 export const getAdSetDeliveryEstimate = async (token, adSetId) => {
@@ -229,13 +215,10 @@ export const getAdSetDeliveryEstimate = async (token, adSetId) => {
 const AD_FIELDS = 'id,name,adset_id,campaign_id,status,effective_status,creative,created_time,updated_time,tracking_specs,conversion_domain';
 
 export const getAds = async (token, adAccountId) => {
-  const { data } = await metaApi.get(`/${adAccountId}/ads`, {
-    params: {
-      access_token: token,
-      fields: AD_FIELDS
-    }
+  return fetchAll(`/${adAccountId}/ads`, token, {
+    limit: 200,
+    fields: AD_FIELDS,
   });
-  return data.data;
 };
 
 export const getAd = async (token, adId) => {
@@ -287,13 +270,10 @@ export const getAdLeads = async (token, adId) => {
 const CREATIVE_FIELDS = 'id,name,status,body,title,image_hash,image_url,video_id,object_story_spec,object_url,call_to_action_type,url_tags,asset_feed_spec,thumbnail_url';
 
 export const getAdCreatives = async (token, adAccountId) => {
-  const { data } = await metaApi.get(`/${adAccountId}/adcreatives`, {
-    params: {
-      access_token: token,
-      fields: CREATIVE_FIELDS
-    }
+  return fetchAll(`/${adAccountId}/adcreatives`, token, {
+    limit: 200,
+    fields: CREATIVE_FIELDS,
   });
-  return data.data;
 };
 
 export const getAdCreative = async (token, creativeId) => {

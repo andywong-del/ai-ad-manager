@@ -102,9 +102,9 @@ router.post('/', async (req, res) => {
       yue: '[LANGUAGE: Reply in Cantonese (廣東話). Use natural spoken Cantonese, not written Chinese. Keep technical terms like campaign names, metric names (ROAS, CTR, CPA), and numbers in English. All explanations, analysis, recommendations, and conversational text should be in Cantonese.]\n\n',
     };
     const langPrefix = LANG_MAP[language] || '';
-    // Inject today's date so the agent always knows the correct date
+    // Inject today's date so the agent calculates date ranges correctly
     const todayStr = new Date().toISOString().split('T')[0];
-    const datePrefix = `[Today is ${todayStr}] `;
+    const datePrefix = `[Current date: ${todayStr}] `;
     const newMessage = {
       role: 'user',
       parts: [{ text: datePrefix + langPrefix + message }],
