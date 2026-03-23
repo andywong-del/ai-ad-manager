@@ -52,6 +52,7 @@ router.post('/', async (req, res) => {
   try {
     const { message, sessionId: clientSessionId, adAccountId, token, language = 'en' } = req.body;
     console.log(`[chat] message="${message?.slice(0, 60)}" adAccountId=${adAccountId} lang=${language} session=${clientSessionId?.slice(0, 8)}`);
+    console.log(`[chat] token=${(req.token || token || '').slice(0, 15)}... bodyToken=${!!token} headerToken=${!!req.token}`);
     console.log(`[chat] env check: GEMINI_API_KEY=${!!process.env.GEMINI_API_KEY}`);
 
     if (!message) {
@@ -106,52 +107,77 @@ router.post('/', async (req, res) => {
       parts: [{ text: langPrefix + message }],
     };
 
-    // Run the agent and stream events
-    console.log(`[chat] running agent...`);
-    const events = runner.runAsync({
-      userId,
-      sessionId: adkSessionId,
-      newMessage,
-      stateDelta: { token: userToken, adAccountId: adAccountId || null },
-    });
-
+    // Run the agent and stream events (with retry on MALFORMED_FUNCTION_CALL)
+    const MAX_RETRIES = 2;
     let fullText = '';
     let eventCount = 0;
 
-    for await (const event of events) {
-      eventCount++;
-      // Log event structure for debugging
-      if (eventCount <= 3) {
-        console.log(`[chat] event #${eventCount}: author=${event.author}, hasContent=${!!event.content}, keys=${Object.keys(event).join(',')}`);
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      if (attempt > 0) {
+        console.log(`[chat] retry attempt ${attempt} after MALFORMED_FUNCTION_CALL`);
+        // Create a fresh session for retry to avoid corrupted state
+        const retrySession = await sessionService.createSession({
+          appName: 'ai_ad_manager',
+          userId,
+          state: { token: userToken, adAccountId: adAccountId || null },
+        });
+        adkSessionId = retrySession.id;
+        if (clientSessionId) sessionMap.set(clientSessionId, adkSessionId);
       }
 
-      // Surface ADK errors as text so the user sees them
-      if (event.errorMessage) {
-        console.error(`[chat] ADK error: ${event.errorCode} ${event.errorMessage}`);
-        sse(res, { type: 'text', content: `Error: ${event.errorMessage}` });
-        fullText += event.errorMessage;
-      }
+      console.log(`[chat] running agent... (attempt ${attempt + 1})`);
+      const events = runner.runAsync({
+        userId,
+        sessionId: adkSessionId,
+        newMessage,
+        stateDelta: { token: userToken, adAccountId: adAccountId || null },
+      });
 
-      // Extract text content from the event
-      if (event.content?.parts) {
-        for (const part of event.content.parts) {
-          if (part.text) {
-            fullText += part.text;
-            sse(res, { type: 'text', content: part.text });
-          }
-          if (part.functionCall) {
-            sse(res, { type: 'tool_call', name: part.functionCall.name });
-            console.log(`[chat] tool call: ${part.functionCall.name}`);
+      fullText = '';
+      eventCount = 0;
+      let malformedCall = false;
+
+      for await (const event of events) {
+        eventCount++;
+        if (eventCount <= 3) {
+          console.log(`[chat] event #${eventCount}: author=${event.author}, hasContent=${!!event.content}, errorCode=${event.errorCode || 'none'}`);
+        }
+
+        // Detect MALFORMED_FUNCTION_CALL — retry instead of showing error
+        if (event.errorCode === 'MALFORMED_FUNCTION_CALL') {
+          console.warn(`[chat] MALFORMED_FUNCTION_CALL detected, will retry`);
+          malformedCall = true;
+          continue;
+        }
+
+        if (event.errorMessage && event.errorCode !== 'MALFORMED_FUNCTION_CALL') {
+          console.error(`[chat] ADK error: ${event.errorCode} ${event.errorMessage}`);
+          sse(res, { type: 'text', content: `Error: ${event.errorMessage}` });
+          fullText += event.errorMessage;
+        }
+
+        if (event.content?.parts) {
+          for (const part of event.content.parts) {
+            if (part.text) {
+              fullText += part.text;
+              sse(res, { type: 'text', content: part.text });
+            }
+            if (part.functionCall) {
+              sse(res, { type: 'tool_call', name: part.functionCall.name });
+              console.log(`[chat] tool call: ${part.functionCall.name}`);
+            }
           }
         }
       }
+
+      // If we got text or no malformed call, stop retrying
+      if (fullText || !malformedCall) break;
     }
 
     console.log(`[chat] done: ${eventCount} events, ${fullText.length} chars of text`);
 
-    // If no text was generated, send a diagnostic message
     if (!fullText) {
-      sse(res, { type: 'text', content: `I received your message but couldn't generate a response. This may be a temporary issue with the AI service. (${eventCount} events processed, adAccountId: ${adAccountId || 'none'})` });
+      sse(res, { type: 'text', content: `I received your message but couldn't generate a response. Please try again. (adAccountId: ${adAccountId || 'none'})` });
     }
 
     sse(res, { type: 'done', sessionId: adkSessionId });

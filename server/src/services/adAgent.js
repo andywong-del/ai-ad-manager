@@ -165,17 +165,18 @@ function getAdVideoStatus({ video_id }, c) {
 }
 
 // ─── Insights ───────────────────────────────────────────────────────────────
-function getAccountInsights({ date_preset = 'last_7d', time_range }, c) {
+function getAccountInsights({ date_preset = 'last_7d', since, until }, c) {
   const { token, adAccountId } = ctx(c);
   if (!adAccountId) return { error: 'No ad account selected.' };
-  return meta.getInsights(token, adAccountId, date_preset, time_range || null);
+  const timeRange = (since && until) ? { since, until } : null;
+  return meta.getInsights(token, adAccountId, date_preset, timeRange);
 }
-function getObjectInsights({ object_id, date_preset = 'last_7d', time_range, breakdowns, fields }, c) {
+function getObjectInsights({ object_id, date_preset = 'last_7d', since, until, breakdowns, fields }, c) {
   const params = {
     fields: fields || 'spend,impressions,clicks,ctr,cpm,cpc,actions,action_values,frequency,reach,cost_per_action_type',
   };
-  if (time_range) {
-    params.time_range = time_range;
+  if (since && until) {
+    params.time_range = { since, until };
   } else {
     params.date_preset = date_preset;
   }
@@ -570,10 +571,10 @@ const adTools = [
     obj({ video_id: str('Video ID') }, ['video_id'])),
 
   // ── Insights ────────────────────────────────────────────────────────────
-  T('get_account_insights', 'Get account-level performance for a date range. Use time_range for exact date matching with Ads Manager.', getAccountInsights,
-    obj({ date_preset: str('today, yesterday, last_3d, last_7d, last_14d, last_28d, last_30d, last_90d, this_month, last_month'), time_range: { type: 'object', description: 'Explicit date range: { "since": "YYYY-MM-DD", "until": "YYYY-MM-DD" }. Use this instead of date_preset to match Ads Manager exactly. "until" should be today\'s date to include today\'s data.' } })),
-  T('get_object_insights', 'Get detailed insights for any campaign/ad set/ad with optional breakdowns. Use time_range for exact date matching.', getObjectInsights,
-    obj({ object_id: str('Campaign, ad set, or ad ID'), date_preset: str('Date range preset'), time_range: { type: 'object', description: 'Explicit date range: { "since": "YYYY-MM-DD", "until": "YYYY-MM-DD" }. Overrides date_preset if provided.' }, breakdowns: str('age, gender, country, placement, device_platform'), fields: str('Custom fields (default: spend,impressions,clicks,ctr,cpm,cpc,actions,action_values,frequency,reach,cost_per_action_type)') }, ['object_id'])),
+  T('get_account_insights', 'Get account-level performance for a date range. For exact Ads Manager matching, use since+until params (includes today).', getAccountInsights,
+    obj({ date_preset: str('today, yesterday, last_3d, last_7d, last_14d, last_28d, last_30d, last_90d, this_month, last_month'), since: str('Start date YYYY-MM-DD for explicit range (overrides date_preset)'), until: str('End date YYYY-MM-DD for explicit range (use today to include partial data)') })),
+  T('get_object_insights', 'Get detailed insights for any campaign/ad set/ad. Use since+until for exact Ads Manager matching.', getObjectInsights,
+    obj({ object_id: str('Campaign, ad set, or ad ID'), date_preset: str('Date range preset'), since: str('Start date YYYY-MM-DD (overrides date_preset)'), until: str('End date YYYY-MM-DD'), breakdowns: str('age, gender, country, placement, device_platform'), fields: str('Custom fields (default: spend,impressions,clicks,ctr,cpm,cpc,actions,action_values,frequency,reach,cost_per_action_type)') }, ['object_id'])),
 
   // ── Account Info ────────────────────────────────────────────────────────
   T('get_ad_account_details', 'Get account details: balance, spend cap, timezone, currency.', getAdAccountDetails),
@@ -904,11 +905,10 @@ Quick reply rules:
 - This is the single most important UX feature: users click instead of type
 
 ## 7. Data accuracy — match Ads Manager exactly
-Meta API date_preset (e.g. last_7d) excludes today's data, which differs from Ads Manager. To match Ads Manager exactly:
-- ALWAYS use time_range with explicit dates instead of date_preset
-- For "last 7 days": use { "since": "7 days ago YYYY-MM-DD", "until": "today YYYY-MM-DD" } to include today's partial data
-- For "yesterday": use { "since": "yesterday YYYY-MM-DD", "until": "yesterday YYYY-MM-DD" }
-- Calculate dates based on today's date and always include today when showing recent performance
+Meta API date_preset (e.g. last_7d) excludes today's data, which differs from Ads Manager. To match Ads Manager:
+- Use the "since" and "until" parameters on get_account_insights and get_object_insights for exact date control
+- For "last 7 days": pass since="YYYY-MM-DD" (7 days ago) and until="YYYY-MM-DD" (today) to include today's partial data
+- Calculate dates based on today's date
 - Mention the exact date range in your response (e.g., "Mar 16–23, 2026")
 - Note: Some conversion data may be delayed up to 48 hours due to attribution windows
 
