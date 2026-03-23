@@ -621,7 +621,7 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack }) => {
     // Status filter (best-effort from available data)
     const matchesStatus = filterStatus.length === 0
       || (filterStatus.includes('in_active_ads') && aud.delivery_status?.status === '200')
-      || (filterStatus.includes('recently_used') && aud.time_content_updated && (Date.now() / 1000 - aud.time_content_updated) < 30 * 86400)
+      || (filterStatus.includes('recently_used') && aud.time_updated && (Date.now() / 1000 - aud.time_updated) < 30 * 86400)
       || (filterStatus.includes('action_needed') && (opStatus === 'Error' || opStatus === 'Failed'));
 
     return matchesSearch && matchesType && matchesAvail && matchesStatus;
