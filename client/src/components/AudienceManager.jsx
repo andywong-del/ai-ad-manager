@@ -37,14 +37,12 @@ const fmtSize = (lower, upper) => {
   return `${fmt(lower)} – ${fmt(upper)}`;
 };
 
-// ── Audience Row ────────────────────────────────────────────────────────────
+// ── Audience Row (compact single-line) ──────────────────────────────────────
 const AudienceRow = ({ audience, onUse, onCreateLookalike, onDelete }) => {
   const [copied, setCopied] = useState(false);
   const subtype = audience.subtype || 'CUSTOM';
   const colorCls = SUBTYPE_COLORS[subtype] || 'bg-slate-100 text-slate-600';
-  const status = audience.operation_status?.status || audience.delivery_status?.status || 'ready';
   const size = fmtSize(audience.approximate_count_lower_bound, audience.approximate_count_upper_bound);
-  const audienceId = audience.id?.replace('act_', '');
 
   const copyId = (e) => {
     e.stopPropagation();
@@ -54,62 +52,48 @@ const AudienceRow = ({ audience, onUse, onCreateLookalike, onDelete }) => {
   };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl px-5 py-4 hover:shadow-md hover:border-slate-300 transition-all group">
-      {/* Top: Name + Size */}
-      <div className="flex items-start justify-between gap-4 mb-2">
-        <div className="flex-1 min-w-0">
-          <p className="text-[13px] font-semibold text-slate-800 leading-snug">{audience.name}</p>
-          {audience.description && (
-            <p className="text-[11px] text-slate-400 mt-0.5 line-clamp-1">{audience.description}</p>
-          )}
-        </div>
-        {size && (
-          <div className="text-right shrink-0">
-            <p className="text-xl font-bold text-slate-900 leading-none">{size}</p>
-            <p className="text-[10px] text-slate-400 mt-0.5">people</p>
-          </div>
-        )}
-      </div>
-
-      {/* Middle: Tags row */}
-      <div className="flex items-center gap-2 flex-wrap mb-3">
-        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${colorCls}`}>
-          {SUBTYPE_LABELS[subtype] || subtype}
-        </span>
-        <span className={`text-[10px] font-medium px-2 py-0.5 rounded-md capitalize
-          ${status === 'ready' ? 'bg-emerald-50 text-emerald-600' :
-            status === 'too_small' ? 'bg-amber-50 text-amber-600' :
-            'bg-slate-50 text-slate-400'}`}>
-          {status.replace(/_/g, ' ')}
-        </span>
-        <span className="text-[10px] text-slate-400 ml-auto">
-          {fmtDate(audience.time_created)}
-        </span>
-      </div>
-
-      {/* Bottom: ID + Actions */}
-      <div className="flex items-center justify-between">
+    <div className="bg-white border border-slate-200 rounded-lg px-4 py-2.5 hover:border-slate-300 transition-all group flex items-center gap-3">
+      {/* Name + ID */}
+      <div className="flex-1 min-w-0">
+        <p className="text-[12px] font-semibold text-slate-800 truncate">{audience.name}</p>
         <button onClick={copyId} title="Copy audience ID"
-          className="flex items-center gap-1.5 text-[11px] font-mono text-slate-400 hover:text-slate-600 transition-colors">
-          <ClipboardCopy size={11} />
-          <span>{copied ? 'Copied!' : audienceId}</span>
+          className="text-[10px] font-mono text-slate-400 hover:text-slate-600 transition-colors flex items-center gap-1 mt-0.5">
+          <ClipboardCopy size={9} />
+          {copied ? 'Copied!' : audience.id}
         </button>
-        <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={() => onUse(audience)} title="Use in campaign"
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-blue-600 text-white hover:bg-blue-500 transition-colors shadow-sm">
-            <Target size={11} /> Use
+      </div>
+
+      {/* Type badge */}
+      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md shrink-0 ${colorCls}`}>
+        {SUBTYPE_LABELS[subtype] || subtype}
+      </span>
+
+      {/* Size */}
+      <div className="w-20 text-right shrink-0">
+        <p className="text-[13px] font-bold text-slate-900">{size || '—'}</p>
+      </div>
+
+      {/* Date */}
+      <span className="text-[10px] text-slate-400 w-24 text-right shrink-0 hidden lg:block">
+        {fmtDate(audience.time_created)}
+      </span>
+
+      {/* Actions */}
+      <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button onClick={() => onUse(audience)} title="Use in campaign"
+          className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold bg-blue-600 text-white hover:bg-blue-500 transition-colors">
+          <Target size={10} /> Use
+        </button>
+        {subtype !== 'LOOKALIKE' && (
+          <button onClick={() => onCreateLookalike(audience)} title="Create lookalike"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors border border-emerald-200">
+            <Copy size={10} /> LAL
           </button>
-          {subtype !== 'LOOKALIKE' && (
-            <button onClick={() => onCreateLookalike(audience)} title="Create lookalike"
-              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors border border-emerald-200">
-              <Copy size={11} /> Lookalike
-            </button>
-          )}
-          <button onClick={() => onDelete(audience)} title="Delete"
-            className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors">
-            <Trash2 size={13} />
-          </button>
-        </div>
+        )}
+        <button onClick={() => onDelete(audience)} title="Delete"
+          className="p-1 rounded-md text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors">
+          <Trash2 size={11} />
+        </button>
       </div>
     </div>
   );
@@ -345,7 +329,13 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack }) => {
     }
   }, [adAccountId]);
 
-  useEffect(() => { fetchAudiences(); }, [fetchAudiences]);
+  // Reset and re-fetch when ad account changes
+  useEffect(() => {
+    setAudiences([]);
+    setSearchQuery('');
+    setFilterType('all');
+    fetchAudiences();
+  }, [adAccountId, fetchAudiences]);
 
   // Filter + search
   const filtered = audiences.filter(aud => {
@@ -460,7 +450,7 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack }) => {
         )}
 
         {filtered.length > 0 && (
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {filtered.map(aud => (
               <AudienceRow key={aud.id} audience={aud}
                 onUse={handleUse} onCreateLookalike={handleCreateLookalike} onDelete={handleDelete} />
