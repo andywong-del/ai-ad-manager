@@ -84,27 +84,15 @@ export const useChatSessions = ({ token, adAccountId, accountName, language = 'e
   const [initialMessages, setInitialMessages] = useState(null);
   const [initialSessionId, setInitialSessionId] = useState(null);
 
-  // Initialize sessions on mount (global, not per-account)
+  // Initialize on mount — always start with a fresh new chat
   useEffect(() => {
     const list = getSessionList();
     setSessions(list);
     setSavedItemsState(getSavedItems());
     setFoldersState(getFolders());
 
-    if (list.length > 0) {
-      const latest = list[0];
-      const msgs = getSessionMessages(latest.id);
-      if (msgs?.length) {
-        setInitialMessages(msgs);
-        setInitialSessionId(latest.id);
-        setActiveSessionId(latest.id);
-      } else {
-        const newId = makeId();
-        setInitialMessages(null);
-        setInitialSessionId(newId);
-        setActiveSessionId(newId);
-      }
-    } else {
+    // Always start fresh — user can click old sessions in sidebar to resume
+    {
       const newId = makeId();
       setInitialMessages(null);
       setInitialSessionId(newId);
