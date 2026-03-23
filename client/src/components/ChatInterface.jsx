@@ -941,7 +941,7 @@ const ICON_BG = {
 
 // Meta logo — full logo for report card headers
 const MetaLogo = ({ height = 16 }) => (
-  <img src="/meta-logo.svg" alt="Meta" style={{ height }} className="shrink-0" />
+  <img src="/meta-icon.svg" alt="Meta" style={{ height }} className="shrink-0" />
 );
 
 // Meta icon — infinity symbol only, for action cards
