@@ -144,6 +144,10 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
   const [urlFilter, setUrlFilter] = useState('');
 
   // Video
+  const [videoSource, setVideoSource] = useState('fb_page');
+  const [videoSourcePage, setVideoSourcePage] = useState('');
+  const [videoSourceIg, setVideoSourceIg] = useState('');
+  const [videoIdInput, setVideoIdInput] = useState('');
   const [videos, setVideos] = useState([]);
   const [videosLoading, setVideosLoading] = useState(false);
   const [selectedVideoIds, setSelectedVideoIds] = useState([]);
@@ -180,9 +184,11 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
     if (tab === 'website' && !pixels.length) {
       api.get(`/meta/adaccounts/${adAccountId}/pixels`).then(r => setPixels(r.data || [])).catch(() => {});
     }
-    if (tab === 'video' && !videos.length) {
-      setVideosLoading(true);
-      api.get(`/meta/adaccounts/${adAccountId}/videos`).then(r => { setVideos(r.data || []); setVideosLoading(false); }).catch(() => setVideosLoading(false));
+    if (tab === 'video') {
+      // Load pages + IG accounts for video source picker
+      if (!pages.length) api.get('/meta/pages').then(r => setPages(r.data || [])).catch(() => {});
+      if (!igAccounts.length) api.get(`/meta/adaccounts/${adAccountId}/instagram-accounts`).then(r => setIgAccounts(r.data || [])).catch(() => {});
+      // Videos loaded by separate effect below
     }
     if (tab === 'ig' && !igAccounts.length) {
       api.get(`/meta/adaccounts/${adAccountId}/instagram-accounts`).then(r => setIgAccounts(r.data || [])).catch(() => {});
@@ -197,6 +203,17 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
       }).catch(() => {});
     }
   }, [tab, adAccountId]);
+
+  // Fetch videos when video source changes
+  useEffect(() => {
+    if (tab !== 'video' || !adAccountId) return;
+    if (videoSource === 'video_id') { setVideos([]); return; }
+    setVideosLoading(true);
+    setVideos([]);
+    setSelectedVideoIds([]);
+    // All sources use the ad account videos endpoint — Meta returns all videos associated with the account
+    api.get(`/meta/adaccounts/${adAccountId}/videos`).then(r => { setVideos(r.data || []); setVideosLoading(false); }).catch(() => setVideosLoading(false));
+  }, [tab, videoSource, adAccountId]);
 
   const toggleVideo = (id) => {
     setSelectedVideoIds(prev => prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id]);
@@ -242,7 +259,8 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
       return `Create a website custom audience${audName ? ` called ${audName}` : ''} using pixel "${pixelName}" (ID: ${selectedPixelId}), targeting ${eventDesc}, ${retentionDays} day retention`;
     }
     if (tab === 'video') {
-      const vidNames = selectedVideoIds.map(id => videos.find(v => v.id === id)?.title || id).join(', ');
+      const videoIds = videoSource === 'video_id' ? videoIdInput.split(/[,\s]+/).filter(Boolean) : selectedVideoIds;
+      const vidNames = videoIds.map(id => videos.find(v => v.id === id)?.title || id).join(', ');
       const engLabels = {
         video_watched_3s: 'viewed at least 3 seconds',
         video_watched_10s: 'viewed at least 10 seconds',
@@ -253,7 +271,7 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
         video_watched_95pct: 'viewed at least 95%',
       };
       const engDesc = engLabels[engagementType] || engagementType;
-      return `Create a video engagement custom audience${audName ? ` called ${audName}` : ''} for people who ${engDesc} of these videos: ${vidNames} (IDs: ${selectedVideoIds.join(', ')}), ${retentionDays} day retention`;
+      return `Create a video engagement custom audience${audName ? ` called ${audName}` : ''} for people who ${engDesc} of these videos: ${vidNames} (IDs: ${videoIds.join(', ')}), ${retentionDays} day retention`;
     }
     if (tab === 'customer_list') {
       if (customerFile) {
@@ -428,55 +446,101 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
           {/* ── Video ── */}
           {tab === 'video' && (
             <>
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                  Select Videos <span className="text-slate-400 font-normal">({selectedVideoIds.length} selected)</span>
-                </label>
-                {videosLoading ? (
-                  <div className="flex items-center gap-2 py-6 justify-center text-xs text-slate-400">
-                    <RefreshCw size={14} className="animate-spin" /> Loading videos...
+              {/* Video source selector */}
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Video Sources</label>
+                  <select value={videoSource} onChange={e => setVideoSource(e.target.value)} className={INPUT_CLS}>
+                    <option value="fb_page">Facebook Page</option>
+                    <option value="ig_account">Instagram professional account</option>
+                    <option value="campaign">Campaign</option>
+                    <option value="video_id">Video ID</option>
+                  </select>
+                </div>
+                {videoSource === 'fb_page' && (
+                  <div className="flex-1">
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">Facebook Page</label>
+                    {pages.length === 0 ? (
+                      <p className="text-xs text-slate-400 italic py-2">Loading...</p>
+                    ) : (
+                      <select value={videoSourcePage} onChange={e => setVideoSourcePage(e.target.value)} className={INPUT_CLS}>
+                        <option value="">All pages</option>
+                        {pages.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      </select>
+                    )}
                   </div>
-                ) : videos.length === 0 ? (
-                  <p className="text-xs text-slate-400 italic py-4 text-center">No videos found in this ad account</p>
-                ) : (
-                  <div className="max-h-[240px] overflow-y-auto space-y-1.5 border border-slate-200 rounded-lg p-2">
-                    {videos.map(v => (
-                      <button key={v.id} onClick={() => toggleVideo(v.id)}
-                        className={`w-full flex items-center gap-3 px-2 py-2 rounded-lg text-left transition-colors
-                          ${selectedVideoIds.includes(v.id) ? 'bg-blue-50 border border-blue-200' : 'hover:bg-slate-50 border border-transparent'}`}>
-                        {/* Thumbnail */}
-                        <div className="w-16 h-10 rounded-md bg-slate-100 overflow-hidden shrink-0 relative">
-                          {v.picture ? (
-                            <img src={v.picture} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center"><Film size={14} className="text-slate-300" /></div>
-                          )}
-                          {v.length && (
-                            <span className="absolute bottom-0.5 right-0.5 bg-black/70 text-white text-[9px] px-1 rounded">{fmtDuration(v.length)}</span>
-                          )}
-                        </div>
-                        {/* Info */}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[11px] font-medium text-slate-700 truncate">{v.title || `Video ${v.id}`}</p>
-                          <p className="text-[10px] text-slate-400">{v.id}</p>
-                        </div>
-                        {/* Checkbox */}
-                        <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0
-                          ${selectedVideoIds.includes(v.id) ? 'bg-blue-600 border-blue-600' : 'border-slate-300'}`}>
-                          {selectedVideoIds.includes(v.id) && <span className="text-white text-[10px] font-bold">✓</span>}
-                        </div>
-                      </button>
-                    ))}
+                )}
+                {videoSource === 'ig_account' && (
+                  <div className="flex-1">
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">Instagram Account</label>
+                    {igAccounts.length === 0 ? (
+                      <p className="text-xs text-slate-400 italic py-2">Loading...</p>
+                    ) : (
+                      <select value={videoSourceIg} onChange={e => setVideoSourceIg(e.target.value)} className={INPUT_CLS}>
+                        <option value="">Select account</option>
+                        {igAccounts.map(a => <option key={a.id} value={a.id}>@{a.username}</option>)}
+                      </select>
+                    )}
                   </div>
                 )}
               </div>
+
+              {/* Video ID manual input */}
+              {videoSource === 'video_id' ? (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Video IDs</label>
+                  <input value={videoIdInput} onChange={e => setVideoIdInput(e.target.value)} placeholder="Paste video IDs, comma separated" className={INPUT_CLS} />
+                  <p className="text-[10px] text-slate-400 mt-1">Enter one or more video IDs separated by commas</p>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                    Select Videos <span className="text-slate-400 font-normal">({selectedVideoIds.length} selected)</span>
+                  </label>
+                  {videosLoading ? (
+                    <div className="flex items-center gap-2 py-6 justify-center text-xs text-slate-400">
+                      <RefreshCw size={14} className="animate-spin" /> Loading videos...
+                    </div>
+                  ) : videos.length === 0 ? (
+                    <p className="text-xs text-slate-400 italic py-4 text-center">No videos found</p>
+                  ) : (
+                    <div className="max-h-[200px] overflow-y-auto space-y-1.5 border border-slate-200 rounded-lg p-2">
+                      {videos.map(v => (
+                        <button key={v.id} onClick={() => toggleVideo(v.id)}
+                          className={`w-full flex items-center gap-3 px-2 py-2 rounded-lg text-left transition-colors
+                            ${selectedVideoIds.includes(v.id) ? 'bg-blue-50 border border-blue-200' : 'hover:bg-slate-50 border border-transparent'}`}>
+                          <div className="w-16 h-10 rounded-md bg-slate-100 overflow-hidden shrink-0 relative">
+                            {v.picture ? (
+                              <img src={v.picture} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center"><Film size={14} className="text-slate-300" /></div>
+                            )}
+                            {v.length && (
+                              <span className="absolute bottom-0.5 right-0.5 bg-black/70 text-white text-[9px] px-1 rounded">{fmtDuration(v.length)}</span>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[11px] font-medium text-slate-700 truncate">{v.title || `Video ${v.id}`}</p>
+                            <p className="text-[10px] text-slate-400">{v.id}</p>
+                          </div>
+                          <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0
+                            ${selectedVideoIds.includes(v.id) ? 'bg-blue-600 border-blue-600' : 'border-slate-300'}`}>
+                            {selectedVideoIds.includes(v.id) && <span className="text-white text-[10px] font-bold">✓</span>}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1.5">Engagement Type</label>
                 <select value={engagementType} onChange={e => setEngagementType(e.target.value)} className={INPUT_CLS}>
                   <option value="">Choose an engagement type</option>
                   <option value="video_watched_3s">People who have viewed at least 3 seconds of your video</option>
                   <option value="video_watched_10s">People who have viewed at least 10 seconds of your video</option>
-                  <option value="video_watched_15s">People who either completed or viewed at least 15 seconds of your video (ThruPlay)</option>
+                  <option value="video_watched_15s">People who either completed or viewed at least 15 seconds (ThruPlay)</option>
                   <option value="video_watched_25pct">People who have viewed at least 25% of your video</option>
                   <option value="video_watched_50pct">People who have viewed at least 50% of your video</option>
                   <option value="video_watched_75pct">People who have viewed at least 75% of your video</option>
