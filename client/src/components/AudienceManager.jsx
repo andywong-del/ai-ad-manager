@@ -52,9 +52,9 @@ const AudienceRow = ({ audience, onUse, onCreateLookalike, onDelete }) => {
   };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-lg px-4 py-2.5 hover:border-slate-300 transition-all group flex items-center gap-3">
+    <div className="grid grid-cols-[1fr_90px_100px_90px_auto] items-center gap-x-3 px-4 py-2 bg-white border border-slate-200 rounded-lg hover:border-slate-300 transition-all group">
       {/* Name + ID */}
-      <div className="flex-1 min-w-0">
+      <div className="min-w-0">
         <p className="text-[12px] font-semibold text-slate-800 truncate">{audience.name}</p>
         <button onClick={copyId} title="Copy audience ID"
           className="text-[10px] font-mono text-slate-400 hover:text-slate-600 transition-colors flex items-center gap-1 mt-0.5">
@@ -64,22 +64,20 @@ const AudienceRow = ({ audience, onUse, onCreateLookalike, onDelete }) => {
       </div>
 
       {/* Type badge */}
-      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md shrink-0 ${colorCls}`}>
+      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md text-center whitespace-nowrap ${colorCls}`}>
         {SUBTYPE_LABELS[subtype] || subtype}
       </span>
 
       {/* Size */}
-      <div className="w-20 text-right shrink-0">
-        <p className="text-[13px] font-bold text-slate-900">{size || '—'}</p>
-      </div>
+      <p className="text-[12px] font-bold text-slate-900 text-right tabular-nums">{size || '—'}</p>
 
       {/* Date */}
-      <span className="text-[10px] text-slate-400 w-24 text-right shrink-0 hidden lg:block">
+      <span className="text-[10px] text-slate-400 text-right whitespace-nowrap">
         {fmtDate(audience.time_created)}
       </span>
 
       {/* Actions */}
-      <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity min-w-[100px]">
         <button onClick={() => onUse(audience)} title="Use in campaign"
           className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold bg-blue-600 text-white hover:bg-blue-500 transition-colors">
           <Target size={10} /> Use
@@ -450,7 +448,15 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack }) => {
         )}
 
         {filtered.length > 0 && (
-          <div className="space-y-1.5">
+          <div className="space-y-1">
+            {/* Header */}
+            <div className="grid grid-cols-[1fr_90px_100px_90px_auto] items-center gap-x-3 px-4 py-1.5">
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Name</span>
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-center">Type</span>
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right">Size</span>
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right">Created</span>
+              <span className="min-w-[100px]" />
+            </div>
             {filtered.map(aud => (
               <AudienceRow key={aud.id} audience={aud}
                 onUse={handleUse} onCreateLookalike={handleCreateLookalike} onDelete={handleDelete} />
