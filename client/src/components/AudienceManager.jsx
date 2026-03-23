@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Users, Plus, RefreshCw, Trash2, Copy, Target, Globe, Hash, X, AlertTriangle, Search, Film, ClipboardCopy, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, SlidersHorizontal, FolderOpen } from 'lucide-react';
+import { Users, Plus, RefreshCw, Trash2, Copy, Target, Globe, Hash, X, AlertTriangle, Search, Film, ClipboardCopy, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, SlidersHorizontal, FolderOpen, Smartphone, ShoppingBag, BookOpen, Sparkles, CalendarDays, Database, FileText } from 'lucide-react';
 import api from '../services/api.js';
 
 // ── Confirm Dialog ──────────────────────────────────────────────────────────
@@ -32,6 +32,9 @@ const SUBTYPE_LABELS = {
   WEBSITE: 'Website', ENGAGEMENT: 'Engagement', CUSTOM: 'Customer List',
   LOOKALIKE: 'Lookalike', OFFLINE_CONVERSION: 'Offline',
   IG_BUSINESS: 'Instagram', IG_BUSINESS_PROFILE: 'Instagram',
+  APP: 'Mobile App', VIDEO: 'Video', LEAD_AD: 'Lead Ad',
+  SHOPPING: 'Shopping', CATALOGUE: 'Catalogue', AR_EXPERIENCE: 'AR',
+  FB_EVENT: 'FB Event', PAGE: 'Page',
 };
 const SUBTYPE_COLORS = {
   WEBSITE: 'bg-blue-100 text-blue-700',
@@ -41,6 +44,14 @@ const SUBTYPE_COLORS = {
   IG_BUSINESS: 'bg-pink-100 text-pink-700',
   IG_BUSINESS_PROFILE: 'bg-pink-100 text-pink-700',
   OFFLINE_CONVERSION: 'bg-slate-100 text-slate-600',
+  APP: 'bg-cyan-100 text-cyan-700',
+  VIDEO: 'bg-violet-100 text-violet-700',
+  LEAD_AD: 'bg-orange-100 text-orange-700',
+  SHOPPING: 'bg-lime-100 text-lime-700',
+  CATALOGUE: 'bg-teal-100 text-teal-700',
+  AR_EXPERIENCE: 'bg-fuchsia-100 text-fuchsia-700',
+  FB_EVENT: 'bg-rose-100 text-rose-700',
+  PAGE: 'bg-indigo-100 text-indigo-700',
 };
 
 const fmtDate = (ts) => {
@@ -98,13 +109,20 @@ const AVAILABILITY_FILTERS = [
 ];
 
 // ── Create Audience Modal ───────────────────────────────────────────────────
-const CREATE_TABS = [
+const SOURCE_LIST = [
   { id: 'website', label: 'Website', icon: Globe },
+  { id: 'customer_list', label: 'Customer list', icon: Users },
   { id: 'video', label: 'Video', icon: Film },
-  { id: 'customer_list', label: 'Customer List', icon: Users },
-  { id: 'ig', label: 'Instagram', icon: Hash },
-  { id: 'fb_page', label: 'FB Page', icon: Globe },
-  { id: 'lookalike', label: 'Lookalike', icon: Users },
+  { id: 'fb_page', label: 'Page', icon: FileText },
+  { id: 'lead_ad', label: 'Lead Ad', icon: ClipboardCopy },
+  { id: 'ig', label: 'Instagram business profile', icon: Hash },
+  { id: 'offline', label: 'Offline events', icon: Database },
+  { id: 'fb_event', label: 'Facebook event', icon: CalendarDays },
+  { id: 'mobile_app', label: 'Mobile App', icon: Smartphone },
+  { id: 'shopping', label: 'Shopping', icon: ShoppingBag },
+  { id: 'catalogue', label: 'Catalogue', icon: BookOpen },
+  { id: 'ar', label: 'Augmented reality', icon: Sparkles },
+  { id: 'lookalike', label: 'Lookalike', icon: Copy },
 ];
 
 const INPUT_CLS = 'w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100';
@@ -256,6 +274,27 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
       const pageEngDesc = pageEngLabels[pageEngagement] || '';
       return `Create a Facebook Page engagement custom audience${audName ? ` called ${audName}` : ''} from page "${pageName}" (ID: ${selectedPageId})${pageEngDesc ? `, targeting people who ${pageEngDesc}` : ''}, ${retentionDays} day retention`;
     }
+    if (tab === 'lead_ad') {
+      return `Create a lead ad custom audience${audName ? ` called ${audName}` : ''} from people who opened or completed a lead form, ${retentionDays} day retention`;
+    }
+    if (tab === 'offline') {
+      return `Create an offline events custom audience${audName ? ` called ${audName}` : ''} from offline conversion data, ${retentionDays} day retention`;
+    }
+    if (tab === 'fb_event') {
+      return `Create a Facebook event custom audience${audName ? ` called ${audName}` : ''} from people who interacted with your events, ${retentionDays} day retention`;
+    }
+    if (tab === 'mobile_app') {
+      return `Create a mobile app custom audience${audName ? ` called ${audName}` : ''} from app activity, ${retentionDays} day retention`;
+    }
+    if (tab === 'shopping') {
+      return `Create a shopping custom audience${audName ? ` called ${audName}` : ''} from people who interacted with your shop, ${retentionDays} day retention`;
+    }
+    if (tab === 'catalogue') {
+      return `Create a catalogue custom audience${audName ? ` called ${audName}` : ''} from people who interacted with items in your catalogue, ${retentionDays} day retention`;
+    }
+    if (tab === 'ar') {
+      return `Create an augmented reality custom audience${audName ? ` called ${audName}` : ''} from people who interacted with your AR experience, ${retentionDays} day retention`;
+    }
     if (tab === 'lookalike') {
       return `Create a lookalike audience from audience ID ${sourceAudienceId}, targeting ${country}, ${ratio}% ratio${audName ? `, name it ${audName}` : ''}`;
     }
@@ -279,30 +318,39 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
     return m > 0 ? `${m}:${String(s).padStart(2, '0')}` : `0:${String(s).padStart(2, '0')}`;
   };
 
+  // Sources that use a simple retention-only config via chat
+  const SIMPLE_SOURCES = ['lead_ad', 'offline', 'fb_event', 'mobile_app', 'shopping', 'catalogue', 'ar'];
+  const simpleSourceLabel = SOURCE_LIST.find(s => s.id === tab)?.label || tab;
+
   return (
     <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 shrink-0">
           <h2 className="text-base font-bold text-slate-900">Create Custom Audience</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
         </div>
 
-        <div className="flex border-b border-slate-100 shrink-0 overflow-x-auto">
-          {CREATE_TABS.map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)}
-              className={`flex items-center justify-center gap-1.5 px-4 py-3 text-[11px] font-semibold transition-colors whitespace-nowrap
-                ${tab === t.id ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-400 hover:text-slate-600'}`}>
-              <t.icon size={12} /> {t.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-          {/* Name — always shown */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">Audience Name</label>
-            <input value={name} onChange={e => setName(e.target.value)} placeholder="Optional — auto-generated if empty" className={INPUT_CLS} />
+        <div className="flex flex-1 overflow-hidden">
+          {/* Source sidebar */}
+          <div className="w-52 shrink-0 border-r border-slate-100 overflow-y-auto py-2">
+            <p className="px-4 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Source</p>
+            {SOURCE_LIST.map(s => (
+              <button key={s.id} onClick={() => setTab(s.id)}
+                className={`w-full flex items-center gap-2.5 px-4 py-2 text-xs text-left transition-colors
+                  ${tab === s.id ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50'}`}>
+                <s.icon size={14} className={tab === s.id ? 'text-blue-500' : 'text-slate-400'} />
+                {s.label}
+              </button>
+            ))}
           </div>
+
+          {/* Config panel */}
+          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+            {/* Name — always shown */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Audience Name</label>
+              <input value={name} onChange={e => setName(e.target.value)} placeholder="Optional — auto-generated if empty" className={INPUT_CLS} />
+            </div>
 
           {/* ── Website ── */}
           {tab === 'website' && (
@@ -585,7 +633,35 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
               </div>
             </>
           )}
-        </div>
+
+          {/* ── Simple sources (Lead Ad, Offline, FB Event, Mobile App, Shopping, Catalogue, AR) ── */}
+          {SIMPLE_SOURCES.includes(tab) && (
+            <>
+              <div className="flex items-start gap-3 bg-slate-50 rounded-xl px-4 py-3">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0 mt-0.5">
+                  {(() => { const S = SOURCE_LIST.find(s => s.id === tab); return S ? <S.icon size={16} className="text-blue-600" /> : null; })()}
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-700">{simpleSourceLabel}</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    {tab === 'lead_ad' && 'Create an audience from people who opened or completed your lead forms.'}
+                    {tab === 'offline' && 'Create an audience from people in your offline event data (in-store, phone, etc.).'}
+                    {tab === 'fb_event' && 'Create an audience from people who interacted with your Facebook events.'}
+                    {tab === 'mobile_app' && 'Create an audience from people who used your mobile app.'}
+                    {tab === 'shopping' && 'Create an audience from people who interacted with your Facebook/Instagram shop.'}
+                    {tab === 'catalogue' && 'Create an audience from people who interacted with items in your product catalogue.'}
+                    {tab === 'ar' && 'Create an audience from people who interacted with your augmented reality experience.'}
+                  </p>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Retention (days)</label>
+                <input type="number" value={retentionDays} onChange={e => setRetentionDays(Number(e.target.value))} min={1} max={365} className={INPUT_CLS} />
+              </div>
+            </>
+          )}
+          </div>{/* end config panel */}
+        </div>{/* end flex wrapper (sidebar + config) */}
 
         {/* Footer */}
         <div className="shrink-0 border-t border-slate-100">
