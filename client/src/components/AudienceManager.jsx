@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Users, Plus, RefreshCw, Trash2, Copy, Target, Globe, Hash, X, AlertTriangle, Search, Film, ClipboardCopy } from 'lucide-react';
+import { Users, Plus, RefreshCw, Trash2, Copy, Target, Globe, Hash, X, AlertTriangle, Search, Film, ClipboardCopy, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import api from '../services/api.js';
 
 // ── Constants ───────────────────────────────────────────────────────────────
@@ -273,6 +273,8 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack }) => {
   const [showCreate, setShowCreate] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('all');
+  const [sortKey, setSortKey] = useState('time_created');
+  const [sortDir, setSortDir] = useState('desc');
 
   const fetchAudiences = useCallback(async () => {
     if (!adAccountId) return;
@@ -297,6 +299,16 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack }) => {
   }, [adAccountId, fetchAudiences]);
 
   // Filter + search
+  const toggleSort = (key) => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir(key === 'name' ? 'asc' : 'desc'); }
+  };
+
+  const SortIcon = ({ col }) => {
+    if (sortKey !== col) return <ArrowUpDown size={10} className="text-slate-300" />;
+    return sortDir === 'asc' ? <ArrowUp size={10} className="text-blue-500" /> : <ArrowDown size={10} className="text-blue-500" />;
+  };
+
   const filtered = audiences.filter(aud => {
     const matchesSearch = !searchQuery || aud.name?.toLowerCase().includes(searchQuery.toLowerCase()) || aud.id?.includes(searchQuery);
     const sub = aud.subtype || 'CUSTOM';
@@ -304,6 +316,21 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack }) => {
       || (filterType === 'IG' && (sub === 'IG_BUSINESS' || sub === 'IG_BUSINESS_PROFILE'))
       || sub === filterType;
     return matchesSearch && matchesFilter;
+  });
+
+  const sorted = [...filtered].sort((a, b) => {
+    const dir = sortDir === 'asc' ? 1 : -1;
+    if (sortKey === 'name') return dir * (a.name || '').localeCompare(b.name || '');
+    if (sortKey === 'subtype') return dir * (a.subtype || '').localeCompare(b.subtype || '');
+    if (sortKey === 'size') {
+      const sA = a.approximate_count_lower_bound || 0;
+      const sB = b.approximate_count_lower_bound || 0;
+      return dir * (sA - sB);
+    }
+    if (sortKey === 'time_created') {
+      return dir * ((a.time_created || 0) - (b.time_created || 0));
+    }
+    return 0;
   });
 
   // Count by type
@@ -408,19 +435,27 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack }) => {
           </div>
         )}
 
-        {filtered.length > 0 && (
+        {sorted.length > 0 && (
           <table className="w-full border-collapse">
             <thead>
               <tr className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                <th className="text-left py-1.5 px-4 font-semibold">Name</th>
-                <th className="text-center py-1.5 px-2 font-semibold w-[100px]">Type</th>
-                <th className="text-right py-1.5 px-2 font-semibold w-[80px]">Size</th>
-                <th className="text-right py-1.5 px-2 font-semibold w-[90px]">Created</th>
+                <th className="text-left py-1.5 px-4 font-semibold cursor-pointer hover:text-slate-600 select-none" onClick={() => toggleSort('name')}>
+                  <span className="inline-flex items-center gap-1">Name <SortIcon col="name" /></span>
+                </th>
+                <th className="text-center py-1.5 px-2 font-semibold w-[100px] cursor-pointer hover:text-slate-600 select-none" onClick={() => toggleSort('subtype')}>
+                  <span className="inline-flex items-center gap-1 justify-center">Type <SortIcon col="subtype" /></span>
+                </th>
+                <th className="text-right py-1.5 px-2 font-semibold w-[80px] cursor-pointer hover:text-slate-600 select-none" onClick={() => toggleSort('size')}>
+                  <span className="inline-flex items-center gap-1 justify-end">Size <SortIcon col="size" /></span>
+                </th>
+                <th className="text-right py-1.5 px-2 font-semibold w-[90px] cursor-pointer hover:text-slate-600 select-none" onClick={() => toggleSort('time_created')}>
+                  <span className="inline-flex items-center gap-1 justify-end">Created <SortIcon col="time_created" /></span>
+                </th>
                 <th className="w-[110px]"></th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map(aud => {
+              {sorted.map(aud => {
                 const subtype = aud.subtype || 'CUSTOM';
                 const colorCls = SUBTYPE_COLORS[subtype] || 'bg-slate-100 text-slate-600';
                 const size = fmtSize(aud.approximate_count_lower_bound, aud.approximate_count_upper_bound);
@@ -466,7 +501,7 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack }) => {
           </table>
         )}
 
-        {audiences.length > 0 && filtered.length === 0 && (
+        {audiences.length > 0 && sorted.length === 0 && (
           <div className="text-center py-12 text-sm text-slate-400">
             No audiences match your search
           </div>
