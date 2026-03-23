@@ -47,18 +47,15 @@ const fmtDate = (ts) => {
 };
 
 const fmtSize = (lower, upper, aud) => {
-  // Check if audience is pending/populating with no size data
   const opCode = aud?.operation_status?.code;
-  if (opCode === 411 || opCode === 412 || opCode === 415) {
-    return { text: 'Pending', sub: 'Size temporarily unavailable' };
+  // No size data — check if populating/pending
+  if (!lower && !upper) {
+    if (opCode === 411 || opCode === 412 || opCode === 415) return { text: 'Pending', sub: 'Size temporarily unavailable' };
+    return null;
   }
-  if (!lower && !upper) return null;
-  if (lower && lower < 1000 && (!upper || upper < 1000)) return { text: `Below 1,000` };
-  const fmt = (n) => {
-    if (n >= 1_000_000) return (n / 1_000_000).toFixed(0).replace(/\.0$/, '') + ',000,000';
-    if (n >= 1_000) return n.toLocaleString();
-    return n.toLocaleString();
-  };
+  // Below 1,000 is a normal ready state — matches Meta's display
+  if ((lower || 0) < 1000 && (!upper || upper < 1000)) return { text: 'Below 1,000' };
+  const fmt = (n) => n.toLocaleString();
   if (lower && upper && lower !== upper) return { text: `${fmt(lower)} - ${fmt(upper)}` };
   return { text: fmt(lower || upper || 0) };
 };
@@ -88,24 +85,30 @@ const getTypeDisplay = (aud) => {
   return { main: 'Custom Audience', detail: detailMap[sub] || null };
 };
 
-// Get availability display matching Meta's UI
+// Get availability display matching Meta's real UI
 const getAvailability = (aud) => {
   const op = aud.operation_status;
   const opCode = op?.code;
-  // Meta operation_status codes: 200=Normal, 300=Expired, 400+=issues
-  // delivery_status code 200 = active delivery
+  const fmtEdited = (ts) => {
+    if (!ts) return null;
+    const ms = ts < 1e12 ? ts * 1000 : ts;
+    return `Last edited on\n${new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(ms))}`;
+  };
+  // Meta operation_status codes: 200=Normal/Ready, 300=Expired, 411/412/415=Populating, 400+=Error
   if (opCode === 200) {
-    const lastEdited = aud.time_updated ? `Last edited on\n${new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date((aud.time_updated < 1e12 ? aud.time_updated * 1000 : aud.time_updated)))}` : null;
-    return { label: 'Ready', color: 'text-emerald-600', dot: 'bg-emerald-500', sub: lastEdited };
+    return { label: 'Ready', color: 'text-emerald-600', dot: 'bg-emerald-500', sub: fmtEdited(aud.time_updated), tooltip: null };
   }
   if (opCode === 411 || opCode === 412 || opCode === 415) {
-    return { label: 'Populating', color: 'text-amber-600', dot: 'bg-amber-500', sub: 'Available for use' };
+    return { label: 'Populating', color: 'text-amber-600', dot: 'bg-amber-500', sub: 'Available for use', tooltip: null };
   }
-  if (opCode === 300) return { label: 'Expired', color: 'text-slate-400', dot: 'bg-slate-400', sub: null };
-  if (opCode >= 400) return { label: 'Error', color: 'text-red-500', dot: 'bg-red-500', sub: op?.description || null };
-  // Fallback for saved audiences or unknown
-  if (aud._isSaved) return { label: 'Ready', color: 'text-emerald-600', dot: 'bg-emerald-500', sub: null };
-  return { label: 'Ready', color: 'text-emerald-600', dot: 'bg-emerald-500', sub: null };
+  if (opCode === 300) {
+    return { label: 'Expired', color: 'text-slate-400', dot: 'bg-slate-400', sub: null, tooltip: op?.description || null };
+  }
+  if (opCode >= 400) {
+    return { label: 'Error', color: 'text-red-500', dot: 'bg-red-500', sub: null, tooltip: op?.description || 'Something went wrong with this audience' };
+  }
+  // Fallback — treat as Ready (saved audiences, unknown states, etc.)
+  return { label: 'Ready', color: 'text-emerald-600', dot: 'bg-emerald-500', sub: fmtEdited(aud.time_updated), tooltip: null };
 };
 
 // ── Audience Table Row ──────────────────────────────────────────────────────
@@ -1202,26 +1205,22 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack }) => {
         {sorted.length > 0 && (
           <table className="w-full border-collapse">
             <thead>
-              <tr className="text-[11px] font-semibold text-slate-500 border-b border-slate-200">
-                <th className="text-left py-2.5 px-4 font-semibold cursor-pointer hover:text-slate-700 select-none" onClick={() => toggleSort('name')}>
+              <tr className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                <th className="text-left py-1.5 px-4 font-semibold cursor-pointer hover:text-slate-600 select-none" onClick={() => toggleSort('name')}>
                   <span className="inline-flex items-center gap-1">Name <SortIcon col="name" /></span>
                 </th>
-                <th className="text-left py-2.5 px-3 font-semibold w-[160px] cursor-pointer hover:text-slate-700 select-none" onClick={() => toggleSort('subtype')}>
+                <th className="text-left py-1.5 px-3 font-semibold w-[150px] cursor-pointer hover:text-slate-600 select-none" onClick={() => toggleSort('subtype')}>
                   <span className="inline-flex items-center gap-1">Type <SortIcon col="subtype" /></span>
                 </th>
-                <th className="text-right py-2.5 px-3 font-semibold w-[180px] cursor-pointer hover:text-slate-700 select-none" onClick={() => toggleSort('size')}>
-                  <span className="inline-flex items-center gap-1 justify-end">Estimated audience size <SortIcon col="size" /></span>
+                <th className="text-right py-1.5 px-2 font-semibold w-[160px] cursor-pointer hover:text-slate-600 select-none" onClick={() => toggleSort('size')}>
+                  <span className="inline-flex items-center gap-1 justify-end">Est. audience size <SortIcon col="size" /></span>
                 </th>
-                <th className="text-left py-2.5 px-3 font-semibold w-[150px]">
-                  Availability
+                <th className="text-left py-1.5 px-2 font-semibold w-[130px]">Availability</th>
+                <th className="text-left py-1.5 px-2 font-semibold w-[110px]">Audience ID</th>
+                <th className="text-right py-1.5 px-2 font-semibold w-[90px] cursor-pointer hover:text-slate-600 select-none" onClick={() => toggleSort('time_created')}>
+                  <span className="inline-flex items-center gap-1 justify-end">Created <SortIcon col="time_created" /></span>
                 </th>
-                <th className="text-left py-2.5 px-3 font-semibold w-[120px]">
-                  Audience ID
-                </th>
-                <th className="text-right py-2.5 px-3 font-semibold w-[100px] cursor-pointer hover:text-slate-700 select-none" onClick={() => toggleSort('time_created')}>
-                  <span className="inline-flex items-center gap-1 justify-end">Date Created <SortIcon col="time_created" /></span>
-                </th>
-                <th className="w-[100px]"></th>
+                <th className="w-[110px]"></th>
               </tr>
             </thead>
             <tbody>
@@ -1233,45 +1232,50 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack }) => {
                 return (
                   <tr key={aud.id} className="group border-t border-slate-100 hover:bg-blue-50/30 transition-colors">
                     {/* Name */}
-                    <td className="py-3 px-4">
-                      <p className="text-[13px] font-medium text-blue-700 truncate max-w-[350px] group-hover:underline cursor-pointer">{aud.name}</p>
+                    <td className="py-2 px-4">
+                      <p className="text-[12px] font-semibold text-blue-700 truncate max-w-[320px]">{aud.name}</p>
                     </td>
-                    {/* Type */}
-                    <td className="py-3 px-3">
-                      <p className="text-[12px] text-slate-700">{typeInfo.main}</p>
-                      {typeInfo.detail && <p className="text-[11px] text-slate-400">{typeInfo.detail}</p>}
+                    {/* Type — two lines like Meta: "Custom Audience" + "Engagement – Page" */}
+                    <td className="py-2 px-3">
+                      <p className="text-[11px] text-slate-700">{typeInfo.main}</p>
+                      {typeInfo.detail && <p className="text-[10px] text-slate-400">{typeInfo.detail}</p>}
                     </td>
                     {/* Size */}
-                    <td className="py-3 px-3 text-right">
+                    <td className="py-2 px-2 text-right">
                       {sizeInfo ? (
                         <div>
-                          <span className="text-[12px] text-slate-700 tabular-nums">{sizeInfo.text}</span>
+                          <span className="text-[12px] font-bold text-slate-900 tabular-nums whitespace-nowrap">{sizeInfo.text}</span>
                           {sizeInfo.sub && <p className="text-[10px] text-slate-400">{sizeInfo.sub}</p>}
                         </div>
                       ) : (
                         <span className="text-[12px] text-slate-300">—</span>
                       )}
                     </td>
-                    {/* Availability */}
-                    <td className="py-3 px-3">
-                      <div className="flex items-start gap-1.5">
+                    {/* Availability — dot + label, error reason on hover */}
+                    <td className="py-2 px-2">
+                      <div className="flex items-start gap-1.5 relative group/avail">
                         <span className={`w-2 h-2 rounded-full ${avail.dot} mt-1 shrink-0`} />
                         <div>
-                          <p className={`text-[12px] font-medium ${avail.color}`}>{avail.label}</p>
-                          {avail.sub && <p className="text-[10px] text-slate-400 whitespace-pre-line">{avail.sub}</p>}
+                          <p className={`text-[11px] font-medium ${avail.color}`}>{avail.label}</p>
+                          {avail.sub && <p className="text-[10px] text-slate-400 whitespace-pre-line leading-tight">{avail.sub}</p>}
                         </div>
+                        {avail.tooltip && (
+                          <div className="absolute bottom-full left-0 mb-1 hidden group-hover/avail:block z-20 w-56 bg-slate-800 text-white text-[11px] rounded-lg px-3 py-2 shadow-lg pointer-events-none">
+                            {avail.tooltip}
+                          </div>
+                        )}
                       </div>
                     </td>
                     {/* Audience ID */}
-                    <td className="py-3 px-3">
+                    <td className="py-2 px-2">
                       <CopyableId id={aud.id} />
                     </td>
                     {/* Date Created */}
-                    <td className="py-3 px-3 text-right">
-                      <span className="text-[11px] text-slate-500 whitespace-pre-line">{fmtDate(aud.time_created)}</span>
+                    <td className="py-2 px-2 text-right">
+                      <span className="text-[10px] text-slate-400 whitespace-pre-line">{fmtDate(aud.time_created)}</span>
                     </td>
                     {/* Actions */}
-                    <td className="py-3 px-2 text-right">
+                    <td className="py-2 px-2 text-right">
                       <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
                         <button onClick={() => handleUse(aud)} title="Use in campaign"
                           className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold bg-blue-600 text-white hover:bg-blue-500 transition-colors">

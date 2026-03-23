@@ -635,7 +635,7 @@ const adTools = [
   T('get_custom_audiences', 'List all custom audiences.', getCustomAudiences),
   T('get_custom_audience', 'Get details of a single audience (size, status, etc).', getCustomAudience,
     obj({ audience_id: str('Audience ID') }, ['audience_id'])),
-  T('create_custom_audience', 'Create a custom audience. Do NOT ask about special_ad_categories (campaign-only). For WEBSITE: pass pixel_id (required) + optional URL rule. For ENGAGEMENT (video views): pass full rule with event_sources. For CUSTOM (customer list): just name + subtype.', createCustomAudience,
+  T('create_custom_audience', 'Create a custom audience. Do NOT ask about special_ad_categories (campaign-only). For WEBSITE: pass pixel_id + optional URL rule. For ENGAGEMENT (video/IG/page/lead_ad/offline): pass full rule with event_sources. For CUSTOM (customer list): just name + subtype. See system prompt for full rule examples per source type.', createCustomAudience,
     obj({
       name: str('Audience name'),
       subtype: str('WEBSITE | ENGAGEMENT | CUSTOM'),
@@ -976,6 +976,53 @@ Audiences created via API do NOT appear in Meta Ads Manager's audience dropdown 
 - Just needs name, subtype="CUSTOM"
 - customer_file_source auto-defaults to "USER_PROVIDED_ONLY"
 - Then use \`add_users_to_audience\` to upload hashed data
+
+### INSTAGRAM engagement audience:
+1. Call \`get_connected_instagram_accounts\` to list IG accounts
+2. Ask: which engagement type? (profile visit, engaged with profile, any post/ad, sent message, saved post)
+3. Build rule with event_sources type "ig_business":
+\`\`\`json
+{"inclusions":{"operator":"or","rules":[{"event_sources":[{"id":"IG_ACCOUNT_ID","type":"ig_business"}],"retention_seconds":2592000,"filter":{"operator":"and","filters":[{"field":"event","operator":"eq","value":"ig_business_profile_all"}]}}]}}
+\`\`\`
+4. Event values: ig_business_profile_all (all engagement), ig_business_profile_visit (visited profile), ig_user_messaged (sent message), ig_user_saved_media (saved post/ad), ig_user_interacted_ad_or_organic (engaged with post/ad)
+
+### FACEBOOK PAGE engagement audience:
+1. Call \`get_pages\` to list user's pages
+2. Ask: which engagement type? (liked/followed page, engaged with post/ad, clicked CTA, sent message, visited page)
+3. Build rule with event_sources type "page":
+\`\`\`json
+{"inclusions":{"operator":"or","rules":[{"event_sources":[{"id":"PAGE_ID","type":"page"}],"retention_seconds":2592000,"filter":{"operator":"and","filters":[{"field":"event","operator":"eq","value":"page_engaged"}]}}]}}
+\`\`\`
+4. Event values: page_engaged (any engagement), page_liked (likes/follows), page_cta_clicked (CTA clicks), page_messaged (messages), page_visited (page visits)
+
+### LOOKALIKE audience:
+1. Call \`get_custom_audiences\` to list existing audiences as source options
+2. Ask: which source audience, target country, and size ratio (1-10%)?
+3. Call \`create_lookalike_audience\` with: name, origin_audience_id, lookalike_spec={"country":"XX","ratio":0.01}
+4. Ratio is decimal: 1% = 0.01, 5% = 0.05, 10% = 0.10
+5. Smaller ratio = more similar to source, larger = broader reach
+
+### SAVED audience (interest/behavior targeting):
+1. Ask: what demographics and interests to target?
+2. Use \`targeting_search\` to find interest/behavior IDs by keyword (e.g., search "fitness" to get interest IDs)
+3. Use \`targeting_browse\` to explore available targeting categories
+4. Call \`create_saved_audience\` with name and targeting spec:
+\`\`\`json
+{"name":"My Saved Audience","targeting":{"geo_locations":{"countries":["SG"]},"age_min":25,"age_max":65,"genders":[1,2],"flexible_spec":[{"interests":[{"id":"6003139266461","name":"Fitness"}]}]}}
+\`\`\`
+5. Saved audiences are reusable targeting templates — great for frequently used targeting combos
+
+### LEAD AD audience:
+- Build rule with event_sources type "lead_gen_form": people who opened or submitted lead forms
+- retention_seconds max: 90 days (7776000)
+
+### OFFLINE EVENTS audience:
+- Build rule with event_sources type "offline_event_set"
+- retention_seconds max: 180 days (15552000)
+
+### All audience creation — retention limits:
+- Website: max 180 days | Lead Ad: max 90 days | Offline: max 180 days | Mobile App: max 180 days
+- Video, IG, FB Page, FB Event, Shopping, Catalogue, AR: max 365 days
 
 ## Pixel & Events Setup — Guided Wizard
 When user asks about pixels, tracking, events, or CAPI, run this guided flow automatically:
