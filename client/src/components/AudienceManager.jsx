@@ -109,21 +109,26 @@ const AVAILABILITY_FILTERS = [
 ];
 
 // ── Create Audience Modal ───────────────────────────────────────────────────
-const SOURCE_LIST = [
+const YOUR_SOURCES = [
   { id: 'website', label: 'Website', icon: Globe },
   { id: 'customer_list', label: 'Customer list', icon: Users },
-  { id: 'video', label: 'Video', icon: Film },
-  { id: 'fb_page', label: 'Page', icon: FileText },
-  { id: 'lead_ad', label: 'Lead Ad', icon: ClipboardCopy },
-  { id: 'ig', label: 'Instagram business profile', icon: Hash },
-  { id: 'offline', label: 'Offline events', icon: Database },
-  { id: 'fb_event', label: 'Facebook event', icon: CalendarDays },
   { id: 'mobile_app', label: 'Mobile App', icon: Smartphone },
+  { id: 'offline', label: 'Offline events', icon: Database },
+];
+const META_SOURCES = [
+  { id: 'video', label: 'Video', icon: Film },
+  { id: 'ig', label: 'Instagram account', icon: Hash },
+  { id: 'fb_page', label: 'Facebook Page', icon: FileText },
+  { id: 'lead_ad', label: 'Lead Ad', icon: ClipboardCopy },
+  { id: 'fb_event', label: 'Facebook event', icon: CalendarDays },
   { id: 'shopping', label: 'Shopping', icon: ShoppingBag },
   { id: 'catalogue', label: 'Catalogue', icon: BookOpen },
   { id: 'ar', label: 'Augmented reality', icon: Sparkles },
-  { id: 'lookalike', label: 'Lookalike', icon: Copy },
 ];
+const OTHER_SOURCES = [
+  { id: 'lookalike', label: 'Lookalike audience', icon: Copy },
+];
+const SOURCE_LIST = [...YOUR_SOURCES, ...META_SOURCES, ...OTHER_SOURCES];
 
 const INPUT_CLS = 'w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100';
 
@@ -160,6 +165,7 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
   const [pageEngagement, setPageEngagement] = useState('');
 
   // Lookalike
+  const [existingAudiences, setExistingAudiences] = useState([]);
   const [sourceAudienceId, setSourceAudienceId] = useState('');
   const [country, setCountry] = useState('SG');
   const [ratio, setRatio] = useState(1);
@@ -183,6 +189,12 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
     }
     if ((tab === 'fb_page') && !pages.length) {
       api.get('/meta/pages').then(r => setPages(r.data || [])).catch(() => {});
+    }
+    if (tab === 'lookalike' && !existingAudiences.length) {
+      api.get('/meta/customaudiences', { params: { adAccountId } }).then(r => {
+        const data = Array.isArray(r.data) ? r.data : r.data?.data || [];
+        setExistingAudiences(data.filter(a => a.subtype !== 'LOOKALIKE'));
+      }).catch(() => {});
     }
   }, [tab, adAccountId]);
 
@@ -296,7 +308,9 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
       return `Create an augmented reality custom audience${audName ? ` called ${audName}` : ''} from people who interacted with your AR experience, ${retentionDays} day retention`;
     }
     if (tab === 'lookalike') {
-      return `Create a lookalike audience from audience ID ${sourceAudienceId}, targeting ${country}, ${ratio}% ratio${audName ? `, name it ${audName}` : ''}`;
+      const srcAud = existingAudiences.find(a => a.id === sourceAudienceId);
+      const srcName = srcAud?.name || sourceAudienceId;
+      return `Create a lookalike audience from "${srcName}" (ID: ${sourceAudienceId}), targeting ${country}, ${ratio}% ratio${audName ? `, name it ${audName}` : ''}`;
     }
     return '';
   };
@@ -332,9 +346,9 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
 
         <div className="flex flex-1 overflow-hidden">
           {/* Source sidebar */}
-          <div className="w-52 shrink-0 border-r border-slate-100 overflow-y-auto py-2">
-            <p className="px-4 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Source</p>
-            {SOURCE_LIST.map(s => (
+          <div className="w-52 shrink-0 border-r border-slate-100 overflow-y-auto py-1">
+            <p className="px-4 pt-2 pb-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Your Sources</p>
+            {YOUR_SOURCES.map(s => (
               <button key={s.id} onClick={() => setTab(s.id)}
                 className={`w-full flex items-center gap-2.5 px-4 py-2 text-xs text-left transition-colors
                   ${tab === s.id ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50'}`}>
@@ -342,6 +356,25 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
                 {s.label}
               </button>
             ))}
+            <p className="px-4 pt-3 pb-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Meta Sources</p>
+            {META_SOURCES.map(s => (
+              <button key={s.id} onClick={() => setTab(s.id)}
+                className={`w-full flex items-center gap-2.5 px-4 py-2 text-xs text-left transition-colors
+                  ${tab === s.id ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50'}`}>
+                <s.icon size={14} className={tab === s.id ? 'text-blue-500' : 'text-slate-400'} />
+                {s.label}
+              </button>
+            ))}
+            <div className="border-t border-slate-100 mt-2 pt-1">
+              {OTHER_SOURCES.map(s => (
+                <button key={s.id} onClick={() => setTab(s.id)}
+                  className={`w-full flex items-center gap-2.5 px-4 py-2 text-xs text-left transition-colors
+                    ${tab === s.id ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50'}`}>
+                  <s.icon size={14} className={tab === s.id ? 'text-blue-500' : 'text-slate-400'} />
+                  {s.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Config panel */}
@@ -615,21 +648,40 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
           {tab === 'lookalike' && (
             <>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Source Audience ID</label>
-                <input value={sourceAudienceId} onChange={e => setSourceAudienceId(e.target.value)} placeholder="Paste audience ID from the list" className={INPUT_CLS} />
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Source Audience</label>
+                {existingAudiences.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic">Loading your audiences...</p>
+                ) : (
+                  <select value={sourceAudienceId} onChange={e => setSourceAudienceId(e.target.value)} className={INPUT_CLS}>
+                    <option value="">Select a source audience</option>
+                    {existingAudiences.map(a => (
+                      <option key={a.id} value={a.id}>{a.name} ({SUBTYPE_LABELS[a.subtype] || a.subtype || 'Custom'})</option>
+                    ))}
+                  </select>
+                )}
+                {sourceAudienceId && (
+                  <p className="text-[10px] text-slate-400 mt-1">ID: {sourceAudienceId}</p>
+                )}
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Country</label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Target Location</label>
                 <select value={country} onChange={e => setCountry(e.target.value)} className={INPUT_CLS}>
                   <option value="SG">Singapore</option><option value="HK">Hong Kong</option><option value="US">United States</option>
                   <option value="GB">United Kingdom</option><option value="AU">Australia</option><option value="MY">Malaysia</option>
-                  <option value="TW">Taiwan</option><option value="JP">Japan</option>
+                  <option value="TW">Taiwan</option><option value="JP">Japan</option><option value="TH">Thailand</option>
+                  <option value="PH">Philippines</option><option value="ID">Indonesia</option><option value="VN">Vietnam</option>
+                  <option value="KR">South Korea</option><option value="IN">India</option><option value="CA">Canada</option>
+                  <option value="DE">Germany</option><option value="FR">France</option>
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Ratio: {ratio}%</label>
-                <input type="range" min={1} max={20} value={ratio} onChange={e => setRatio(Number(e.target.value))} className="w-full accent-emerald-500" />
-                <div className="flex justify-between text-[10px] text-slate-400"><span>1% (most similar)</span><span>20% (broadest)</span></div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Audience Size: {ratio}%</label>
+                <input type="range" min={1} max={10} value={ratio} onChange={e => setRatio(Number(e.target.value))} className="w-full accent-emerald-500" />
+                <div className="flex justify-between text-[10px] text-slate-400 mt-1">
+                  <span>1% — Most similar</span>
+                  <span>5%</span>
+                  <span>10% — Broadest</span>
+                </div>
               </div>
             </>
           )}
