@@ -333,7 +333,25 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
     return '';
   };
 
+  // Validation — returns error message or null if valid
+  const MAX_RETENTION = { website: 180, video: 365, ig: 365, fb_page: 365, lead_ad: 90, offline: 180, fb_event: 365, mobile_app: 180, shopping: 365, catalogue: 365, ar: 365 };
+  const getValidationError = () => {
+    const maxRet = MAX_RETENTION[tab];
+    if (maxRet && retentionDays > maxRet) return `Retention cannot exceed ${maxRet} days for this source`;
+    if (maxRet && retentionDays < 1) return 'Retention must be at least 1 day';
+    if (tab === 'website' && !selectedPixelId) return 'Please select a pixel';
+    if (tab === 'video' && videoSource !== 'video_id' && selectedVideoIds.length === 0) return 'Please select at least one video';
+    if (tab === 'video' && videoSource === 'video_id' && !videoIdInput.trim()) return 'Please enter at least one video ID';
+    if (tab === 'video' && !engagementType) return 'Please choose an engagement type';
+    if (tab === 'ig' && !selectedIgId) return 'Please select an Instagram account';
+    if (tab === 'fb_page' && !selectedPageId) return 'Please select a Facebook Page';
+    if (tab === 'lookalike' && !sourceAudienceId) return 'Please select a source audience';
+    return null;
+  };
+  const validationError = getValidationError();
+
   const handleCreate = () => {
+    if (validationError) return;
     const prompt = buildPrompt();
     setPendingPrompt(prompt);
     setShowConfirm(true);
@@ -785,10 +803,17 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
             <AlertTriangle size={14} className="text-amber-500 shrink-0 mt-0.5" />
             <p className="text-[11px] text-amber-700">Audiences created via API won't appear in Ads Manager's audience picker, but work perfectly when assigned to ad sets through this tool.</p>
           </div>
+          {validationError && (
+            <div className="mx-5 mb-0 bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex items-center gap-2">
+              <AlertTriangle size={13} className="text-red-400 shrink-0" />
+              <p className="text-[11px] text-red-600 font-medium">{validationError}</p>
+            </div>
+          )}
           <div className="flex items-center justify-end gap-2 px-5 py-3">
             <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-500 hover:bg-slate-50">Cancel</button>
-            <button onClick={handleCreate}
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors">
+            <button onClick={handleCreate} disabled={!!validationError}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors
+                ${validationError ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-500'}`}>
               Create via AI Agent
             </button>
           </div>
