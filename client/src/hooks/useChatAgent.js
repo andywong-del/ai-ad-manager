@@ -2,19 +2,31 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 
 const makeId = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
 
-export const getWelcomeMessage = (accountName) => ({
-  id: 'welcome',
-  role: 'agent',
-  text: accountName
-    ? `Hi! I'm your **AI Ad Consultant**. I'm connected to **${accountName}** and ready to help.\n\nAsk me anything — audit campaigns, analyze performance, manage budgets, or find optimization opportunities.`
-    : "Hi! I'm your **AI Ad Consultant**. Connect an ad account below to get started, or ask me a general question about Meta advertising.",
-  timestamp: Date.now(),
-});
+export const getWelcomeMessage = (accountName, language = 'en') => {
+  if (language === 'yue') {
+    return {
+      id: 'welcome',
+      role: 'agent',
+      text: accountName
+        ? `你好！我係你嘅 **AI 廣告顧問**，已經連接咗 **${accountName}**，隨時可以幫你。\n\n你可以問我任何嘢 — 審計廣告系列、分析表現、管理預算、或者搵優化機會。`
+        : '你好！我係你嘅 **AI 廣告顧問**。喺左邊揀一個廣告帳戶就可以開始，或者直接問我關於 Meta 廣告嘅問題。',
+      timestamp: Date.now(),
+    };
+  }
+  return {
+    id: 'welcome',
+    role: 'agent',
+    text: accountName
+      ? `Hi! I'm your **AI Ad Consultant**. I'm connected to **${accountName}** and ready to help.\n\nAsk me anything — audit campaigns, analyze performance, manage budgets, or find optimization opportunities.`
+      : "Hi! I'm your **AI Ad Consultant**. Connect an ad account below to get started, or ask me a general question about Meta advertising.",
+    timestamp: Date.now(),
+  };
+};
 
 export { makeId };
 
 export const useChatAgent = ({ token, adAccountId, accountName, language = 'en', initialMessages, externalSessionId }) => {
-  const [messages, setMessages] = useState(initialMessages || [getWelcomeMessage(accountName)]);
+  const [messages, setMessages] = useState(initialMessages || [getWelcomeMessage(accountName, language)]);
   const [isTyping, setIsTyping] = useState(false);
   const [thinkingText, setThinkingText] = useState('');
   const [notification, setNotification] = useState(null);
@@ -26,30 +38,30 @@ export const useChatAgent = ({ token, adAccountId, accountName, language = 'en',
     if (externalSessionId && externalSessionId !== sessionIdRef.current) {
       if (abortRef.current) abortRef.current.abort();
       sessionIdRef.current = externalSessionId;
-      setMessages(initialMessages || [getWelcomeMessage(accountName)]);
+      setMessages(initialMessages || [getWelcomeMessage(accountName, language)]);
       setIsTyping(false);
       setThinkingText('');
     }
-  }, [externalSessionId, initialMessages, accountName]);
+  }, [externalSessionId, initialMessages, accountName, language]);
 
-  // Update welcome message when account changes (only if chat is empty)
+  // Update welcome message when account or language changes (only if chat is empty)
   useEffect(() => {
     setMessages((prev) => {
       if (prev.length === 1 && prev[0].id === 'welcome') {
-        return [getWelcomeMessage(accountName)];
+        return [getWelcomeMessage(accountName, language)];
       }
       return prev;
     });
-  }, [accountName]);
+  }, [accountName, language]);
 
   // Allow external session switching
   const loadSession = useCallback((newSessionId, newMessages) => {
     if (abortRef.current) abortRef.current.abort();
     sessionIdRef.current = newSessionId;
-    setMessages(newMessages || [getWelcomeMessage(accountName)]);
+    setMessages(newMessages || [getWelcomeMessage(accountName, language)]);
     setIsTyping(false);
     setThinkingText('');
-  }, [accountName]);
+  }, [accountName, language]);
 
   const stopGeneration = useCallback(() => {
     if (abortRef.current) {
@@ -64,11 +76,11 @@ export const useChatAgent = ({ token, adAccountId, accountName, language = 'en',
     if (abortRef.current) abortRef.current.abort();
     const newId = makeId();
     sessionIdRef.current = newId;
-    setMessages([getWelcomeMessage(accountName)]);
+    setMessages([getWelcomeMessage(accountName, language)]);
     setIsTyping(false);
     setThinkingText('');
     return newId;
-  }, [accountName]);
+  }, [accountName, language]);
 
   const sendMessage = useCallback(async (text, attachments) => {
     if (!text.trim() || isTyping) return;

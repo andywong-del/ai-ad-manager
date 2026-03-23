@@ -91,11 +91,16 @@ export const getMinimumBudgets = async (token, adAccountId) => {
 // ─── Campaigns ───────────────────────────────────────────────────────
 
 export const getCampaigns = async (token, adAccountId) => {
-  // Use fetchAll to paginate through ALL campaigns (accounts can have 300+)
-  return fetchAll(`/${adAccountId}/campaigns`, token, {
-    limit: 200,
-    fields: 'id,name,status,daily_budget,insights.date_preset(last_7d){spend,impressions,clicks,actions,action_values}',
+  // Get campaigns with inline insights — limit to 100 to avoid timeout
+  // For full account totals, agent should use get_account_insights separately
+  const { data } = await metaApi.get(`/${adAccountId}/campaigns`, {
+    params: {
+      access_token: token,
+      limit: 100,
+      fields: 'id,name,status,objective,daily_budget,lifetime_budget,insights.date_preset(last_7d){spend,impressions,clicks,ctr,cpm,actions,action_values,cost_per_action_type}',
+    },
   });
+  return data.data;
 };
 
 export const getCampaign = async (token, campaignId) => {

@@ -174,7 +174,7 @@ export const useChatSessions = ({ token, adAccountId, accountName, language = 'e
     if (msgs?.length) {
       agent.loadSession(sessionId, msgs);
     } else {
-      agent.loadSession(sessionId, [getWelcomeMessage(accountName)]);
+      agent.loadSession(sessionId, [getWelcomeMessage(accountName, language)]);
     }
     setActiveSessionId(sessionId);
   }, [activeSessionId, persistCurrent, agent, accountName]);
