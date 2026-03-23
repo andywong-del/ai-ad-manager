@@ -32,11 +32,7 @@ const fmtSize = (lower, upper) => {
     if (n >= 1_000) return Math.round(n / 1_000) + 'K';
     return n.toLocaleString();
   };
-  // Show midpoint with ~ for ranges to keep it compact
-  if (lower && upper && lower !== upper) {
-    const mid = Math.round((lower + upper) / 2);
-    return `~${fmt(mid)}`;
-  }
+  if (lower && upper && lower !== upper) return `${fmt(lower)} – ${fmt(upper)}`;
   return fmt(lower || upper || 0);
 };
 
@@ -445,7 +441,7 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack }) => {
                 <th className="text-center py-1.5 px-2 font-semibold w-[100px] cursor-pointer hover:text-slate-600 select-none" onClick={() => toggleSort('subtype')}>
                   <span className="inline-flex items-center gap-1 justify-center">Type <SortIcon col="subtype" /></span>
                 </th>
-                <th className="text-right py-1.5 px-2 font-semibold w-[80px] cursor-pointer hover:text-slate-600 select-none" onClick={() => toggleSort('size')}>
+                <th className="text-right py-1.5 px-2 font-semibold w-[120px] cursor-pointer hover:text-slate-600 select-none" onClick={() => toggleSort('size')}>
                   <span className="inline-flex items-center gap-1 justify-end">Size <SortIcon col="size" /></span>
                 </th>
                 <th className="text-right py-1.5 px-2 font-semibold w-[90px] cursor-pointer hover:text-slate-600 select-none" onClick={() => toggleSort('time_created')}>
