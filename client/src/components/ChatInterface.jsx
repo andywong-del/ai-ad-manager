@@ -814,9 +814,25 @@ export const hasRichCards = (text) => {
   return segments.some(s => !['text', 'quickreplies'].includes(s.type));
 };
 
+// ── Split chat summary from canvas detail ───────────────────────────────────
+export const splitChatAndCanvas = (text) => {
+  if (!text) return { chatText: '', canvasText: null };
+  const marker = '~~~canvas_detail';
+  const idx = text.indexOf(marker);
+  if (idx === -1) return { chatText: text, canvasText: null };
+  const chatText = text.slice(0, idx).trim();
+  let canvasText = text.slice(idx + marker.length);
+  // Remove closing ~~~ if present
+  const closeIdx = canvasText.lastIndexOf('~~~');
+  if (closeIdx > 0) canvasText = canvasText.slice(0, closeIdx);
+  canvasText = canvasText.trim();
+  return { chatText, canvasText: canvasText || null };
+};
+
 // ── Save menu for agent messages ─────────────────────────────────────────────
 const SaveMenu = ({ messageId, onSave, folders = [] }) => {
   const [open, setOpen] = useState(false);
+  const [saved, setSaved] = useState(false);
   const ref = useRef(null);
 
   useEffect(() => {
@@ -826,6 +842,13 @@ const SaveMenu = ({ messageId, onSave, folders = [] }) => {
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
+  const handleSave = (folderId) => {
+    onSave(messageId, folderId);
+    setOpen(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
   const folderList = folders.length > 0 ? folders : [
     { id: 'reports', name: 'Reports' },
     { id: 'strategies', name: 'Strategies' },
@@ -834,18 +857,19 @@ const SaveMenu = ({ messageId, onSave, folders = [] }) => {
   return (
     <div className="relative" ref={ref}>
       <button
-        onClick={() => setOpen(!open)}
-        className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-blue-500 hover:bg-blue-50 transition-colors opacity-0 group-hover:opacity-100"
-        title="Save this message"
+        onClick={() => !saved && setOpen(!open)}
+        className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all opacity-0 group-hover:opacity-100
+          ${saved ? 'text-blue-500 bg-blue-50 scale-110 opacity-100' : 'text-slate-300 hover:text-blue-500 hover:bg-blue-50'}`}
+        title={saved ? 'Saved!' : 'Save this message'}
       >
-        <Bookmark size={14} />
+        <Bookmark size={14} fill={saved ? 'currentColor' : 'none'} />
       </button>
       {open && (
         <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-20 py-1 w-48">
           <p className="px-3 py-1.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Save to folder</p>
           {folderList.map(folder => (
             <button key={folder.id}
-              onClick={() => { onSave(messageId, folder.id); setOpen(false); }}
+              onClick={() => handleSave(folder.id)}
               className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
             >
               <FileText size={13} className="text-blue-400" />
@@ -865,9 +889,13 @@ const MessageBubble = ({ message, isLatest, onSend, isTyping, onSaveItem, onOpen
 
   const isAgent = message.role === 'agent';
   if (isAgent) {
-    const segments = parseMarkdownTable(message.text);
+    // Split chat summary from canvas detail
+    const { chatText, canvasText } = splitChatAndCanvas(message.text);
+    const segments = parseMarkdownTable(chatText);
     const hasWide = segments.some(s => s.type !== 'text');
-    const isRichReport = segments.some(s => !['text', 'quickreplies'].includes(s.type));
+    // Show "View Full Report" only when canvas detail exists, OR fallback for old messages with rich content
+    const hasCanvasContent = canvasText !== null;
+    const hasRichFallback = !hasCanvasContent && segments.some(s => !['text', 'quickreplies'].includes(s.type));
     return (
       <>
         <div className="flex items-end gap-3 mb-2 group">
@@ -898,13 +926,13 @@ const MessageBubble = ({ message, isLatest, onSend, isTyping, onSaveItem, onOpen
                   default: return <div key={i} className="whitespace-pre-wrap">{renderRichText(seg.content)}</div>;
                 }
               })}
-              {/* Open Report Canvas button for rich content */}
-              {isRichReport && onOpenReport && message.id !== 'welcome' && (
+              {/* View Full Report button — shows when canvas detail exists */}
+              {(hasCanvasContent || hasRichFallback) && onOpenReport && message.id !== 'welcome' && (
                 <div className="mt-3 pt-3 border-t border-slate-100">
                   <button onClick={() => onOpenReport(message.id, message.text)}
                     className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/60 text-blue-700 text-[13px] font-semibold hover:shadow-md hover:border-blue-300 transition-all w-full justify-center">
                     <FileText size={15} />
-                    Open Report Canvas
+                    View Full Report
                   </button>
                 </div>
               )}

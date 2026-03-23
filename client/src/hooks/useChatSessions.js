@@ -77,6 +77,7 @@ export const useChatSessions = ({ token, adAccountId, accountName, language = 'e
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [savedItems, setSavedItemsState] = useState([]);
   const [folders, setFoldersState] = useState([...DEFAULT_FOLDERS]);
+  const [saveNotification, setSaveNotification] = useState(null);
   const prevTypingRef = useRef(false);
 
   // Load initial session from last session or create new
@@ -263,8 +264,12 @@ export const useChatSessions = ({ token, adAccountId, accountName, language = 'e
       setSavedItems(newItems);
       return newItems;
     });
+    // Show toast notification
+    const folderName = folders.find(f => f.id === folderId)?.name || folderId;
+    setSaveNotification(`Saved to ${folderName}`);
+    setTimeout(() => setSaveNotification(null), 3000);
     return item;
-  }, [agent.messages, activeSessionId]);
+  }, [agent.messages, activeSessionId, folders]);
 
   // Delete saved item
   const deleteSavedItem = useCallback((itemId) => {
@@ -310,7 +315,7 @@ export const useChatSessions = ({ token, adAccountId, accountName, language = 'e
     thinkingText: agent.thinkingText,
     sendMessage,
     stopGeneration: agent.stopGeneration,
-    notification: agent.notification,
+    notification: saveNotification || agent.notification,
     // Saved items
     savedItems,
     saveItem,
