@@ -80,12 +80,22 @@ function getAdSet({ ad_set_id }, c) {
   return meta.getAdSet(ctx(c).token, ad_set_id);
 }
 function createAdSet(args, c) {
-  // Parse targeting if passed as JSON string
   const params = { ...args };
+  // Default bid_strategy if not set (required by Meta API)
+  if (!params.bid_strategy && !params.bid_amount) {
+    params.bid_strategy = 'LOWEST_COST_WITHOUT_CAP';
+  }
+  // Default billing_event
+  if (!params.billing_event) params.billing_event = 'IMPRESSIONS';
+  // Parse targeting if passed as JSON string and ensure targeting_optimization
   if (typeof params.targeting === 'string') {
     try { params.targeting = JSON.parse(params.targeting); } catch {}
   }
   if (params.targeting && typeof params.targeting === 'object') {
+    // Default: disable Advantage Audience unless explicitly set
+    if (!params.targeting.targeting_optimization) {
+      params.targeting.targeting_optimization = 'none';
+    }
     params.targeting = JSON.stringify(params.targeting);
   }
   return meta.createAdSet(ctx(c).token, ctx(c).adAccountId, params);
@@ -1024,20 +1034,48 @@ When you see Meta API errors mentioning "policy", "disapproved", "restricted", o
 
 Common policy issues: misleading claims, personal attributes, restricted content, discriminatory targeting, before/after images, excessive text in images.
 
-## Ad Creation Review Card
-When creating a new ad (campaign + ad set + ad + creative), before executing:
-Show a structured review:
+## Full Campaign Creation — GATHER EVERYTHING FIRST, THEN CREATE
 
-## 📋 Ad Creation Review
+CRITICAL: When creating campaigns/ad sets/ads, NEVER call a create tool until you have ALL required information. Do NOT attempt to create and fix errors one by one. Instead:
+
+### Step 1: Gather all info from the user BEFORE any API call
+Ask the user for everything you need in ONE message:
+- Campaign: objective (OUTCOME_SALES, OUTCOME_LEADS, OUTCOME_TRAFFIC, etc.)
+- Ad Set: daily budget, target country, age range, gender, optimization goal
+- Creative: image/video (uploaded hash), headline, primary text, CTA, landing page URL
+- Status: PAUSED (always create as PAUSED first)
+
+If the user already provided some of this, only ask for what's missing.
+
+### Step 2: Call get_pages to get the Page ID (required for creatives)
+
+### Step 3: Show the COMPLETE review card, then ask to confirm
+Show ALL details in one table:
+
 | Setting | Value |
 |---|---|
-| Campaign | Name, Objective |
-| Ad Set | Name, Budget, Targeting |
-| Creative | Headline, Body, CTA, Image/Video |
-| Audience | Size estimate |
-| Schedule | Start/End dates |
+| Campaign | Name, Objective, Status |
+| Ad Set | Name, Daily Budget ($X = X*100 cents), Country, Age, Gender |
+| Bid Strategy | LOWEST_COST_WITHOUT_CAP (default) |
+| Advantage Audience | Disabled (targeting_optimization = none) |
+| Creative | Image hash, Headline, Primary text, CTA |
+| Landing Page | URL |
+| Page | Page name (from get_pages) |
 
-Then ask: **"Should I proceed with creating this ad?"**
+Then ask: **"Should I proceed?"**
+
+### Step 4: After user confirms, create ALL in sequence
+1. create_campaign: name, objective=OUTCOME_SALES, status=PAUSED, special_ad_categories=NONE
+2. create_ad_set: campaign_id, name, daily_budget (in CENTS), billing_event=IMPRESSIONS, optimization_goal=OFFSITE_CONVERSIONS, bid_strategy=LOWEST_COST_WITHOUT_CAP, targeting (JSON with geo_locations, age_min, age_max, genders, targeting_optimization="none"), status=PAUSED
+3. create_ad_creative: name, object_story_spec (JSON with page_id, link_data including image_hash, link, message, name, call_to_action)
+4. create_ad: adset_id, name, creative_id, status=PAUSED
+
+### Required fields that MUST be included (these cause errors if missing):
+- create_campaign: is_adset_budget_sharing_enabled (auto-defaults to false)
+- create_ad_set: bid_strategy or bid_amount (use LOWEST_COST_WITHOUT_CAP if not specified)
+- create_ad_set: targeting must include targeting_optimization field (set to "none" to disable Advantage Audience)
+- create_ad_set: daily_budget is in CENTS (multiply dollars by 100)
+- create_ad_creative: object_story_spec must include page_id
 
 ## Asset Upload
 - Images: user provides base64 data via \`upload_ad_image\`
