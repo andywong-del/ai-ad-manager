@@ -989,63 +989,135 @@ const ActionCard = ({ label, desc, prompt, onSend, disabled }) => (
   </button>
 );
 
-// ── Input box with drag & drop ───────────────────────────────────────────────
-const ChatInput = ({ input, setInput, onKeyDown, onSend, onStop, onFilesAdded, attachments, onRemoveAttachment, fileRef, isTyping, handleFileUpload, isOver, activeStrategist, onDeactivateStrategist }) => (
-  <div className={`bg-white/80 backdrop-blur-xl border rounded-2xl overflow-hidden shadow-lg shadow-slate-200/50 transition-all
-    ${isOver ? 'border-blue-400 ring-2 ring-blue-100' : 'border-slate-200'}`}>
-    <AttachmentBar attachments={attachments} onRemove={onRemoveAttachment} />
-    <div className="px-4 pt-4 pb-3">
-      <textarea
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        onKeyDown={onKeyDown}
-        placeholder={activeStrategist ? `Ask with ${activeStrategist.name} active...` : attachments.length ? 'Describe what to do with these files...' : 'Ask anything about your ads...'}
-        rows={1}
-        disabled={isTyping}
-        className="w-full resize-none text-sm bg-transparent text-slate-800 placeholder:text-slate-400 focus:outline-none disabled:text-slate-400 max-h-32 overflow-y-auto"
-        style={{ lineHeight: '1.5' }}
-      />
+// ── Slash Command Picker ────────────────────────────────────────────────────
+const SlashPicker = ({ skills, filter, onSelect, selectedIndex }) => {
+  const filtered = skills.filter(s =>
+    !filter || s.name.toLowerCase().includes(filter.toLowerCase()) || s.id.includes(filter.toLowerCase())
+  );
+  if (filtered.length === 0) return null;
+  return (
+    <div className="absolute bottom-full left-0 right-0 mb-2 bg-white/95 backdrop-blur-xl border border-slate-200 rounded-xl shadow-xl shadow-slate-200/50 max-h-64 overflow-y-auto z-50">
+      <div className="px-3 py-2 border-b border-slate-100">
+        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Skills — type to filter</p>
+      </div>
+      {filtered.map((skill, i) => (
+        <button key={skill.id} onClick={() => onSelect(skill)}
+          className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors
+            ${i === selectedIndex ? 'bg-indigo-50' : 'hover:bg-slate-50'}`}>
+          <Sparkles size={14} className={`shrink-0 ${i === selectedIndex ? 'text-indigo-500' : 'text-slate-400'}`} />
+          <div className="flex-1 min-w-0">
+            <p className={`text-xs font-medium truncate ${i === selectedIndex ? 'text-indigo-700' : 'text-slate-700'}`}>/{skill.id}</p>
+            <p className="text-[10px] text-slate-400 truncate">{skill.name} — {skill.description}</p>
+          </div>
+          {skill.isDefault && <span className="text-[9px] bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded-full font-semibold shrink-0">Default</span>}
+        </button>
+      ))}
     </div>
-    {/* Active strategist chip */}
-    {activeStrategist && (
-      <div className="px-4 pb-2">
-        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-[11px] font-semibold text-indigo-700">
-          <Sparkles size={11} />
-          {activeStrategist.name}
-          <button onClick={onDeactivateStrategist} className="ml-0.5 text-indigo-400 hover:text-indigo-600 transition-colors">
-            <X size={11} />
+  );
+};
+
+// ── Input box with drag & drop + slash commands ─────────────────────────────
+const ChatInput = ({ input, setInput, onKeyDown, onSend, onStop, onFilesAdded, attachments, onRemoveAttachment, fileRef, isTyping, handleFileUpload, isOver, activeSkill, onDeactivateSkill, skills = [], onSlashSelect, slashSkill, onClearSlash }) => {
+  // Slash command detection
+  const showSlash = input.startsWith('/') && !slashSkill;
+  const slashFilter = showSlash ? input.slice(1) : '';
+  const filteredSkills = showSlash ? skills.filter(s =>
+    !slashFilter || s.name.toLowerCase().includes(slashFilter.toLowerCase()) || s.id.includes(slashFilter.toLowerCase())
+  ) : [];
+  const [slashIndex, setSlashIndex] = useState(0);
+
+  const handleChange = (e) => {
+    setInput(e.target.value);
+    setSlashIndex(0);
+  };
+
+  const handleSlashKeyDown = (e) => {
+    if (showSlash && filteredSkills.length > 0) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); setSlashIndex(i => Math.min(i + 1, filteredSkills.length - 1)); return; }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setSlashIndex(i => Math.max(i - 1, 0)); return; }
+      if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
+        e.preventDefault();
+        onSlashSelect(filteredSkills[slashIndex]);
+        return;
+      }
+      if (e.key === 'Escape') { setInput(''); return; }
+    }
+    onKeyDown(e);
+  };
+
+  return (
+    <div className={`bg-white/80 backdrop-blur-xl border rounded-2xl overflow-hidden shadow-lg shadow-slate-200/50 transition-all relative
+      ${isOver ? 'border-blue-400 ring-2 ring-blue-100' : 'border-slate-200'}`}>
+      {/* Slash command picker */}
+      {showSlash && filteredSkills.length > 0 && (
+        <SlashPicker skills={filteredSkills} filter={slashFilter} onSelect={onSlashSelect} selectedIndex={slashIndex} />
+      )}
+      <AttachmentBar attachments={attachments} onRemove={onRemoveAttachment} />
+      <div className="px-4 pt-4 pb-3">
+        <textarea
+          value={input}
+          onChange={handleChange}
+          onKeyDown={handleSlashKeyDown}
+          placeholder={slashSkill ? `Using /${slashSkill.id} — type your message...` : activeSkill ? `Ask with ${activeSkill.name} active...` : attachments.length ? 'Describe what to do with these files...' : 'Ask anything about your ads... (type / for skills)'}
+          rows={1}
+          disabled={isTyping}
+          className="w-full resize-none text-sm bg-transparent text-slate-800 placeholder:text-slate-400 focus:outline-none disabled:text-slate-400 max-h-32 overflow-y-auto"
+          style={{ lineHeight: '1.5' }}
+        />
+      </div>
+      {/* Skill chips */}
+      {(activeSkill || slashSkill) && (
+        <div className="px-4 pb-2 flex items-center gap-2">
+          {slashSkill && (
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-violet-50 border border-violet-200 text-[11px] font-semibold text-violet-700">
+              <Sparkles size={11} />
+              /{slashSkill.id}
+              <button onClick={onClearSlash} className="ml-0.5 text-violet-400 hover:text-violet-600 transition-colors">
+                <X size={11} />
+              </button>
+            </div>
+          )}
+          {activeSkill && !slashSkill && (
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-[11px] font-semibold text-indigo-700">
+              <Sparkles size={11} />
+              {activeSkill.name}
+              <button onClick={onDeactivateSkill} className="ml-0.5 text-indigo-400 hover:text-indigo-600 transition-colors">
+                <X size={11} />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+      <div className="px-4 pb-3 flex items-center justify-end">
+        <div className="flex items-center gap-2">
+          <button onClick={() => fileRef.current?.click()} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+            <Paperclip size={16} />
           </button>
+          <input ref={fileRef} type="file" accept="image/*,video/*,.pdf,.txt,.doc,.docx" multiple className="hidden" onChange={handleFileUpload} />
+          {isTyping ? (
+            <button onClick={onStop}
+              className="w-8 h-8 rounded-lg bg-red-500 hover:bg-red-400 text-white flex items-center justify-center transition-colors shadow-sm"
+              title="Stop generating">
+              <Square size={12} fill="currentColor" />
+            </button>
+          ) : (
+            <button onClick={onSend} disabled={!input.trim() && !attachments.length}
+              className="w-8 h-8 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:bg-slate-200 disabled:text-slate-400 text-white flex items-center justify-center transition-colors shadow-sm">
+              <Send size={14} />
+            </button>
+          )}
         </div>
       </div>
-    )}
-    <div className="px-4 pb-3 flex items-center justify-end">
-      <div className="flex items-center gap-2">
-        <button onClick={() => fileRef.current?.click()} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
-          <Paperclip size={16} />
-        </button>
-        <input ref={fileRef} type="file" accept="image/*,video/*,.pdf,.txt,.doc,.docx" multiple className="hidden" onChange={handleFileUpload} />
-        {isTyping ? (
-          <button onClick={onStop}
-            className="w-8 h-8 rounded-lg bg-red-500 hover:bg-red-400 text-white flex items-center justify-center transition-colors shadow-sm"
-            title="Stop generating">
-            <Square size={12} fill="currentColor" />
-          </button>
-        ) : (
-          <button onClick={onSend} disabled={!input.trim() && !attachments.length}
-            className="w-8 h-8 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:bg-slate-200 disabled:text-slate-400 text-white flex items-center justify-center transition-colors shadow-sm">
-            <Send size={14} />
-          </button>
-        )}
-      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // ── Main component ────────────────────────────────────────────────────────────
-export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, onStop, suggestedActions = [], adAccountId, onSaveItem, onOpenReport, folders = [], activeStrategist = null, onDeactivateStrategist }) => {
+export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, onStop, suggestedActions = [], adAccountId, onSaveItem, onOpenReport, folders = [], activeSkill = null, onDeactivateSkill, skills = [], onSlashInvoke }) => {
   const [input, setInput] = useState('');
   const [attachments, setAttachments] = useState([]); // { id, file, preview, status, progress, result }
   const [isDragOver, setIsDragOver] = useState(false);
+  const [slashSkill, setSlashSkill] = useState(null); // one-off skill from /command
   const endRef   = useRef(null);
   const inputRef = useRef(null);
   const fileRef  = useRef(null);
@@ -1200,6 +1272,11 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, onStop
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
 
+  const handleSlashSelect = useCallback((skill) => {
+    setSlashSkill(skill);
+    setInput('');
+  }, []);
+
   const handleSend = useCallback((text) => {
     const t = (typeof text === 'string' ? text : input).trim();
     const doneAttachments = attachments.filter(a => a.status === 'done');
@@ -1213,6 +1290,12 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, onStop
 
     // Build message text with asset info
     let msgText = t;
+
+    // If a slash skill was selected, notify parent to inject its context
+    if (slashSkill && onSlashInvoke) {
+      onSlashInvoke(slashSkill.id);
+    }
+    setSlashSkill(null);
     const mediaAttachments = doneAttachments.filter(a => !a.isDoc);
     const docAttachments = doneAttachments.filter(a => a.isDoc && a.result?.text);
 
@@ -1298,7 +1381,8 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, onStop
                 attachments={attachments} onRemoveAttachment={removeAttachment}
                 fileRef={fileRef} isTyping={isTyping}
                 handleFileUpload={handleFileInput} isOver={isDragOver}
-                activeStrategist={activeStrategist} onDeactivateStrategist={onDeactivateStrategist}
+                activeSkill={activeSkill} onDeactivateSkill={onDeactivateSkill}
+                skills={skills} onSlashSelect={handleSlashSelect} slashSkill={slashSkill} onClearSlash={() => setSlashSkill(null)}
               />
             </div>
           </div>
@@ -1332,7 +1416,8 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, onStop
                 attachments={attachments} onRemoveAttachment={removeAttachment}
                 fileRef={fileRef} isTyping={isTyping}
                 handleFileUpload={handleFileInput} isOver={isDragOver}
-                activeStrategist={activeStrategist} onDeactivateStrategist={onDeactivateStrategist}
+                activeSkill={activeSkill} onDeactivateSkill={onDeactivateSkill}
+                skills={skills} onSlashSelect={handleSlashSelect} slashSkill={slashSkill} onClearSlash={() => setSlashSkill(null)}
               />
             </div>
           </div>

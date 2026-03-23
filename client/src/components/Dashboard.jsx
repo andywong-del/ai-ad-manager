@@ -1,13 +1,13 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { MessageSquare } from 'lucide-react';
 import { useChatSessions } from '../hooks/useChatSessions.js';
-import { useStrategists } from '../hooks/useStrategists.js';
+import { useSkills } from '../hooks/useSkills.js';
 import { ChatInterface } from './ChatInterface.jsx';
 import { Sidebar } from './Sidebar.jsx';
 import { SavedItemView } from './SavedItemView.jsx';
 import { DashboardPage } from './DashboardPage.jsx';
 import { ReportPanel } from './ReportPanel.jsx';
-import { StrategistConfig } from './StrategistConfig.jsx';
+import { SkillsLibrary } from './SkillsLibrary.jsx';
 import { AudienceManager } from './AudienceManager.jsx';
 
 const SUGGESTED_ACTIONS = [
@@ -39,12 +39,12 @@ export const Dashboard = ({
   const [chatLanguage, setChatLanguage] = useState(() => localStorage.getItem('aam_language') || 'en');
   const [activeView, setActiveView] = useState({ type: 'chat' });
   const [reportPanel, setReportPanel] = useState(null);
-  const [configuringStrategistId, setConfiguringStrategistId] = useState(null);
+  const slashSkillRef = useRef(null); // one-off skill context for next message
 
   const {
-    strategists, activeStrategist, toggleStrategist, updateStrategist,
-    addDocument, removeDocument, getStrategistContext,
-  } = useStrategists();
+    skills, activeSkill, activeSkillId, toggleSkill,
+    createSkill, updateSkill, deleteSkill, getSkillContext, getSkillContextById,
+  } = useSkills();
 
   const {
     sessions, activeSessionId, createNewChat, switchSession, deleteSession,
@@ -67,11 +67,17 @@ export const Dashboard = ({
 
   const handleSend = useCallback((text, attachments) => {
     setActiveView({ type: 'chat' });
-    // Prepend strategist context if active
-    const stratContext = getStrategistContext();
-    const fullText = stratContext ? `${stratContext}\n\n---\n\nUser message: ${text}` : text;
+    // Inject skill context: slash command (one-off) takes priority, then active skill
+    const slashCtx = slashSkillRef.current ? getSkillContextById(slashSkillRef.current) : null;
+    slashSkillRef.current = null; // clear after use
+    const skillCtx = slashCtx || getSkillContext();
+    const fullText = skillCtx ? `${skillCtx}\n\n---\n\nUser message: ${text}` : text;
     sendMessage(fullText, attachments);
-  }, [sendMessage, getStrategistContext]);
+  }, [sendMessage, getSkillContext, getSkillContextById]);
+
+  const handleSlashInvoke = useCallback((skillId) => {
+    slashSkillRef.current = skillId;
+  }, []);
 
   const handleSwitchSession = useCallback((sessionId) => {
     setActiveView({ type: 'chat' });
@@ -159,10 +165,11 @@ export const Dashboard = ({
         onDeleteFolder={deleteFolder}
         onRenameFolder={renameFolder}
         onReorderFolders={reorderFolders}
-        strategists={strategists}
-        activeStrategist={activeStrategist}
-        onToggleStrategist={toggleStrategist}
-        onConfigureStrategist={(id) => { setConfiguringStrategistId(id); setActiveView({ type: 'strategist' }); }}
+        skills={skills}
+        activeSkill={activeSkill}
+        activeSkillId={activeSkillId}
+        onToggleSkill={toggleSkill}
+        onOpenSkillsLibrary={() => setActiveView({ type: 'skills' })}
         onOpenAudiences={handleOpenAudiences}
       />
 
@@ -178,12 +185,14 @@ export const Dashboard = ({
             </button>
           )}
 
-          {activeView.type === 'strategist' && configuringStrategistId ? (
-            <StrategistConfig
-              strategist={strategists.find(s => s.id === configuringStrategistId) || strategists[0]}
-              onUpdate={updateStrategist}
-              onAddDoc={addDocument}
-              onRemoveDoc={removeDocument}
+          {activeView.type === 'skills' ? (
+            <SkillsLibrary
+              skills={skills}
+              activeSkillId={activeSkillId}
+              onToggle={toggleSkill}
+              onCreate={createSkill}
+              onUpdate={updateSkill}
+              onDelete={deleteSkill}
               onBack={() => setActiveView({ type: 'chat' })}
             />
           ) : activeView.type === 'funnel' ? (
@@ -215,8 +224,10 @@ export const Dashboard = ({
               onSaveItem={saveItem}
               onOpenReport={handleOpenReport}
               folders={folders}
-              activeStrategist={activeStrategist}
-              onDeactivateStrategist={() => activeStrategist && toggleStrategist(activeStrategist.id)}
+              activeSkill={activeSkill}
+              onDeactivateSkill={() => activeSkill && toggleSkill(activeSkill.id)}
+              skills={skills}
+              onSlashInvoke={handleSlashInvoke}
             />
           )}
         </div>

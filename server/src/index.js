@@ -19,6 +19,7 @@ import leadsRouter from './api/leads.js';
 import catalogsRouter from './api/catalogs.js';
 import previewsRouter from './api/previews.js';
 import chatRouter from './api/chat.js';
+import skillsRouter from './api/skills.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -53,6 +54,7 @@ app.use('/api/leads', requireToken, leadsRouter);
 app.use('/api/catalogs', requireToken, catalogsRouter);
 app.use('/api/previews', requireToken, previewsRouter);
 app.use('/api/chat', requireToken, chatRouter);
+app.use('/api/skills', requireToken, skillsRouter);
 
 app.use((err, _req, res, _next) => {
   console.error('EXPRESS ERROR:', err?.message, err?.stack);

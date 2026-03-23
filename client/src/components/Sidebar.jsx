@@ -153,10 +153,11 @@ export const Sidebar = ({
   language,
   onLanguageChange,
   folders = [],
-  strategists = [],
-  activeStrategist = null,
-  onToggleStrategist,
-  onConfigureStrategist,
+  skills = [],
+  activeSkill = null,
+  activeSkillId = null,
+  onToggleSkill,
+  onOpenSkillsLibrary,
   onCreateFolder,
   onDeleteFolder,
   onRenameFolder,
@@ -267,35 +268,33 @@ export const Sidebar = ({
         </button>
       </div>
 
-      {/* Skills */}
+      {/* Skills Library */}
       <div className="px-3 mb-2">
-        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-1 py-1">Skills</p>
+        <div className="flex items-center justify-between px-1 py-1">
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Skills Library</p>
+          <button onClick={onOpenSkillsLibrary} className="text-slate-300 hover:text-indigo-500 transition-colors" title="Open Skills Library">
+            <ChevronRight size={12} />
+          </button>
+        </div>
         <div className="space-y-1">
-          {strategists.map(strat => (
-            <div key={strat.id} className="flex items-center gap-1.5 group">
-              <button
-                onClick={() => !strat.comingSoon && onToggleStrategist?.(strat.id)}
-                className={`flex-1 flex items-center gap-2 px-3 py-2 rounded-xl text-[12px] font-medium transition-all
-                  ${strat.comingSoon ? 'text-slate-300 cursor-default' :
-                    strat.isActive ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' :
-                    'text-slate-500 hover:bg-slate-50 hover:text-slate-700 border border-transparent'}`}
-              >
-                <Sparkles size={14} className={strat.isActive ? 'text-indigo-500' : strat.comingSoon ? 'text-slate-200' : 'text-slate-400'} />
-                <span className="flex-1 text-left truncate">{strat.name}</span>
-                {strat.comingSoon && <span className="text-[9px] bg-slate-100 text-slate-400 px-1.5 py-0.5 rounded-full font-semibold">Soon</span>}
-                {strat.isActive && <span className="w-2 h-2 rounded-full bg-indigo-500" />}
-              </button>
-              {!strat.comingSoon && (
-                <button
-                  onClick={() => onConfigureStrategist?.(strat.id)}
-                  className="text-slate-300 hover:text-slate-500 opacity-0 group-hover:opacity-100 transition-all p-1 shrink-0"
-                  title="Configure"
-                >
-                  <ChevronRight size={12} />
-                </button>
-              )}
-            </div>
+          {skills.slice(0, 5).map(skill => (
+            <button key={skill.id}
+              onClick={() => onToggleSkill?.(skill.id)}
+              className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-[12px] font-medium transition-all
+                ${skill.id === activeSkillId ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' :
+                  'text-slate-500 hover:bg-slate-50 hover:text-slate-700 border border-transparent'}`}
+            >
+              <Sparkles size={14} className={skill.id === activeSkillId ? 'text-indigo-500' : 'text-slate-400'} />
+              <span className="flex-1 text-left truncate">{skill.name}</span>
+              {skill.id === activeSkillId && <span className="w-2 h-2 rounded-full bg-indigo-500" />}
+            </button>
           ))}
+          {skills.length > 5 && (
+            <button onClick={onOpenSkillsLibrary}
+              className="w-full text-center text-[11px] text-indigo-500 hover:text-indigo-700 font-medium py-1.5 transition-colors">
+              View all {skills.length} skills
+            </button>
+          )}
         </div>
       </div>
 
