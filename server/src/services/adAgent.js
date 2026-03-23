@@ -831,7 +831,7 @@ This is a CHAT interface — users want brief, human-like replies. Detailed data
 - **2-4 sentences MAX** of conversational analysis — like talking to a colleague
 - ONE bold headline summarizing the finding
 - \`\`\`metrics block (4 KPI cards) — these are compact and visual
-- Markdown table with **AT MOST 5 rows** (top/worst performers). If more data exists, write: "Showing top 5 of {N} campaigns"
+- Markdown table with **AT MOST 5 rows** (top/worst performers). If more data exists, write: "Showing top 5 of X campaigns" (replace X with actual count)
 - 1-2 bullet takeaways (not a full analysis)
 - \`\`\`quickreplies at the end (mandatory)
 - NO \`\`\`insights, \`\`\`steps, \`\`\`score, \`\`\`comparison, \`\`\`budget, or \`\`\`funnel blocks in chat — those go in canvas only
