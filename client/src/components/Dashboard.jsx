@@ -8,6 +8,7 @@ import { SavedItemView } from './SavedItemView.jsx';
 import { DashboardPage } from './DashboardPage.jsx';
 import { ReportPanel } from './ReportPanel.jsx';
 import { StrategistConfig } from './StrategistConfig.jsx';
+import { AudienceManager } from './AudienceManager.jsx';
 
 const SUGGESTED_ACTIONS = [
   { icon: 'BarChart3',     label: 'Weekly Performance Report',      desc: 'Spend, ROAS, CTR, CPA across all campaigns — with trends vs last week.',
@@ -97,6 +98,15 @@ export const Dashboard = ({
     setActiveView({ type: 'funnel' });
   }, []);
 
+  const handleOpenAudiences = useCallback(() => {
+    setActiveView({ type: 'audiences' });
+  }, []);
+
+  const handleAudienceToChat = useCallback((prompt) => {
+    setActiveView({ type: 'chat' });
+    sendMessage(prompt);
+  }, [sendMessage]);
+
   const handleFunnelToChat = useCallback((prompt) => {
     setActiveView({ type: 'chat' });
     sendMessage(prompt);
@@ -153,6 +163,7 @@ export const Dashboard = ({
         activeStrategist={activeStrategist}
         onToggleStrategist={toggleStrategist}
         onConfigureStrategist={(id) => { setConfiguringStrategistId(id); setActiveView({ type: 'strategist' }); }}
+        onOpenAudiences={handleOpenAudiences}
       />
 
       {/* Main Content */}
@@ -179,6 +190,12 @@ export const Dashboard = ({
             <DashboardPage
               adAccountId={adAccountId}
               onNavigateToChat={handleFunnelToChat}
+            />
+          ) : activeView.type === 'audiences' ? (
+            <AudienceManager
+              adAccountId={adAccountId}
+              onSendToChat={handleAudienceToChat}
+              onBack={() => setActiveView({ type: 'chat' })}
             />
           ) : activeView.type === 'saved' && currentSavedItem ? (
             <SavedItemView

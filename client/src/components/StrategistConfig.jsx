@@ -58,7 +58,7 @@ export const StrategistConfig = ({ strategist, onUpdate, onAddDoc, onRemoveDoc, 
         </button>
         <div className="flex items-center gap-2 flex-1">
           <Sparkles size={18} className="text-indigo-500" />
-          <span className="text-lg font-bold text-slate-900">Configure Strategist</span>
+          <span className="text-lg font-bold text-slate-900">Configure Skill</span>
         </div>
         <button onClick={handleSave}
           className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all ${saved ? 'bg-emerald-500 text-white' : 'bg-indigo-600 hover:bg-indigo-500 text-white'}`}>
@@ -85,7 +85,7 @@ export const StrategistConfig = ({ strategist, onUpdate, onAddDoc, onRemoveDoc, 
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-1.5">
               Instructions
-              <span className="text-xs font-normal text-slate-400 ml-2">Tell the AI how to behave when this strategist is active</span>
+              <span className="text-xs font-normal text-slate-400 ml-2">Tell the AI how to behave when this skill is active</span>
             </label>
             <textarea
               value={instructions}

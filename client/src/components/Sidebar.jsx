@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Bot, Plus, MessageSquare, Trash2, Sparkles, ChevronDown, ChevronLeft, ChevronRight, LogOut, FileText, Lightbulb, FolderOpen, Building2, Check, Globe, GripVertical, FolderPlus, X } from 'lucide-react';
+import { Bot, Plus, MessageSquare, Trash2, Sparkles, ChevronDown, ChevronLeft, ChevronRight, LogOut, FileText, Lightbulb, FolderOpen, Building2, Check, Globe, GripVertical, FolderPlus, X, Users } from 'lucide-react';
 import { groupSessionsByDate } from '../hooks/useChatSessions.js';
 import { useAdAccounts } from '../hooks/useAdAccounts.js';
 import { useBusinesses } from '../hooks/useBusinesses.js';
@@ -161,6 +161,7 @@ export const Sidebar = ({
   onDeleteFolder,
   onRenameFolder,
   onReorderFolders,
+  onOpenAudiences,
 }) => {
   const [openFolders, setOpenFolders] = useState({});
   const [hoveredSession, setHoveredSession] = useState(null);
@@ -244,9 +245,9 @@ export const Sidebar = ({
         </button>
       </div>
 
-      {/* My Strategist — Gems-like */}
+      {/* Skills — Gems-like */}
       <div className="px-3 mb-2">
-        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-1 py-1">My Strategist</p>
+        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-1 py-1">Skills</p>
         <div className="space-y-1">
           {strategists.map(strat => (
             <div key={strat.id} className="flex items-center gap-1.5 group">
@@ -282,6 +283,21 @@ export const Sidebar = ({
         selectedBusiness={selectedBusiness}
         onSelect={onSelectAccount}
       />
+
+      {/* Audiences */}
+      <div className="px-3 mb-2">
+        <button
+          onClick={onOpenAudiences}
+          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12px] font-medium transition-all border
+            ${activeView?.type === 'audiences'
+              ? 'bg-blue-50 text-blue-700 border-blue-200'
+              : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700 border border-transparent'}`}
+        >
+          <Users size={14} className={activeView?.type === 'audiences' ? 'text-blue-500' : 'text-slate-400'} />
+          <span className="flex-1 text-left">Audiences</span>
+          <ChevronRight size={12} className="text-slate-300" />
+        </button>
+      </div>
 
       {/* Scrollable area: Folders first, then Chat History */}
       <div className="flex-1 overflow-y-auto px-2 pb-2">
