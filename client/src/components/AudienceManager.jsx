@@ -2,6 +2,31 @@ import { useState, useEffect, useCallback } from 'react';
 import { Users, Plus, RefreshCw, Trash2, Copy, Target, Globe, Hash, X, AlertTriangle, Search, Film, ClipboardCopy, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import api from '../services/api.js';
 
+// ── Confirm Dialog ──────────────────────────────────────────────────────────
+const ConfirmDialog = ({ title, message, details, confirmLabel, confirmColor = 'blue', onConfirm, onCancel }) => (
+  <div className="fixed inset-0 z-[60] bg-black/30 backdrop-blur-sm flex items-center justify-center p-4" onClick={onCancel}>
+    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
+      <div className="px-5 pt-5 pb-3">
+        <h3 className="text-sm font-bold text-slate-900 mb-1">{title}</h3>
+        <p className="text-xs text-slate-500">{message}</p>
+        {details && (
+          <div className="mt-3 bg-slate-50 rounded-lg px-3 py-2 text-[11px] text-slate-600 space-y-0.5">
+            {details.map((d, i) => <p key={i}>{d}</p>)}
+          </div>
+        )}
+      </div>
+      <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-slate-100">
+        <button onClick={onCancel} className="px-4 py-2 rounded-lg text-xs font-medium text-slate-500 hover:bg-slate-50">Cancel</button>
+        <button onClick={onConfirm}
+          className={`px-4 py-2 rounded-lg text-xs font-semibold text-white transition-colors
+            ${confirmColor === 'red' ? 'bg-red-600 hover:bg-red-500' : 'bg-blue-600 hover:bg-blue-500'}`}>
+          {confirmLabel}
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
 // ── Constants ───────────────────────────────────────────────────────────────
 const SUBTYPE_LABELS = {
   WEBSITE: 'Website', ENGAGEMENT: 'Engagement', CUSTOM: 'Customer List',
@@ -92,20 +117,32 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat }) => {
     { id: 'video_id', label: 'Video ID', desc: 'People who watched a specific video' },
   ];
 
-  const handleCreate = () => {
-    let prompt = '';
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [pendingPrompt, setPendingPrompt] = useState('');
+
+  const buildPrompt = () => {
     if (tab === 'website') {
-      prompt = `Create a website custom audience called "${name || 'Website Visitors - Last ' + retentionDays + 'd'}" with ${retentionDays} day retention${urlFilter ? `, only visitors to pages containing "${urlFilter}"` : ''}`;
+      return `Create a website custom audience called "${name || 'Website Visitors - Last ' + retentionDays + 'd'}" with ${retentionDays} day retention${urlFilter ? `, only visitors to pages containing "${urlFilter}"` : ''}`;
     } else if (tab === 'video') {
       const srcLabel = VIDEO_SOURCES.find(s => s.id === videoSource)?.label || videoSource;
       const defaultName = `Video Viewers ${videoWatchPct}% - ${srcLabel} - Last ${retentionDays}d`;
-      prompt = `Create a video engagement custom audience called "${name || defaultName}" for people who watched at least ${videoWatchPct}% of videos from ${srcLabel}${videoSource === 'video_id' && videoId ? ` (video ID: ${videoId})` : ''}, ${retentionDays} day retention`;
+      return `Create a video engagement custom audience called "${name || defaultName}" for people who watched at least ${videoWatchPct}% of videos from ${srcLabel}${videoSource === 'video_id' && videoId ? ` (video ID: ${videoId})` : ''}, ${retentionDays} day retention`;
     } else if (tab === 'lookalike') {
-      prompt = `Create a lookalike audience from audience ID ${sourceAudienceId}, targeting ${country}, ${ratio}% ratio, name it "${name || 'Lookalike ' + ratio + '% - ' + country}"`;
+      return `Create a lookalike audience from audience ID ${sourceAudienceId}, targeting ${country}, ${ratio}% ratio, name it "${name || 'Lookalike ' + ratio + '% - ' + country}"`;
     } else if (tab === 'engagement') {
-      prompt = `Create an engagement audience for ${engagementType.replace(/_/g, ' ')}, ${retentionDays} day retention, name it "${name || engagementType.replace(/_/g, ' ') + ' - Last ' + retentionDays + 'd'}"`;
+      return `Create an engagement audience for ${engagementType.replace(/_/g, ' ')}, ${retentionDays} day retention, name it "${name || engagementType.replace(/_/g, ' ') + ' - Last ' + retentionDays + 'd'}"`;
     }
-    onCreateViaChat(prompt);
+    return '';
+  };
+
+  const handleCreate = () => {
+    const prompt = buildPrompt();
+    setPendingPrompt(prompt);
+    setShowConfirm(true);
+  };
+
+  const handleConfirmCreate = () => {
+    onCreateViaChat(pendingPrompt);
     onClose();
   };
 
@@ -256,6 +293,17 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat }) => {
             Create via AI Agent
           </button>
         </div>
+
+        {showConfirm && (
+          <ConfirmDialog
+            title="Create Audience?"
+            message="The AI agent will create this audience in your ad account."
+            details={[pendingPrompt]}
+            confirmLabel="Create"
+            onConfirm={handleConfirmCreate}
+            onCancel={() => setShowConfirm(false)}
+          />
+        )}
       </div>
     </div>
   );
@@ -337,12 +385,35 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack }) => {
     return acc;
   }, {});
 
+  const [confirmAction, setConfirmAction] = useState(null); // { title, message, details, confirmLabel, confirmColor, onConfirm }
+
   const handleUse = (aud) => onSendToChat(`Create an ad set targeting custom audience "${aud.name}" (ID: ${aud.id})`);
-  const handleCreateLookalike = (aud) => onSendToChat(`Create a 1% lookalike audience from "${aud.name}" (ID: ${aud.id}) targeting Singapore`);
+
+  const handleCreateLookalike = (aud) => {
+    setConfirmAction({
+      title: 'Create Lookalike Audience?',
+      message: `This will create a 1% lookalike audience from "${aud.name}".`,
+      details: [`Source: ${aud.name}`, `ID: ${aud.id}`, `Target: Singapore, 1% ratio`],
+      confirmLabel: 'Create Lookalike',
+      onConfirm: () => {
+        onSendToChat(`Create a 1% lookalike audience from "${aud.name}" (ID: ${aud.id}) targeting Singapore`);
+        setConfirmAction(null);
+      },
+    });
+  };
+
   const handleDelete = (aud) => {
-    if (confirm(`Delete audience "${aud.name}"? This cannot be undone.`)) {
-      onSendToChat(`Delete custom audience "${aud.name}" (ID: ${aud.id})`);
-    }
+    setConfirmAction({
+      title: 'Delete Audience?',
+      message: `This will permanently delete "${aud.name}". This cannot be undone.`,
+      details: [`Name: ${aud.name}`, `ID: ${aud.id}`],
+      confirmLabel: 'Delete',
+      confirmColor: 'red',
+      onConfirm: () => {
+        onSendToChat(`Delete custom audience "${aud.name}" (ID: ${aud.id})`);
+        setConfirmAction(null);
+      },
+    });
   };
 
   return (
@@ -509,6 +580,19 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack }) => {
         <CreateAudienceModal
           onClose={() => setShowCreate(false)}
           onCreateViaChat={(prompt) => onSendToChat(prompt)}
+        />
+      )}
+
+      {/* Confirm Dialog */}
+      {confirmAction && (
+        <ConfirmDialog
+          title={confirmAction.title}
+          message={confirmAction.message}
+          details={confirmAction.details}
+          confirmLabel={confirmAction.confirmLabel}
+          confirmColor={confirmAction.confirmColor}
+          onConfirm={confirmAction.onConfirm}
+          onCancel={() => setConfirmAction(null)}
         />
       )}
     </div>
