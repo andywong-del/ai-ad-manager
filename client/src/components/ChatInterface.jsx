@@ -1017,12 +1017,13 @@ const SlashPicker = ({ skills, filter, onSelect, selectedIndex }) => {
 };
 
 // ── Input box with drag & drop + slash commands ─────────────────────────────
-const ChatInput = ({ input, setInput, onKeyDown, onSend, onStop, onFilesAdded, attachments, onRemoveAttachment, fileRef, isTyping, handleFileUpload, isOver, activeSkill, onDeactivateSkill, skills = [], onSlashSelect, slashSkill, onClearSlash }) => {
-  // Slash command detection
-  const showSlash = input.startsWith('/') && !slashSkill;
-  const slashFilter = showSlash ? input.slice(1) : '';
+const ChatInput = ({ input, setInput, onKeyDown, onSend, onStop, onFilesAdded, attachments, onRemoveAttachment, fileRef, isTyping, handleFileUpload, isOver, activeSkill, onDeactivateSkill, skills = [], onSlashSelect, slashSkills = [], onRemoveSlashSkill, onClearAllSlash }) => {
+  // Slash command detection — show picker when input is just "/" or "/filter"
+  const showSlash = /^\/\S*$/.test(input.trim()) && input.trim().length >= 1;
+  const slashFilter = showSlash ? input.trim().slice(1) : '';
   const filteredSkills = showSlash ? skills.filter(s =>
-    !slashFilter || s.name.toLowerCase().includes(slashFilter.toLowerCase()) || s.id.includes(slashFilter.toLowerCase())
+    !slashSkills.find(ss => ss.id === s.id) && // hide already-selected
+    (!slashFilter || s.name.toLowerCase().includes(slashFilter.toLowerCase()) || s.id.includes(slashFilter.toLowerCase()))
   ) : [];
   const [slashIndex, setSlashIndex] = useState(0);
 
@@ -1042,8 +1043,15 @@ const ChatInput = ({ input, setInput, onKeyDown, onSend, onStop, onFilesAdded, a
       }
       if (e.key === 'Escape') { setInput(''); return; }
     }
+    // Backspace on empty input removes last slash skill chip
+    if (e.key === 'Backspace' && !input && slashSkills.length > 0) {
+      onRemoveSlashSkill(slashSkills[slashSkills.length - 1].id);
+      return;
+    }
     onKeyDown(e);
   };
+
+  const hasChips = slashSkills.length > 0 || activeSkill;
 
   return (
     <div className={`bg-white/80 backdrop-blur-xl border rounded-2xl overflow-hidden shadow-lg shadow-slate-200/50 transition-all relative
@@ -1053,31 +1061,19 @@ const ChatInput = ({ input, setInput, onKeyDown, onSend, onStop, onFilesAdded, a
         <SlashPicker skills={filteredSkills} filter={slashFilter} onSelect={onSlashSelect} selectedIndex={slashIndex} />
       )}
       <AttachmentBar attachments={attachments} onRemove={onRemoveAttachment} />
-      <div className="px-4 pt-4 pb-3">
-        <textarea
-          value={input}
-          onChange={handleChange}
-          onKeyDown={handleSlashKeyDown}
-          placeholder={slashSkill ? `Using /${slashSkill.id} — type your message...` : activeSkill ? `Ask with ${activeSkill.name} active...` : attachments.length ? 'Describe what to do with these files...' : 'Ask anything about your ads... (type / for skills)'}
-          rows={1}
-          disabled={isTyping}
-          className="w-full resize-none text-sm bg-transparent text-slate-800 placeholder:text-slate-400 focus:outline-none disabled:text-slate-400 max-h-32 overflow-y-auto"
-          style={{ lineHeight: '1.5' }}
-        />
-      </div>
-      {/* Skill chips */}
-      {(activeSkill || slashSkill) && (
-        <div className="px-4 pb-2 flex items-center gap-2">
-          {slashSkill && (
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-violet-50 border border-violet-200 text-[11px] font-semibold text-violet-700">
+      {/* Skill chips — shown above textarea */}
+      {hasChips && (
+        <div className="px-4 pt-3 pb-0 flex flex-wrap items-center gap-1.5">
+          {slashSkills.map(sk => (
+            <div key={sk.id} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-violet-50 border border-violet-200 text-[11px] font-semibold text-violet-700 animate-in fade-in">
               <Sparkles size={11} />
-              /{slashSkill.id}
-              <button onClick={onClearSlash} className="ml-0.5 text-violet-400 hover:text-violet-600 transition-colors">
+              /{sk.id}
+              <button onClick={() => onRemoveSlashSkill(sk.id)} className="ml-0.5 text-violet-400 hover:text-violet-600 transition-colors">
                 <X size={11} />
               </button>
             </div>
-          )}
-          {activeSkill && !slashSkill && (
+          ))}
+          {activeSkill && (
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-[11px] font-semibold text-indigo-700">
               <Sparkles size={11} />
               {activeSkill.name}
@@ -1088,6 +1084,18 @@ const ChatInput = ({ input, setInput, onKeyDown, onSend, onStop, onFilesAdded, a
           )}
         </div>
       )}
+      <div className="px-4 pt-4 pb-3">
+        <textarea
+          value={input}
+          onChange={handleChange}
+          onKeyDown={handleSlashKeyDown}
+          placeholder={slashSkills.length ? 'Type your message...' : activeSkill ? `Ask with ${activeSkill.name} active...` : attachments.length ? 'Describe what to do with these files...' : 'Ask anything about your ads... (type / for skills)'}
+          rows={1}
+          disabled={isTyping}
+          className="w-full resize-none text-sm bg-transparent text-slate-800 placeholder:text-slate-400 focus:outline-none disabled:text-slate-400 max-h-32 overflow-y-auto"
+          style={{ lineHeight: '1.5' }}
+        />
+      </div>
       <div className="px-4 pb-3 flex items-center justify-end">
         <div className="flex items-center gap-2">
           <button onClick={() => fileRef.current?.click()} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
@@ -1117,7 +1125,7 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, onStop
   const [input, setInput] = useState('');
   const [attachments, setAttachments] = useState([]); // { id, file, preview, status, progress, result }
   const [isDragOver, setIsDragOver] = useState(false);
-  const [slashSkill, setSlashSkill] = useState(null); // one-off skill from /command
+  const [slashSkills, setSlashSkills] = useState([]); // multiple one-off skills from /command
   const endRef   = useRef(null);
   const inputRef = useRef(null);
   const fileRef  = useRef(null);
@@ -1273,8 +1281,12 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, onStop
   }, [messages, isTyping]);
 
   const handleSlashSelect = useCallback((skill) => {
-    setSlashSkill(skill);
+    setSlashSkills(prev => prev.find(s => s.id === skill.id) ? prev : [...prev, skill]);
     setInput('');
+  }, []);
+
+  const handleRemoveSlashSkill = useCallback((skillId) => {
+    setSlashSkills(prev => prev.filter(s => s.id !== skillId));
   }, []);
 
   const handleSend = useCallback((text) => {
@@ -1291,11 +1303,11 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, onStop
     // Build message text with asset info
     let msgText = t;
 
-    // If a slash skill was selected, notify parent to inject its context
-    if (slashSkill && onSlashInvoke) {
-      onSlashInvoke(slashSkill.id);
+    // If slash skills were selected, notify parent to inject their context
+    if (slashSkills.length > 0 && onSlashInvoke) {
+      onSlashInvoke(slashSkills.map(s => s.id));
     }
-    setSlashSkill(null);
+    setSlashSkills([]);
     const mediaAttachments = doneAttachments.filter(a => !a.isDoc);
     const docAttachments = doneAttachments.filter(a => a.isDoc && a.result?.text);
 
@@ -1382,7 +1394,7 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, onStop
                 fileRef={fileRef} isTyping={isTyping}
                 handleFileUpload={handleFileInput} isOver={isDragOver}
                 activeSkill={activeSkill} onDeactivateSkill={onDeactivateSkill}
-                skills={skills} onSlashSelect={handleSlashSelect} slashSkill={slashSkill} onClearSlash={() => setSlashSkill(null)}
+                skills={skills} onSlashSelect={handleSlashSelect} slashSkills={slashSkills} onRemoveSlashSkill={handleRemoveSlashSkill} onClearAllSlash={() => setSlashSkills([])}
               />
             </div>
           </div>
@@ -1417,7 +1429,7 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, onStop
                 fileRef={fileRef} isTyping={isTyping}
                 handleFileUpload={handleFileInput} isOver={isDragOver}
                 activeSkill={activeSkill} onDeactivateSkill={onDeactivateSkill}
-                skills={skills} onSlashSelect={handleSlashSelect} slashSkill={slashSkill} onClearSlash={() => setSlashSkill(null)}
+                skills={skills} onSlashSelect={handleSlashSelect} slashSkills={slashSkills} onRemoveSlashSkill={handleRemoveSlashSkill} onClearAllSlash={() => setSlashSkills([])}
               />
             </div>
           </div>

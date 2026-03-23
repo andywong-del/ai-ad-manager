@@ -67,16 +67,20 @@ export const Dashboard = ({
 
   const handleSend = useCallback((text, attachments) => {
     setActiveView({ type: 'chat' });
-    // Inject skill context: slash command (one-off) takes priority, then active skill
-    const slashCtx = slashSkillRef.current ? getSkillContextById(slashSkillRef.current) : null;
+    // Inject skill context: slash commands (one-off, may be multiple) take priority, then active skill
+    const slashIds = slashSkillRef.current;
     slashSkillRef.current = null; // clear after use
-    const skillCtx = slashCtx || getSkillContext();
+    let skillCtx = null;
+    if (slashIds?.length) {
+      skillCtx = slashIds.map(id => getSkillContextById(id)).filter(Boolean).join('\n\n---\n\n');
+    }
+    if (!skillCtx) skillCtx = getSkillContext();
     const fullText = skillCtx ? `${skillCtx}\n\n---\n\nUser message: ${text}` : text;
     sendMessage(fullText, attachments);
   }, [sendMessage, getSkillContext, getSkillContextById]);
 
-  const handleSlashInvoke = useCallback((skillId) => {
-    slashSkillRef.current = skillId;
+  const handleSlashInvoke = useCallback((skillIds) => {
+    slashSkillRef.current = skillIds; // array of skill IDs
   }, []);
 
   const handleSwitchSession = useCallback((sessionId) => {

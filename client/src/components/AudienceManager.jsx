@@ -47,14 +47,15 @@ const fmtDate = (ts) => {
 };
 
 const fmtSize = (lower, upper, aud) => {
-  const opCode = aud?.operation_status?.code;
-  // No size data — check if populating/pending
+  // No size data at all
   if (!lower && !upper) {
-    if (opCode === 411 || opCode === 412 || opCode === 415) return { text: 'Pending', sub: 'Size temporarily unavailable' };
+    // Check if audience is still populating
+    const opCode = aud?.operation_status?.code;
+    if (opCode && opCode !== 200) return { text: 'Pending', sub: 'Size temporarily unavailable' };
     return null;
   }
-  // Below 1,000 is a normal ready state — matches Meta's display
-  if ((lower || 0) < 1000 && (!upper || upper < 1000)) return { text: 'Below 1,000' };
+  // Meta shows "Below 1,000" when upper bound <= 1000
+  if ((!upper || upper <= 1000) && (!lower || lower <= 1000)) return { text: 'Below 1,000' };
   const fmt = (n) => n.toLocaleString();
   if (lower && upper && lower !== upper) return { text: `${fmt(lower)} - ${fmt(upper)}` };
   return { text: fmt(lower || upper || 0) };
@@ -99,7 +100,7 @@ const getAvailability = (aud) => {
     return { label: 'Ready', color: 'text-emerald-600', dot: 'bg-emerald-500', sub: fmtEdited(aud.time_updated), tooltip: null };
   }
   if (opCode === 411 || opCode === 412 || opCode === 415) {
-    return { label: 'Populating', color: 'text-amber-600', dot: 'bg-amber-500', sub: 'Available for use', tooltip: null };
+    return { label: 'Ready', color: 'text-emerald-600', dot: 'bg-emerald-500', sub: fmtEdited(aud.time_updated), tooltip: null };
   }
   if (opCode === 300) {
     return { label: 'Expired', color: 'text-slate-400', dot: 'bg-slate-400', sub: null, tooltip: op?.description || null };
@@ -190,6 +191,7 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
   const [videos, setVideos] = useState([]);
   const [videosLoading, setVideosLoading] = useState(false);
   const [selectedVideoIds, setSelectedVideoIds] = useState([]);
+  const [videoSearchQuery, setVideoSearchQuery] = useState('');
   const [engagementType, setEngagementType] = useState('');
 
   // Customer List
@@ -561,8 +563,14 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
                   ) : videos.length === 0 ? (
                     <p className="text-xs text-slate-400 italic py-4 text-center">No videos found</p>
                   ) : (
+                    <>
+                    <div className="relative mb-1.5">
+                      <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input value={videoSearchQuery} onChange={e => setVideoSearchQuery(e.target.value)}
+                        placeholder="Search videos..." className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300" />
+                    </div>
                     <div className="max-h-[200px] overflow-y-auto space-y-1.5 border border-slate-200 rounded-lg p-2">
-                      {videos.map(v => (
+                      {videos.filter(v => !videoSearchQuery || (v.title || v.id || '').toLowerCase().includes(videoSearchQuery.toLowerCase())).map(v => (
                         <button key={v.id} onClick={() => toggleVideo(v.id)}
                           className={`w-full flex items-center gap-3 px-2 py-2 rounded-lg text-left transition-colors
                             ${selectedVideoIds.includes(v.id) ? 'bg-blue-50 border border-blue-200' : 'hover:bg-slate-50 border border-transparent'}`}>
@@ -587,6 +595,7 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
                         </button>
                       ))}
                     </div>
+                    </>
                   )}
                 </div>
               )}
