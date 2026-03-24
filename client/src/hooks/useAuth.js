@@ -3,11 +3,9 @@ import { login as fbLogin } from '../services/facebookSdk.js';
 
 const TOKEN_KEY = 'fb_long_lived_token';
 
-// Clear any stale token on load — user must login every session
-localStorage.removeItem(TOKEN_KEY);
-
 export const useAuth = () => {
-  const [longLivedToken, setLongLivedToken] = useState(null);
+  // Restore token from localStorage if it exists (persist across reloads)
+  const [longLivedToken, setLongLivedToken] = useState(() => localStorage.getItem(TOKEN_KEY));
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError]         = useState(null);
 
@@ -16,8 +14,6 @@ export const useAuth = () => {
   const login = () => {
     setIsLoading(true);
     setError(null);
-    localStorage.removeItem(TOKEN_KEY);
-    setLongLivedToken(null);
 
     fbLogin()
       .then(async (authResponse) => {
@@ -44,6 +40,8 @@ export const useAuth = () => {
         console.log('[Auth] Long-lived token obtained, length:', llToken.length);
         localStorage.setItem(TOKEN_KEY, llToken);
         setLongLivedToken(llToken);
+        // Notify other hooks (useBusinesses) that token is available
+        window.dispatchEvent(new Event('fb_token_changed'));
       })
       .catch((err) => {
         console.error('[Auth] Login failed:', err.message);
@@ -57,6 +55,7 @@ export const useAuth = () => {
   const logout = () => {
     localStorage.removeItem(TOKEN_KEY);
     setLongLivedToken(null);
+    window.dispatchEvent(new Event('fb_token_changed'));
   };
 
   return { longLivedToken, isLoading, error, login, logout };
