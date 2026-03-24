@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, Plus, Sparkles, BarChart3, Palette, DollarSign, Users, Zap, Trash2, Edit3, Save, X, Target, TrendingUp } from 'lucide-react';
+import { X, Plus, Sparkles, BarChart3, Palette, DollarSign, Users, Zap, Trash2, Edit3, Save, Target, TrendingUp, ChevronRight, MessageSquare } from 'lucide-react';
 
 const ICON_MAP = {
   funnel: BarChart3,
@@ -29,41 +29,8 @@ const getCategoryForSkill = (skill) => {
   return SKILL_CATEGORIES[skill.id] || 'Custom';
 };
 
-const SkillCard = ({ skill, onEdit, onDelete }) => {
-  const Icon = ICON_MAP[skill.icon] || Sparkles;
-  return (
-    <div onClick={() => onEdit(skill)}
-      className="group relative rounded-xl border border-slate-200 bg-white hover:border-indigo-300 hover:shadow-sm transition-all cursor-pointer">
-      <div className="px-4 py-4">
-        <div className="flex items-start gap-3">
-          <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-slate-100 group-hover:bg-indigo-100 transition-colors">
-            <Icon size={18} className="text-slate-500 group-hover:text-indigo-600 transition-colors" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm font-semibold truncate text-slate-800">{skill.name}</h3>
-              {skill.isDefault && <span className="text-[9px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full font-semibold shrink-0">Default</span>}
-            </div>
-            <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2">{skill.description}</p>
-          </div>
-        </div>
-        <div className="flex items-center justify-between mt-3">
-          <span className="text-[10px] text-slate-400 group-hover:text-indigo-500 transition-colors flex items-center gap-1">
-            <Edit3 size={10} /> Click to configure
-          </span>
-          {!skill.isDefault && (
-            <button onClick={(e) => { e.stopPropagation(); onDelete(skill); }} className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100" title="Delete">
-              <Trash2 size={13} />
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ── Create / Edit Skill Modal ────────────────────────────────────────────────
-const SkillEditor = ({ skill, onSave, onCancel, saving }) => {
+// ── Inline Skill Editor (expandable within the panel) ────────────────────────
+const InlineSkillEditor = ({ skill, onSave, onCancel, saving }) => {
   const [name, setName] = useState(skill?.name || '');
   const [description, setDescription] = useState(skill?.description || '');
   const [content, setContent] = useState(skill?.content || '');
@@ -74,52 +41,33 @@ const SkillEditor = ({ skill, onSave, onCancel, saving }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4" onClick={onCancel}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 shrink-0">
-          <h2 className="text-base font-bold text-slate-900">{skill ? 'Edit Skill' : 'Create New Skill'}</h2>
-          <button onClick={onCancel} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1.5">Skill Name</label>
-            <input value={name} onChange={e => setName(e.target.value)}
-              placeholder="e.g., Creative A/B Test Planner"
-              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300" />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-              Description
-              <span className="text-xs font-normal text-slate-400 ml-2">Short summary shown in the library</span>
-            </label>
-            <input value={description} onChange={e => setDescription(e.target.value)}
-              placeholder="e.g., Plan and structure A/B tests for ad creatives"
-              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300" />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-              Instructions
-              <span className="text-xs font-normal text-slate-400 ml-2">Tell the AI how to behave when this skill is active</span>
-            </label>
-            <textarea value={content} onChange={e => setContent(e.target.value)}
-              rows={10}
-              placeholder={"e.g., You are a creative testing expert. When analyzing ads:\n\n1. Identify the strongest performing ad\n2. Propose 3 variations to test against it\n3. Define success metrics and test duration\n4. Recommend budget allocation for the test"}
-              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300 resize-y font-mono" />
-            <p className="text-[11px] text-slate-400 mt-1">{content.length} characters — the AI will follow these instructions when this skill is invoked</p>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-slate-100 shrink-0">
-          <button onClick={onCancel} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-500 hover:bg-slate-50">Cancel</button>
-          <button onClick={handleSave} disabled={!name.trim() || !content.trim() || saving}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-500 disabled:bg-slate-200 disabled:text-slate-400 transition-colors">
-            <Save size={14} />
-            {saving ? 'Saving...' : skill ? 'Update Skill' : 'Create Skill'}
-          </button>
-        </div>
+    <div className="border border-indigo-200 rounded-xl bg-indigo-50/30 p-4 space-y-3">
+      <div>
+        <label className="block text-[11px] font-semibold text-slate-600 mb-1">Name</label>
+        <input value={name} onChange={e => setName(e.target.value)}
+          placeholder="e.g., Creative A/B Test Planner"
+          className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300 bg-white" />
+      </div>
+      <div>
+        <label className="block text-[11px] font-semibold text-slate-600 mb-1">Description</label>
+        <input value={description} onChange={e => setDescription(e.target.value)}
+          placeholder="Short summary"
+          className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300 bg-white" />
+      </div>
+      <div>
+        <label className="block text-[11px] font-semibold text-slate-600 mb-1">Instructions</label>
+        <textarea value={content} onChange={e => setContent(e.target.value)}
+          rows={6}
+          placeholder="Tell the AI how to behave when this expert is active..."
+          className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300 resize-y font-mono bg-white" />
+      </div>
+      <div className="flex items-center justify-end gap-2">
+        <button onClick={onCancel} className="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-500 hover:bg-slate-100">Cancel</button>
+        <button onClick={handleSave} disabled={!name.trim() || !content.trim() || saving}
+          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-500 disabled:bg-slate-200 disabled:text-slate-400 transition-colors">
+          <Save size={12} />
+          {saving ? 'Saving...' : skill ? 'Update' : 'Create'}
+        </button>
       </div>
     </div>
   );
@@ -141,10 +89,10 @@ const DeleteConfirm = ({ skill, onConfirm, onCancel }) => (
   </div>
 );
 
-// ── Main Skills Library ──────────────────────────────────────────────────────
-export const SkillsLibrary = ({ skills, onCreate, onUpdate, onDelete, onBack, onConfigure }) => {
-  const [showEditor, setShowEditor] = useState(false);
-  const [editingSkill, setEditingSkill] = useState(null);
+// ── Main Skills Library (slide-over panel) ──────────────────────────────────
+export const SkillsLibrary = ({ skills, onCreate, onUpdate, onDelete, onBack, onConfigure, onActivateSkill }) => {
+  const [editingSkillId, setEditingSkillId] = useState(null);
+  const [creatingNew, setCreatingNew] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [saving, setSaving] = useState(false);
 
@@ -160,27 +108,17 @@ export const SkillsLibrary = ({ skills, onCreate, onUpdate, onDelete, onBack, on
   const handleSave = async (data) => {
     setSaving(true);
     try {
-      if (editingSkill) {
-        await onUpdate(editingSkill.id, data);
+      if (editingSkillId) {
+        await onUpdate(editingSkillId, data);
+        setEditingSkillId(null);
       } else {
         await onCreate(data);
+        setCreatingNew(false);
       }
-      setShowEditor(false);
-      setEditingSkill(null);
     } catch (err) {
       console.error('Failed to save skill:', err);
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleEdit = (skill) => {
-    // Navigate to StrategistConfig for this skill
-    if (onConfigure) {
-      onConfigure(skill);
-    } else {
-      setEditingSkill(skill);
-      setShowEditor(true);
     }
   };
 
@@ -195,82 +133,115 @@ export const SkillsLibrary = ({ skills, onCreate, onUpdate, onDelete, onBack, on
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-white">
+    <div className="w-full h-full bg-white flex flex-col">
       {/* Header */}
-      <div className="flex items-center gap-3 px-6 py-4 border-b border-slate-200 shrink-0">
-        <button onClick={onBack} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
-          <ArrowLeft size={18} />
-        </button>
-        <div className="flex items-center gap-2 flex-1">
-          <Sparkles size={18} className="text-indigo-500" />
-          <span className="text-lg font-bold text-slate-900">Expertise Library</span>
+      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 shrink-0">
+        <div className="flex items-center gap-2">
+          <Sparkles size={16} className="text-indigo-500" />
+          <span className="text-sm font-bold text-slate-900">Expertise Library</span>
         </div>
-        <button onClick={() => { setEditingSkill(null); setShowEditor(true); }}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-500 transition-colors shadow-sm">
-          <Plus size={14} /> Create Skill
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button onClick={() => { setEditingSkillId(null); setCreatingNew(true); }}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-indigo-600 text-white hover:bg-indigo-500 transition-colors">
+            <Plus size={12} /> New
+          </button>
+          <button onClick={onBack} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+            <X size={16} />
+          </button>
+        </div>
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto px-6 py-6">
-        <div className="max-w-3xl mx-auto">
-          {/* How to use */}
-          <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3 mb-6">
-            <p className="text-[12px] font-semibold text-indigo-700 mb-1">How AI Experts work</p>
-            <ul className="text-[11px] text-indigo-600 space-y-0.5">
-              <li><strong>Click an expert</strong> to configure its instructions and knowledge base</li>
-              <li>Experts are saved as MD files — the AI agent references them automatically</li>
-              <li>Upload PDFs or documents to build domain expertise</li>
-            </ul>
+      <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5 max-w-3xl">
+        {/* Create new inline */}
+        {creatingNew && (
+          <InlineSkillEditor
+            onSave={handleSave}
+            onCancel={() => setCreatingNew(false)}
+            saving={saving}
+          />
+        )}
+
+        {/* Skills by category */}
+        {orderedCategories.map(category => (
+          <div key={category}>
+            <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">{category}</h2>
+            <div className="space-y-1.5">
+              {grouped[category].map(skill => {
+                const Icon = ICON_MAP[skill.icon] || Sparkles;
+                const isEditing = editingSkillId === skill.id;
+
+                if (isEditing) {
+                  return (
+                    <InlineSkillEditor
+                      key={skill.id}
+                      skill={skill}
+                      onSave={handleSave}
+                      onCancel={() => setEditingSkillId(null)}
+                      saving={saving}
+                    />
+                  );
+                }
+
+                return (
+                  <div key={skill.id}
+                    className="group flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-slate-100 group-hover:bg-indigo-100 transition-colors">
+                      <Icon size={15} className="text-slate-500 group-hover:text-indigo-600 transition-colors" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <h3 className="text-[13px] font-semibold truncate text-slate-800">{skill.name}</h3>
+                        {skill.isDefault && <span className="text-[8px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full font-semibold shrink-0">Built-in</span>}
+                      </div>
+                      <p className="text-[10px] text-slate-500 truncate">{skill.description}</p>
+                    </div>
+                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                      {onActivateSkill && (
+                        <button onClick={() => { onActivateSkill(skill); onBack(); }}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors" title="Use in chat">
+                          <MessageSquare size={13} />
+                        </button>
+                      )}
+                      <button onClick={() => {
+                        if (onConfigure && skill.isDefault) { onConfigure(skill); }
+                        else { setEditingSkillId(skill.id); setCreatingNew(false); }
+                      }}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors" title="Edit">
+                        <Edit3 size={13} />
+                      </button>
+                      {!skill.isDefault && (
+                        <button onClick={() => setDeleteTarget(skill)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors" title="Delete">
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                    </div>
+                    {onConfigure && skill.isDefault && (
+                      <button onClick={() => onConfigure(skill)}
+                        className="shrink-0 text-slate-300 hover:text-indigo-500 transition-colors opacity-0 group-hover:opacity-100">
+                        <ChevronRight size={14} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
+        ))}
 
-          {/* Category-grouped skills */}
-          {orderedCategories.map(category => (
-            <div key={category} className="mb-6">
-              <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">{category}</h2>
-              <div className="grid grid-cols-2 gap-3">
-                {grouped[category].map(skill => (
-                  <SkillCard key={skill.id} skill={skill}
-                    onEdit={handleEdit} onDelete={setDeleteTarget} />
-                ))}
-                {category === 'Custom' && (
-                  <button onClick={() => { setEditingSkill(null); setShowEditor(true); }}
-                    className="rounded-xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center py-6 text-slate-400 hover:text-indigo-500 hover:border-indigo-300 transition-colors">
-                    <Plus size={20} />
-                    <span className="text-xs font-medium mt-1">New Expert</span>
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-
-          {/* Show create button if no custom category yet */}
-          {!grouped['Custom'] && (
-            <div className="mb-6">
-              <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Custom</h2>
-              <div className="text-center py-8 border-2 border-dashed border-slate-200 rounded-xl">
-                <Sparkles size={24} className="text-slate-200 mx-auto mb-2" />
-                <p className="text-sm text-slate-400 mb-1">No custom experts yet</p>
-                <p className="text-xs text-slate-300 mb-3">Create your own strategy or workflow</p>
-                <button onClick={() => { setEditingSkill(null); setShowEditor(true); }}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors">
-                  <Plus size={12} /> Create Expert
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+        {/* Empty custom section */}
+        {!grouped['Custom'] && !creatingNew && (
+          <div>
+            <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Custom</h2>
+            <button onClick={() => setCreatingNew(true)}
+              className="w-full rounded-xl border-2 border-dashed border-slate-200 flex items-center justify-center py-5 text-slate-400 hover:text-indigo-500 hover:border-indigo-300 transition-colors">
+              <Plus size={16} className="mr-1.5" />
+              <span className="text-xs font-medium">Create Expert</span>
+            </button>
+          </div>
+        )}
       </div>
-
-      {/* Editor Modal */}
-      {showEditor && (
-        <SkillEditor
-          skill={editingSkill}
-          onSave={handleSave}
-          onCancel={() => { setShowEditor(false); setEditingSkill(null); }}
-          saving={saving}
-        />
-      )}
 
       {/* Delete Confirm */}
       {deleteTarget && (

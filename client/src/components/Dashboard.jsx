@@ -5,23 +5,14 @@ import { useSkills } from '../hooks/useSkills.js';
 import { ChatInterface } from './ChatInterface.jsx';
 import { Sidebar } from './Sidebar.jsx';
 import { SavedItemView } from './SavedItemView.jsx';
-import { DashboardPage } from './DashboardPage.jsx';
-import { ReportPanel } from './ReportPanel.jsx';
-import { SkillsLibrary } from './SkillsLibrary.jsx';
 import { StrategistConfig } from './StrategistConfig.jsx';
+import { SkillsLibrary } from './SkillsLibrary.jsx';
 import { AudienceManager } from './AudienceManager.jsx';
 
-const SUGGESTED_ACTIONS = [
+// Actions that require a connected ad account
+const ACCOUNT_ACTIONS = [
   { icon: 'Zap',           label: 'Create Campaign',                desc: 'Launch a new ad campaign step by step — objective, audience, creative, budget.',
-    prompt: `I want to create a new ad campaign. Please guide me through the process step by step:
-
-Step 1: Ask me to choose a campaign objective (Awareness, Traffic, Engagement, Leads, App Promotion, or Sales)
-Step 2: Help me select or create a target audience
-Step 3: Ask me to upload or describe my ad creative (image/video + copy)
-Step 4: Help me set budget and schedule with smart defaults
-Step 5: Show a pre-flight checklist validating everything before launch
-
-Present each step as a clear card with options. Wait for my input before proceeding to the next step.` },
+    prompt: `I want to create a new ad campaign. Guide me step by step with option cards for each choice.` },
   { icon: 'BarChart3',     label: 'Weekly Performance Report',      desc: 'Spend, ROAS, CTR, CPA across all campaigns — with trends vs last week.',
     prompt: 'Show my weekly performance report for the last 7 days with all campaigns, spend, ROAS, CTR, CPA. Compare to previous week.' },
   { icon: 'AlertTriangle', label: 'Problems & Quick Wins',          desc: 'Find issues, wasted spend, and actionable fixes you can apply today.',
@@ -34,32 +25,23 @@ Present each step as a clear card with options. Wait for my input before proceed
     prompt: 'Review my audiences and targeting. Show sizes, find overlap, suggest new audiences to test.' },
 ];
 
+// Actions available without auth — general knowledge questions
+const GENERAL_ACTIONS = [
+  { icon: 'Zap',           label: 'Plan a Campaign Strategy',       desc: 'Get expert advice on objectives, targeting, and budget for your next campaign.',
+    prompt: 'Help me plan a Facebook ad campaign strategy. What objective should I pick, how should I structure targeting, and what budget should I start with?' },
+  { icon: 'BarChart3',     label: 'What Makes Great Ad Creative?',  desc: 'Learn best practices for images, video, and copy that convert.',
+    prompt: 'What makes great Facebook ad creative? Give me best practices for images, video, and ad copy that actually convert.' },
+  { icon: 'Target',        label: 'Audience Targeting Guide',       desc: 'Understand custom, lookalike, and interest-based audiences.',
+    prompt: 'Explain the different types of Facebook ad audiences — custom, lookalike, saved — and when to use each one.' },
+  { icon: 'DollarSign',    label: 'Budget & Bidding Explained',     desc: 'CBO vs ABO, bidding strategies, and how to allocate spend.',
+    prompt: 'Explain Facebook ad budgets and bidding. What is CBO vs ABO? Which bidding strategy should I use and how much should I spend?' },
+  { icon: 'AlertTriangle', label: 'Common Ad Mistakes',             desc: 'Top pitfalls that waste budget and how to avoid them.',
+    prompt: 'What are the most common Facebook ad mistakes that waste budget? How do I avoid them?' },
+  { icon: 'Search',        label: 'Ad Formats & Placements',        desc: 'Carousel, video, stories — which format works best for your goal.',
+    prompt: 'What are the different Facebook ad formats and placements? Which format works best for conversions vs awareness?' },
+];
+
 // ── Dashboard ─────────────────────────────────────────────────────────────────
-// ── Connect Prompt (soft wall for unauthenticated users) ──────────────────────
-const ConnectPrompt = ({ onLogin, isLoading, error, onDismiss }) => (
-  <div className="fixed inset-0 z-[70] bg-black/30 backdrop-blur-sm flex items-center justify-center p-4" onClick={onDismiss}>
-    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
-      <div className="px-6 pt-6 pb-4 text-center">
-        <div className="w-14 h-14 rounded-2xl bg-blue-100 flex items-center justify-center mx-auto mb-4">
-          <svg viewBox="0 0 24 24" className="w-7 h-7 text-blue-600" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.879V14.89h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.989C18.343 21.129 22 16.99 22 12c0-5.523-4.477-10-10-10z"/></svg>
-        </div>
-        <h3 className="text-base font-bold text-slate-900 mb-1">Connect Your Ad Account</h3>
-        <p className="text-sm text-slate-500">Sign in with Facebook to unlock this feature — manage campaigns, audiences, and chat with your AI agent.</p>
-        {error && <p className="text-xs text-red-500 mt-2">{error}</p>}
-      </div>
-      <div className="px-6 pb-6 space-y-2">
-        <button onClick={onLogin} disabled={isLoading}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold bg-blue-600 text-white hover:bg-blue-500 transition-colors disabled:opacity-50">
-          {isLoading ? 'Connecting...' : 'Continue with Facebook'}
-        </button>
-        <button onClick={onDismiss}
-          className="w-full px-4 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors">
-          Browse first
-        </button>
-      </div>
-    </div>
-  </div>
-);
 
 export const Dashboard = ({
   token = null,
@@ -76,15 +58,6 @@ export const Dashboard = ({
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [chatLanguage, setChatLanguage] = useState(() => localStorage.getItem('aam_language') || 'en');
   const [activeView, setActiveView] = useState({ type: 'chat' });
-  const [reportPanel, setReportPanel] = useState(null);
-  const [showConnectPrompt, setShowConnectPrompt] = useState(false);
-
-  // Guard: show connect prompt when user tries to use a feature without auth
-  const requireAuth = useCallback((action) => {
-    if (token) return true;
-    setShowConnectPrompt(true);
-    return false;
-  }, [token]);
 
   const {
     skills, activeSkill, activeSkillId, toggleSkill,
@@ -111,7 +84,6 @@ export const Dashboard = ({
   }, [onSwitchBusiness, onSwitchAccount]);
 
   const handleSend = useCallback((text, attachments, slashIds) => {
-    if (!requireAuth()) return;
     setActiveView({ type: 'chat' });
     // Inject skill context: slash commands take priority, then active skill
     let skillCtx = null;
@@ -145,44 +117,26 @@ export const Dashboard = ({
     }
   }, [deleteSavedItem, activeView]);
 
-  const handleNavigateFunnel = useCallback(() => {
-    if (!requireAuth()) return;
-    setActiveView({ type: 'funnel' });
-  }, [requireAuth]);
-
   const handleOpenAudiences = useCallback(() => {
-    if (!requireAuth()) return;
     setActiveView({ type: 'audiences' });
-  }, [requireAuth]);
+  }, []);
+
+  const handleOpenSkillsLibrary = useCallback(() => {
+    setActiveView({ type: 'skillsLibrary' });
+  }, []);
 
   const handleAudienceToChat = useCallback((prompt) => {
     setActiveView({ type: 'chat' });
     sendMessage(prompt);
   }, [sendMessage]);
 
-  const handleFunnelToChat = useCallback((prompt) => {
-    setActiveView({ type: 'chat' });
-    sendMessage(prompt);
-  }, [sendMessage]);
-
-  // Report canvas panel
-  const handleOpenReport = useCallback((messageId, content) => {
-    const title = content?.split('\n').find(l => l.trim())?.replace(/^[#*\s]+/, '')?.slice(0, 60) || 'Report';
-    setReportPanel({ messageId, content, title });
-  }, []);
-
-  const handleCloseReport = useCallback(() => setReportPanel(null), []);
-
-  const handleSaveFromPanel = useCallback((folderId) => {
-    if (reportPanel) {
-      saveItem(reportPanel.messageId, folderId, reportPanel.title);
-    }
-  }, [reportPanel, saveItem]);
-
   // Find current saved item for viewer
   const currentSavedItem = activeView.type === 'saved'
     ? savedItems.find(i => i.id === activeView.itemId)
     : null;
+
+  // Show account-specific actions when connected, general knowledge actions otherwise
+  const suggestedActions = token && adAccountId ? ACCOUNT_ACTIONS : GENERAL_ACTIONS;
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
@@ -199,7 +153,6 @@ export const Dashboard = ({
         savedItems={savedItems}
         onViewSavedItem={handleViewSavedItem}
         onDeleteSavedItem={handleDeleteSavedItem}
-        onNavigateFunnel={handleNavigateFunnel}
         activeView={activeView}
         onLogout={onLogout}
         selectedAccount={selectedAccount}
@@ -214,17 +167,16 @@ export const Dashboard = ({
         onReorderFolders={reorderFolders}
         skills={skills}
         activeSkill={activeSkill}
-        activeSkillId={activeSkillId}
         onToggleSkill={toggleSkill}
-        onOpenSkillsLibrary={() => setActiveView({ type: 'skills' })}
         onOpenAudiences={handleOpenAudiences}
+        onOpenSkillsLibrary={handleOpenSkillsLibrary}
         token={token}
         onLogin={onLogin}
       />
 
       {/* Main Content */}
       <main className="flex-1 flex min-w-0">
-        <div className={`flex flex-col min-w-0 ${reportPanel ? 'w-[45%]' : 'flex-1'} transition-all duration-300`}>
+        <div className="flex flex-col min-w-0 flex-1 transition-all duration-300">
           {!sidebarOpen && (
             <button
               onClick={() => setSidebarOpen(true)}
@@ -234,17 +186,7 @@ export const Dashboard = ({
             </button>
           )}
 
-          {activeView.type === 'skillConfig' && activeView.skill ? (
-            <StrategistConfig
-              strategist={activeView.skill}
-              onUpdate={async (id, updates) => {
-                await updateSkill(id, updates);
-              }}
-              onAddDoc={() => {}}
-              onRemoveDoc={() => {}}
-              onBack={() => setActiveView({ type: 'skills' })}
-            />
-          ) : activeView.type === 'skills' ? (
+          {activeView.type === 'skillsLibrary' ? (
             <SkillsLibrary
               skills={skills}
               onCreate={createSkill}
@@ -252,17 +194,25 @@ export const Dashboard = ({
               onDelete={deleteSkill}
               onBack={() => setActiveView({ type: 'chat' })}
               onConfigure={(skill) => setActiveView({ type: 'skillConfig', skill })}
+              onActivateSkill={(skill) => { toggleSkill(skill.id); setActiveView({ type: 'chat' }); }}
             />
-          ) : activeView.type === 'funnel' ? (
-            <DashboardPage
-              adAccountId={adAccountId}
-              onNavigateToChat={handleFunnelToChat}
+          ) : activeView.type === 'skillConfig' && activeView.skill ? (
+            <StrategistConfig
+              strategist={activeView.skill}
+              onUpdate={async (id, updates) => {
+                await updateSkill(id, updates);
+              }}
+              onAddDoc={() => {}}
+              onRemoveDoc={() => {}}
+              onBack={() => setActiveView({ type: 'skillsLibrary' })}
             />
           ) : activeView.type === 'audiences' ? (
             <AudienceManager
               adAccountId={adAccountId}
               onSendToChat={handleAudienceToChat}
               onBack={() => setActiveView({ type: 'chat' })}
+              token={token}
+              onLogin={onLogin}
             />
           ) : activeView.type === 'saved' && currentSavedItem ? (
             <SavedItemView
@@ -277,28 +227,22 @@ export const Dashboard = ({
               thinkingText={thinkingText}
               onSend={handleSend}
               onStop={stopGeneration}
-              suggestedActions={SUGGESTED_ACTIONS}
+              suggestedActions={suggestedActions}
               adAccountId={adAccountId}
               onSaveItem={saveItem}
-              onOpenReport={handleOpenReport}
               folders={folders}
               activeSkill={activeSkill}
               onDeactivateSkill={() => activeSkill && toggleSkill(activeSkill.id)}
               skills={skills}
+              onToggleSkill={toggleSkill}
+              onManageSkills={(skill) => skill ? setActiveView({ type: 'skillConfig', skill }) : setActiveView({ type: 'skillsLibrary' })}
+              onNavigate={(view) => {
+                const viewMap = { audiences: 'audiences', skills: 'skillsLibrary' };
+                setActiveView({ type: viewMap[view] || 'chat' });
+              }}
             />
           )}
         </div>
-
-        {/* Report Canvas Panel */}
-        {reportPanel && (
-          <ReportPanel
-            content={reportPanel.content}
-            title={reportPanel.title}
-            onClose={handleCloseReport}
-            onSave={handleSaveFromPanel}
-            folders={folders}
-          />
-        )}
       </main>
 
       {/* Notification Toast */}
@@ -306,16 +250,6 @@ export const Dashboard = ({
         <div className="fixed bottom-6 right-6 z-50 bg-emerald-500 text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-2 text-sm font-medium">
           {notification}
         </div>
-      )}
-
-      {/* Connect Prompt — soft wall for unauthenticated users */}
-      {showConnectPrompt && onLogin && (
-        <ConnectPrompt
-          onLogin={onLogin}
-          isLoading={isLoginLoading}
-          error={loginError}
-          onDismiss={() => setShowConnectPrompt(false)}
-        />
       )}
     </div>
   );

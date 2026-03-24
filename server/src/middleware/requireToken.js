@@ -10,3 +10,12 @@ export const requireToken = (req, res, next) => {
   }
   next();
 };
+
+// Same as requireToken but allows requests without a token (for general chat)
+export const optionalToken = (req, res, next) => {
+  const auth = req.headers.authorization;
+  if (auth?.startsWith('Bearer ')) {
+    req.token = auth.slice(7);
+  }
+  next();
+};

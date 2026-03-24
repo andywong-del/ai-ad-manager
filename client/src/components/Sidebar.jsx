@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Zap, Plus, MessageSquare, Trash2, Sparkles, ChevronDown, ChevronLeft, ChevronRight, LogOut, FileText, Lightbulb, FolderOpen, Building2, Check, Globe, GripVertical, FolderPlus, X, Users } from 'lucide-react';
+import { Zap, Plus, MessageSquare, Trash2, ChevronDown, ChevronLeft, ChevronRight, LogOut, FileText, Lightbulb, FolderOpen, Building2, Check, Globe, GripVertical, FolderPlus, X, Users, Sparkles } from 'lucide-react';
 import { groupSessionsByDate } from '../hooks/useChatSessions.js';
 import { useAdAccounts } from '../hooks/useAdAccounts.js';
 import { useBusinesses } from '../hooks/useBusinesses.js';
@@ -210,7 +210,7 @@ export const Sidebar = ({
   savedItems,
   onViewSavedItem,
   onDeleteSavedItem,
-  onNavigateFunnel,
+  onOpenSkillsLibrary,
   activeView,
   onLogout,
   selectedAccount,
@@ -221,9 +221,7 @@ export const Sidebar = ({
   folders = [],
   skills = [],
   activeSkill = null,
-  activeSkillId = null,
   onToggleSkill,
-  onOpenSkillsLibrary,
   onCreateFolder,
   onDeleteFolder,
   onRenameFolder,
@@ -324,7 +322,7 @@ export const Sidebar = ({
       />
 
       {/* Audiences */}
-      <div className="px-3 mb-2">
+      <div className="px-3 mb-1">
         <button
           onClick={onOpenAudiences}
           className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12px] font-medium transition-all border
@@ -343,13 +341,12 @@ export const Sidebar = ({
         <button
           onClick={onOpenSkillsLibrary}
           className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12px] font-medium transition-all border
-            ${activeView?.type === 'skills'
+            ${activeView?.type === 'skillsLibrary' || activeView?.type === 'skillConfig'
               ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
               : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700 border border-transparent'}`}
         >
-          <Sparkles size={14} className={activeView?.type === 'skills' ? 'text-indigo-500' : 'text-slate-400'} />
-          <span className="flex-1 text-left">Expertise Library</span>
-          {activeSkillId && <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" title="Skill active" />}
+          <Sparkles size={14} className={activeView?.type === 'skillsLibrary' || activeView?.type === 'skillConfig' ? 'text-indigo-500' : 'text-slate-400'} />
+          <span className="flex-1 text-left">Skills Library</span>
           <ChevronRight size={12} className="text-slate-300" />
         </button>
       </div>

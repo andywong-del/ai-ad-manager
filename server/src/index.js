@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import { requireToken } from './middleware/requireToken.js';
+import { requireToken, optionalToken } from './middleware/requireToken.js';
 import authRouter from './api/auth.js';
 import campaignsRouter from './api/campaigns.js';
 import insightsRouter from './api/insights.js';
@@ -53,7 +53,7 @@ app.use('/api/conversions', requireToken, conversionsRouter);
 app.use('/api/leads', requireToken, leadsRouter);
 app.use('/api/catalogs', requireToken, catalogsRouter);
 app.use('/api/previews', requireToken, previewsRouter);
-app.use('/api/chat', requireToken, chatRouter);
+app.use('/api/chat', optionalToken, chatRouter);
 app.use('/api/skills', requireToken, skillsRouter);
 
 app.use((err, _req, res, _next) => {

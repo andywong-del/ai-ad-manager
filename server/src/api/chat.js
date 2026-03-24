@@ -115,10 +115,8 @@ router.post('/', async (req, res) => {
     }
 
     // Use token from requireToken middleware (Bearer header), falling back to body
-    const userToken = req.token || token;
-    if (!userToken) {
-      return res.status(401).json({ error: 'token is required' });
-    }
+    // Token is optional — allow general questions without auth
+    const userToken = req.token || token || null;
 
     // Check server-side env vars
     if (!process.env.GEMINI_API_KEY && !process.env.GOOGLE_GENAI_API_KEY) {

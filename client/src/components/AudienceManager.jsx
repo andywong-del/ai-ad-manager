@@ -1610,7 +1610,7 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
 };
 
 // ── Main Audience Manager ───────────────────────────────────────────────────
-export const AudienceManager = ({ adAccountId, onSendToChat, onBack }) => {
+export const AudienceManager = ({ adAccountId, onSendToChat, onBack, token, onLogin }) => {
   const [audiences, setAudiences] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -1783,6 +1783,47 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack }) => {
       },
     });
   };
+
+  // Empty state when not connected
+  if (!adAccountId) {
+    return (
+      <div className="flex-1 flex flex-col h-full bg-slate-50/50">
+        <div className="bg-white border-b border-slate-200 shrink-0">
+          <div className="flex items-center justify-between px-6 py-4">
+            <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <Users size={20} className="text-blue-500" />
+              Audiences
+            </h1>
+            {onBack && (
+              <button onClick={onBack} className="text-xs text-slate-400 hover:text-slate-600 transition-colors">Back to chat</button>
+            )}
+          </div>
+        </div>
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="text-center max-w-sm">
+            <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto mb-5">
+              <Users size={28} className="text-blue-400" />
+            </div>
+            <h2 className="text-lg font-bold text-slate-800 mb-2">Your audiences will appear here</h2>
+            <p className="text-sm text-slate-500 mb-6">
+              {!token
+                ? 'Connect your Meta Ads account to manage custom, lookalike, and saved audiences.'
+                : 'Select an ad account from the sidebar to view your audiences.'}
+            </p>
+            {!token && onLogin ? (
+              <button onClick={onLogin}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-blue-600 text-white hover:bg-blue-500 transition-colors shadow-sm">
+                <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.879V14.89h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.989C18.343 21.129 22 16.99 22 12c0-5.523-4.477-10-10-10z"/></svg>
+                Connect Meta Ads
+              </button>
+            ) : (
+              <p className="text-xs text-slate-400">Use the account picker in the sidebar</p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 flex flex-col h-full bg-slate-50/50">

@@ -1,5 +1,18 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Send, Square, Paperclip, CheckCircle2, XCircle, ArrowUpRight, BarChart3, Target, TrendingDown, Search, FileText, DollarSign, AlertTriangle, Zap, X, Upload, Image, Film, TrendingUp, ChevronRight, Shield, Sparkles, Download, Bookmark } from 'lucide-react';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend,
+  AreaChart, Area,
+  LineChart, Line,
+} from 'recharts';
+
+const CHART_COLORS = ['#3B82F6','#8B5CF6','#EC4899','#F59E0B','#10B981','#6366F1','#EF4444','#14B8A6'];
+const parseNum = (s) => {
+  if (typeof s === 'number') return s;
+  if (!s || typeof s !== 'string') return 0;
+  return parseFloat(s.replace(/[$,%x\s]/g, '').replace(/,/g, '')) || 0;
+};
 
 // ── Export utilities ─────────────────────────────────────────────────────────
 const downloadCSV = (title, rows) => {
@@ -57,7 +70,7 @@ export const parseMarkdownTable = (text) => {
   let textBuf = [];
   let i = 0;
 
-  const RICH_BLOCKS = ['adlib', 'metrics', 'options', 'insights', 'score', 'copyvariations', 'steps', 'quickreplies', 'funnel', 'comparison', 'budget'];
+  const RICH_BLOCKS = ['adlib', 'metrics', 'options', 'insights', 'score', 'copyvariations', 'steps', 'quickreplies', 'funnel', 'comparison', 'budget', 'trend'];
 
   while (i < lines.length) {
     const trimmed = lines[i].trim();
@@ -95,6 +108,40 @@ export const parseMarkdownTable = (text) => {
 };
 
 // ── Styled table ─────────────────────────────────────────────────────────────
+const TableBarChart = ({ columns, rows }) => {
+  const numericCols = columns.slice(1).filter((_, ci) =>
+    rows.some(row => parseNum(row[ci + 1]) > 0)
+  );
+  const chartCols = numericCols.slice(0, 3);
+  if (!chartCols.length || rows.length < 2) return null;
+
+  const data = rows.slice(0, 10).map(row => {
+    const entry = { name: String(row[0] || '').length > 18 ? String(row[0]).slice(0, 18) + '…' : String(row[0] || '') };
+    chartCols.forEach(col => {
+      const ci = columns.indexOf(col);
+      entry[col] = parseNum(row[ci]);
+    });
+    return entry;
+  });
+
+  return (
+    <div className="px-4 py-3 border-t border-slate-100">
+      <ResponsiveContainer width="100%" height={Math.max(180, data.length * 36)}>
+        <BarChart data={data} layout="vertical" margin={{ left: 10, right: 20, top: 5, bottom: 5 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+          <XAxis type="number" tick={{ fontSize: 11, fill: '#94a3b8' }} />
+          <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 11, fill: '#475569' }} />
+          <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}
+            formatter={(value, name) => [typeof value === 'number' ? value.toLocaleString() : value, name]} />
+          {chartCols.map((col, i) => (
+            <Bar key={col} dataKey={col} fill={CHART_COLORS[i % CHART_COLORS.length]} radius={[0, 4, 4, 0]} barSize={16} />
+          ))}
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+};
+
 const StyledTable = ({ columns, rows }) => {
   const tableRef = useRef(null);
   const csvRows = rows.map(row => Object.fromEntries(columns.map((col, i) => [col, row[i] || ''])));
@@ -124,6 +171,7 @@ const StyledTable = ({ columns, rows }) => {
           ))}
         </tbody>
       </table>
+      <TableBarChart columns={columns} rows={rows} />
     </div>
   );
 };
@@ -234,28 +282,61 @@ const MetricCards = ({ data }) => {
 };
 
 // ── Option Cards (A/B/C selectable) ──────────────────────────────────────────
+const isRawId = (v) => typeof v === 'string' && /^\d{6,}$/.test(v);
+const badgeLabel = (opt) => {
+  if (!isRawId(opt.id) && String(opt.id).length <= 3) return opt.id;
+  return opt.title?.[0]?.toUpperCase() || '?';
+};
+
 const OptionCards = ({ data, onSend }) => {
   if (!data?.options) return null;
+  const count = data.options.length;
+  const isCompact = count >= 7;
+  const gridCls = count <= 3 ? 'grid grid-cols-1 sm:grid-cols-3 divide-x divide-slate-100'
+    : count <= 6 ? 'grid grid-cols-1 sm:grid-cols-2 divide-x divide-slate-100'
+    : '';
+
   return (
-    <MetaCard title={data.title || 'Choose Your Approach'} subtitle="Select a strategy to proceed" badge="Action Required">
-      <div className="grid grid-cols-1 sm:grid-cols-3 divide-x divide-slate-100">
-        {data.options.map((opt, i) => (
-          <button key={i} onClick={() => onSend?.(`I choose Option ${opt.id}: ${opt.title}`)}
-            className="flex flex-col px-4 py-4 text-left hover:bg-blue-50/50 transition-all group relative">
-            {opt.tag && (
-              <span className="absolute top-2 right-3 text-[9px] font-bold bg-slate-900 text-white px-2 py-0.5 rounded-full">{opt.tag}</span>
-            )}
-            <div className="flex items-center gap-2.5 mb-2">
-              <span className="w-7 h-7 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 text-xs font-bold group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-600 transition-colors">{opt.id}</span>
-              <p className="text-[13px] font-semibold text-slate-800">{opt.title}</p>
-            </div>
-            <p className="text-xs text-slate-500 leading-relaxed flex-1">{opt.desc}</p>
-            <div className="flex items-center gap-1 mt-3 text-blue-600 text-[11px] font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
-              <span>Select this option</span><ArrowUpRight size={11} />
-            </div>
-          </button>
-        ))}
-      </div>
+    <MetaCard title={data.title || 'Choose an option'} subtitle={data.subtitle || null}>
+      {isCompact ? (
+        <div className="max-h-[320px] overflow-y-auto divide-y divide-slate-100">
+          {data.options.map((opt, i) => (
+            <button key={i} onClick={() => onSend?.(`I choose: ${opt.title}`)}
+              className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-blue-50/50 transition-all group">
+              <span className="w-7 h-7 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 text-xs font-bold group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-600 transition-colors shrink-0">
+                {badgeLabel(opt)}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-semibold text-slate-800 truncate">{opt.title}</p>
+                {opt.desc && <p className="text-xs text-slate-500 truncate">{opt.desc}</p>}
+              </div>
+              {opt.tag && <span className="text-[9px] font-bold bg-slate-900 text-white px-2 py-0.5 rounded-full shrink-0">{opt.tag}</span>}
+              <ArrowUpRight size={12} className="text-slate-300 group-hover:text-blue-600 transition-colors shrink-0" />
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className={gridCls}>
+          {data.options.map((opt, i) => (
+            <button key={i} onClick={() => onSend?.(`I choose: ${opt.title}`)}
+              className="flex flex-col px-4 py-4 text-left hover:bg-blue-50/50 transition-all group relative">
+              {opt.tag && (
+                <span className="absolute top-2 right-3 text-[9px] font-bold bg-slate-900 text-white px-2 py-0.5 rounded-full">{opt.tag}</span>
+              )}
+              <div className="flex items-center gap-2.5 mb-2">
+                <span className="w-7 h-7 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 text-xs font-bold group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-600 transition-colors">
+                  {badgeLabel(opt)}
+                </span>
+                <p className="text-[13px] font-semibold text-slate-800">{opt.title}</p>
+              </div>
+              <p className="text-xs text-slate-500 leading-relaxed flex-1 line-clamp-2">{opt.desc}</p>
+              <div className="flex items-center gap-1 mt-3 text-blue-600 text-[11px] font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
+                <span>Select</span><ArrowUpRight size={11} />
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
     </MetaCard>
   );
 };
@@ -409,13 +490,19 @@ const QuickRepliesCard = ({ data, onSend }) => {
   if (!Array.isArray(data) || !data.length) return null;
   return (
     <div className="flex flex-wrap gap-2 mt-3 mb-1">
-      {data.map((text, i) => (
-        <button key={i} onClick={() => onSend?.(text)}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border border-blue-200 bg-blue-50/60 text-[13px] font-medium text-blue-700 hover:bg-blue-100 hover:border-blue-300 transition-all hover:-translate-y-0.5 active:translate-y-0">
-          {text}
-          <ArrowUpRight size={12} className="opacity-50" />
-        </button>
-      ))}
+      {data.map((text, i) => {
+        const isNav = /^\[\w+\]/.test(text);
+        const displayText = text.replace(/^\[\w+\]\s*/, '');
+        return (
+          <button key={i} onClick={() => onSend?.(text)}
+            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border text-[13px] font-medium transition-all hover:-translate-y-0.5 active:translate-y-0
+              ${isNav ? 'border-indigo-200 bg-indigo-50/60 text-indigo-700 hover:bg-indigo-100 hover:border-indigo-300'
+                      : 'border-blue-200 bg-blue-50/60 text-blue-700 hover:bg-blue-100 hover:border-blue-300'}`}>
+            {displayText}
+            <ArrowUpRight size={12} className="opacity-50" />
+          </button>
+        );
+      })}
     </div>
   );
 };
@@ -426,9 +513,37 @@ const FunnelCard = ({ data }) => {
   if (!data?.stages?.length) return null;
   const max = Math.max(...data.stages.map(s => parseFloat(s.value) || 0));
   const colors = ['bg-blue-500', 'bg-indigo-500', 'bg-violet-500', 'bg-purple-500', 'bg-fuchsia-500', 'bg-pink-500'];
+
+  // Area chart data
+  const chartData = data.stages.map(s => ({
+    name: s.label,
+    value: parseNum(String(s.value)),
+  }));
+
   return (
     <MetaCard title={data.title || 'Conversion Funnel'}>
-      <div className="space-y-2">
+      {/* Area chart visualization */}
+      {chartData.length >= 2 && (
+        <div className="px-4 pt-3 pb-1">
+          <ResponsiveContainer width="100%" height={180}>
+            <AreaChart data={chartData} margin={{ left: 10, right: 20, top: 10, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#475569' }} />
+              <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} />
+              <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }} formatter={(v) => v.toLocaleString()} />
+              <Area type="monotone" dataKey="value" stroke="#6366f1" fill="url(#funnelGrad)" strokeWidth={2} />
+              <defs>
+                <linearGradient id="funnelGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#6366f1" stopOpacity={0.3} />
+                  <stop offset="100%" stopColor="#6366f1" stopOpacity={0.02} />
+                </linearGradient>
+              </defs>
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+      {/* Horizontal bars */}
+      <div className="space-y-2 px-4 pb-4">
         {data.stages.map((stage, i) => {
           const val = parseFloat(stage.value) || 0;
           const pct = max > 0 ? (val / max) * 100 : 0;
@@ -457,15 +572,42 @@ const FunnelCard = ({ data }) => {
 // Data: { title, items: [{ label, metrics: { [key]: { a, b } } }] } OR { title, a_label, b_label, metrics: [{ label, a, b }] }
 const ComparisonCard = ({ data }) => {
   if (!data?.metrics?.length) return null;
+  const keyA = data.a_label || 'Period A';
+  const keyB = data.b_label || 'Period B';
+
+  // Grouped bar chart data
+  const chartData = data.metrics.map(m => ({
+    name: String(m.label || '').length > 12 ? String(m.label).slice(0, 12) + '…' : String(m.label || ''),
+    [keyA]: parseNum(String(m.a)),
+    [keyB]: parseNum(String(m.b)),
+  }));
+
   return (
     <MetaCard title={data.title || 'Comparison'}>
+      {/* Bar chart */}
+      {chartData.length >= 2 && (
+        <div className="px-4 pt-3 pb-1">
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={chartData} margin={{ left: 10, right: 20, top: 10, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#475569' }} />
+              <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} />
+              <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }} />
+              <Bar dataKey={keyA} fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={20} />
+              <Bar dataKey={keyB} fill="#8b5cf6" radius={[4, 4, 0, 0]} barSize={20} />
+              <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+      {/* Table */}
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-slate-200">
               <th className="text-left py-2 px-2 text-[11px] font-semibold text-slate-500 uppercase">Metric</th>
-              <th className="text-right py-2 px-2 text-[11px] font-semibold text-blue-600 uppercase">{data.a_label || 'Period A'}</th>
-              <th className="text-right py-2 px-2 text-[11px] font-semibold text-violet-600 uppercase">{data.b_label || 'Period B'}</th>
+              <th className="text-right py-2 px-2 text-[11px] font-semibold text-blue-600 uppercase">{keyA}</th>
+              <th className="text-right py-2 px-2 text-[11px] font-semibold text-violet-600 uppercase">{keyB}</th>
               <th className="text-right py-2 px-2 text-[11px] font-semibold text-slate-500 uppercase">Change</th>
             </tr>
           </thead>
@@ -500,17 +642,39 @@ const BudgetCard = ({ data }) => {
   if (!data?.items?.length) return null;
   const total = parseFloat(data.total_budget) || data.items.reduce((s, it) => s + (parseFloat(it.spend) || 0), 0);
   const colors = ['bg-blue-500', 'bg-emerald-500', 'bg-violet-500', 'bg-amber-500', 'bg-rose-500', 'bg-cyan-500', 'bg-indigo-500', 'bg-orange-500'];
+
+  // Donut pie chart data
+  const pieData = data.items.map((item, i) => ({
+    name: String(item.name || '').length > 20 ? String(item.name).slice(0, 20) + '…' : String(item.name || ''),
+    value: parseNum(String(item.spend || item.percentage || 0)),
+  }));
+
   return (
     <MetaCard title={data.title || 'Budget Allocation'}>
+      {/* Donut chart */}
+      {pieData.length >= 2 && (
+        <div className="px-4 pt-3 pb-1">
+          <ResponsiveContainer width="100%" height={240}>
+            <PieChart>
+              <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} innerRadius={45} paddingAngle={2}
+                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={{ stroke: '#94a3b8' }}>
+                {pieData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+              </Pie>
+              <Tooltip formatter={(value) => `$${value.toLocaleString()}`} contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }} />
+              <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      )}
       {/* Stacked bar */}
-      <div className="flex h-5 rounded-full overflow-hidden mb-4 bg-slate-100">
+      <div className="flex h-5 rounded-full overflow-hidden mb-4 mx-4 bg-slate-100">
         {data.items.map((item, i) => {
           const pct = total > 0 ? ((parseFloat(item.spend) || 0) / total * 100) : 0;
           return <div key={i} className={`${colors[i % colors.length]} transition-all`} style={{ width: `${Math.max(pct, 1)}%` }} title={`${item.name}: ${pct.toFixed(1)}%`} />;
         })}
       </div>
       {/* Legend */}
-      <div className="space-y-2">
+      <div className="space-y-2 px-4">
         {data.items.map((item, i) => {
           const spend = parseFloat(item.spend) || 0;
           const pct = total > 0 ? (spend / total * 100).toFixed(1) : '0';
@@ -530,11 +694,48 @@ const BudgetCard = ({ data }) => {
         })}
       </div>
       {total > 0 && (
-        <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
+        <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between px-4 pb-4">
           <span className="text-xs font-medium text-slate-500">Total</span>
           <span className="text-sm font-bold text-slate-900">${total.toLocaleString()}</span>
         </div>
       )}
+    </MetaCard>
+  );
+};
+
+// ── Trend Card (time-series line chart) ─────────────────────────────────────
+// Data: { title, series: [{ name, data: [{ date, value }] }], yLabel? }
+const TrendCard = ({ data }) => {
+  if (!data?.series?.length) return null;
+  // Merge all dates and build chart data
+  const dateSet = new Set();
+  data.series.forEach(s => s.data?.forEach(d => dateSet.add(d.date)));
+  const dates = [...dateSet].sort();
+  const chartData = dates.map(date => {
+    const point = { date };
+    data.series.forEach(s => {
+      const match = s.data?.find(d => d.date === date);
+      point[s.name] = match ? parseNum(String(match.value)) : 0;
+    });
+    return point;
+  });
+
+  return (
+    <MetaCard title={data.title || 'Performance Trend'}>
+      <div className="px-2 pt-3 pb-2">
+        <ResponsiveContainer width="100%" height={260}>
+          <LineChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+            <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} />
+            <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} label={data.yLabel ? { value: data.yLabel, angle: -90, position: 'insideLeft', style: { fontSize: 10, fill: '#94a3b8' } } : undefined} />
+            <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }} />
+            {data.series.map((s, i) => (
+              <Line key={s.name} type="monotone" dataKey={s.name} stroke={CHART_COLORS[i % CHART_COLORS.length]} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+            ))}
+            {data.series.length > 1 && <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
     </MetaCard>
   );
 };
@@ -800,6 +1001,7 @@ export const RichContent = ({ text, onSend }) => {
           case 'funnel': return <FunnelCard key={i} data={seg.data} />;
           case 'comparison': return <ComparisonCard key={i} data={seg.data} />;
           case 'budget': return <BudgetCard key={i} data={seg.data} />;
+          case 'trend': return <TrendCard key={i} data={seg.data} />;
           default: return <div key={i} className="whitespace-pre-wrap">{renderRichText(seg.content)}</div>;
         }
       })}
@@ -814,19 +1016,11 @@ export const hasRichCards = (text) => {
   return segments.some(s => !['text', 'quickreplies'].includes(s.type));
 };
 
-// ── Split chat summary from canvas detail ───────────────────────────────────
+// ── Strip canvas_detail markers — everything renders inline now ──────────────
 export const splitChatAndCanvas = (text) => {
   if (!text) return { chatText: '', canvasText: null };
-  const marker = '~~~canvas_detail';
-  const idx = text.indexOf(marker);
-  if (idx === -1) return { chatText: text, canvasText: null };
-  const chatText = text.slice(0, idx).trim();
-  let canvasText = text.slice(idx + marker.length);
-  // Remove closing ~~~ if present
-  const closeIdx = canvasText.lastIndexOf('~~~');
-  if (closeIdx > 0) canvasText = canvasText.slice(0, closeIdx);
-  canvasText = canvasText.trim();
-  return { chatText, canvasText: canvasText || null };
+  // Remove ~~~canvas_detail markers but keep the content
+  return { chatText: text.replace(/~~~canvas_detail~~~?/g, '').trim(), canvasText: null };
 };
 
 // ── Save menu for agent messages ─────────────────────────────────────────────
@@ -883,19 +1077,16 @@ const SaveMenu = ({ messageId, onSave, folders = [] }) => {
 };
 
 // ── Message bubble ────────────────────────────────────────────────────────────
-const MessageBubble = ({ message, isLatest, onSend, isTyping, onSaveItem, onOpenReport, folders }) => {
+const MessageBubble = ({ message, isLatest, onSend, isTyping, onSaveItem, folders }) => {
   if (message.type === 'report') return (<><ReportMessage message={message} timestamp={message.timestamp} /><div className="mb-2" /></>);
   if (message.type === 'table') return (<><TableMessage message={message} />{isLatest && message.actions?.length > 0 && <QuickReplies actions={message.actions} onSend={onSend} disabled={isTyping} />}<div className="mb-6" /></>);
 
   const isAgent = message.role === 'agent';
   if (isAgent) {
-    // Split chat summary from canvas detail
-    const { chatText, canvasText } = splitChatAndCanvas(message.text);
+    // All content renders inline — no canvas split
+    const { chatText } = splitChatAndCanvas(message.text);
     const segments = parseMarkdownTable(chatText);
     const hasWide = segments.some(s => s.type !== 'text');
-    // Show "View Full Report" only when canvas detail exists, OR fallback for old messages with rich content
-    const hasCanvasContent = canvasText !== null;
-    const hasRichFallback = !hasCanvasContent && segments.some(s => !['text', 'quickreplies'].includes(s.type));
     return (
       <>
         <div className="flex items-end gap-3 mb-2 group">
@@ -923,19 +1114,10 @@ const MessageBubble = ({ message, isLatest, onSend, isTyping, onSaveItem, onOpen
                   case 'funnel': return <FunnelCard key={i} data={seg.data} />;
                   case 'comparison': return <ComparisonCard key={i} data={seg.data} />;
                   case 'budget': return <BudgetCard key={i} data={seg.data} />;
+                  case 'trend': return <TrendCard key={i} data={seg.data} />;
                   default: return <div key={i} className="whitespace-pre-wrap">{renderRichText(seg.content)}</div>;
                 }
               })}
-              {/* View Full Report button — shows when canvas detail exists */}
-              {(hasCanvasContent || hasRichFallback) && onOpenReport && message.id !== 'welcome' && (
-                <div className="mt-3 pt-3 border-t border-slate-100">
-                  <button onClick={() => onOpenReport(message.id, message.text)}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/60 text-blue-700 text-[13px] font-semibold hover:shadow-md hover:border-blue-300 transition-all w-full justify-center">
-                    <FileText size={15} />
-                    View Full Report
-                  </button>
-                </div>
-              )}
             </div>
             <p className="text-xs text-slate-400 mt-1 ml-1">{fmtTime(message.timestamp)}</p>
           </div>
@@ -1016,6 +1198,67 @@ const SlashPicker = ({ skills, filter, onSelect, selectedIndex }) => {
   );
 };
 
+// ── Skills Dropdown (chat bar) ──────────────────────────────────────────────
+const SKILL_CATEGORIES = {
+  performance_analyst: 'Analysis',
+  inception_funnel_audit: 'Analysis',
+  creative_strategist: 'Creative',
+  budget_optimizer: 'Strategy',
+  audience_strategist: 'Targeting',
+};
+const CATEGORY_ORDER = ['Analysis', 'Strategy', 'Creative', 'Targeting', 'Custom'];
+
+const SKILL_ICONS = {
+  performance_analyst: BarChart3,
+  inception_funnel_audit: Target,
+  creative_strategist: Sparkles,
+  budget_optimizer: DollarSign,
+  audience_strategist: Target,
+};
+
+const SkillsDropdown = ({ skills, activeSkill, onToggleSkill, onManageSkills, onClose }) => {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) onClose();
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [onClose]);
+
+  // Flat list — no category grouping for compact dropdown
+  return (
+    <div ref={ref} className="absolute top-full left-0 mt-2 w-[240px] bg-white border border-slate-200 rounded-xl shadow-xl shadow-slate-200/50 z-[100] overflow-hidden">
+      {/* Skill list */}
+      <div className="max-h-[320px] overflow-y-auto py-1">
+        {skills.map(skill => {
+          const isActive = activeSkill?.id === skill.id;
+          const Icon = SKILL_ICONS[skill.id] || Sparkles;
+          return (
+            <button key={skill.id} onClick={() => { onToggleSkill(skill.id); onClose(); }}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors ${isActive ? 'bg-indigo-50' : 'hover:bg-slate-50'}`}>
+              <Icon size={14} className={isActive ? 'text-indigo-500' : 'text-slate-400'} />
+              <span className={`text-[13px] font-medium flex-1 truncate ${isActive ? 'text-indigo-700' : 'text-slate-700'}`}>{skill.name}</span>
+              {isActive && <CheckCircle2 size={14} className="text-indigo-500 shrink-0" />}
+            </button>
+          );
+        })}
+      </div>
+      {/* Footer */}
+      {onManageSkills && (
+        <div className="border-t border-slate-100 px-3 py-2">
+          <button onClick={() => { onManageSkills(null); onClose(); }}
+            className="w-full flex items-center gap-2 px-1 py-1 text-[12px] font-medium text-slate-500 hover:text-indigo-600 transition-colors rounded-lg">
+            <Sparkles size={12} />
+            Manage Experts...
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ── Input box with drag & drop + slash commands ─────────────────────────────
 // Keyword-based skill suggestion — match user input against skill descriptions
 const useSuggestedSkill = (input, skills, activeSkill, slashSkills) => {
@@ -1036,7 +1279,8 @@ const useSuggestedSkill = (input, skills, activeSkill, slashSkills) => {
   return null;
 };
 
-const ChatInput = ({ input, setInput, onKeyDown, onSend, onStop, onFilesAdded, attachments, onRemoveAttachment, fileRef, isTyping, handleFileUpload, isOver, activeSkill, onDeactivateSkill, skills = [], onSlashSelect, slashSkills = [], onRemoveSlashSkill, onClearAllSlash }) => {
+const ChatInput = ({ input, setInput, onKeyDown, onSend, onStop, onFilesAdded, attachments, onRemoveAttachment, fileRef, isTyping, handleFileUpload, isOver, activeSkill, onDeactivateSkill, skills = [], onSlashSelect, slashSkills = [], onRemoveSlashSkill, onClearAllSlash, onToggleSkill, onManageSkills }) => {
+  const [skillsOpen, setSkillsOpen] = useState(false);
   // Slash command detection — show picker when input starts with "/"
   const showSlash = input.startsWith('/');
   const slashFilter = showSlash ? input.slice(1).trim() : '';
@@ -1078,7 +1322,7 @@ const ChatInput = ({ input, setInput, onKeyDown, onSend, onStop, onFilesAdded, a
 
   return (
     <div className="relative">
-      <div className={`bg-white/80 backdrop-blur-xl border rounded-2xl overflow-hidden shadow-lg shadow-slate-200/50 transition-all
+      <div className={`bg-white/80 backdrop-blur-xl border rounded-2xl shadow-lg shadow-slate-200/50 transition-all
         ${isOver ? 'border-blue-400 ring-2 ring-blue-100' : 'border-slate-200'}`}>
         <AttachmentBar attachments={attachments} onRemove={onRemoveAttachment} />
         {/* Skill chips — shown above textarea */}
@@ -1133,7 +1377,18 @@ const ChatInput = ({ input, setInput, onKeyDown, onSend, onStop, onFilesAdded, a
             style={{ lineHeight: '1.5' }}
           />
         </div>
-        <div className="px-4 pb-3 flex items-center justify-end">
+        <div className="px-4 pb-3 flex items-center justify-between">
+          <div className="relative">
+            <button onClick={() => setSkillsOpen(!skillsOpen)}
+              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors relative ${skillsOpen ? 'text-indigo-600 bg-indigo-50' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`}
+              title="Experts">
+              <Sparkles size={16} />
+              {activeSkill && <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-indigo-500 ring-2 ring-white" />}
+            </button>
+            {skillsOpen && (
+              <SkillsDropdown skills={skills} activeSkill={activeSkill} onToggleSkill={onToggleSkill} onManageSkills={onManageSkills} onClose={() => setSkillsOpen(false)} />
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <button onClick={() => fileRef.current?.click()} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
               <Paperclip size={16} />
@@ -1163,7 +1418,7 @@ const ChatInput = ({ input, setInput, onKeyDown, onSend, onStop, onFilesAdded, a
 };
 
 // ── Main component ────────────────────────────────────────────────────────────
-export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, onStop, suggestedActions = [], adAccountId, onSaveItem, onOpenReport, folders = [], activeSkill = null, onDeactivateSkill, skills = [] }) => {
+export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, onStop, suggestedActions = [], adAccountId, onSaveItem, folders = [], activeSkill = null, onDeactivateSkill, skills = [], onToggleSkill, onManageSkills, onNavigate }) => {
   const [input, setInput] = useState('');
   const [attachments, setAttachments] = useState([]); // { id, file, preview, status, progress, result }
   const [isDragOver, setIsDragOver] = useState(false);
@@ -1333,6 +1588,14 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, onStop
 
   const handleSend = useCallback((text) => {
     const t = (typeof text === 'string' ? text : input).trim();
+
+    // Navigation prefixes — intercept and route instead of sending as message
+    const navMatch = t.match(/^\[(\w+)\]\s*(.*)/);
+    if (navMatch && onNavigate) {
+      onNavigate(navMatch[1]); // e.g. "audiences"
+      return;
+    }
+
     const doneAttachments = attachments.filter(a => a.status === 'done');
 
     if (!t && !doneAttachments.length) return;
@@ -1408,13 +1671,7 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, onStop
         </div>
       )}
 
-      {/* Sticky banner when no account selected */}
-      {!adAccountId && (
-        <div className="shrink-0 bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex items-center justify-center gap-2 text-sm font-medium text-amber-700">
-          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-          Please select an ad account to get started
-        </div>
-      )}
+      {/* Subtle inline hint when no account connected */}
 
       {/* Empty State */}
       {isEmptyState && (
@@ -1425,22 +1682,21 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, onStop
             <h1 className="text-3xl font-extrabold text-slate-900 mb-6 text-center tracking-tight">
               What would you like to know?
             </h1>
-            <div className={!adAccountId ? 'opacity-50 pointer-events-none' : ''}>
-              <ChatInput
-                input={input} setInput={setInput} onKeyDown={handleKeyDown}
-                onSend={() => handleSend()} onStop={onStop} onFilesAdded={addFiles}
-                attachments={attachments} onRemoveAttachment={removeAttachment}
-                fileRef={fileRef} isTyping={isTyping}
-                handleFileUpload={handleFileInput} isOver={isDragOver}
-                activeSkill={activeSkill} onDeactivateSkill={onDeactivateSkill}
-                skills={skills} onSlashSelect={handleSlashSelect} slashSkills={slashSkills} onRemoveSlashSkill={handleRemoveSlashSkill} onClearAllSlash={() => setSlashSkills([])}
-              />
-            </div>
+            <ChatInput
+              input={input} setInput={setInput} onKeyDown={handleKeyDown}
+              onSend={() => handleSend()} onStop={onStop} onFilesAdded={addFiles}
+              attachments={attachments} onRemoveAttachment={removeAttachment}
+              fileRef={fileRef} isTyping={isTyping}
+              handleFileUpload={handleFileInput} isOver={isDragOver}
+              activeSkill={activeSkill} onDeactivateSkill={onDeactivateSkill}
+              skills={skills} onSlashSelect={handleSlashSelect} slashSkills={slashSkills} onRemoveSlashSkill={handleRemoveSlashSkill} onClearAllSlash={() => setSlashSkills([])}
+              onToggleSkill={onToggleSkill} onManageSkills={onManageSkills}
+            />
           </div>
 
-          <div className={`w-full max-w-3xl mx-auto grid grid-cols-2 lg:grid-cols-3 gap-3 mt-8 pb-8 ${!adAccountId ? 'opacity-50 pointer-events-none' : ''}`}>
+          <div className="w-full max-w-3xl mx-auto grid grid-cols-2 lg:grid-cols-3 gap-3 mt-8 pb-8">
             {suggestedActions.map((action) => (
-              <ActionCard key={action.label} {...action} onSend={handleSend} disabled={isTyping || !adAccountId} />
+              <ActionCard key={action.label} {...action} onSend={handleSend} disabled={isTyping} />
             ))}
           </div>
         </div>
@@ -1452,7 +1708,7 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, onStop
           <div className="flex-1 overflow-y-auto">
             <div className="max-w-3xl mx-auto px-4 pt-6 pb-2">
               {messages.map((msg) => (
-                <MessageBubble key={msg.id} message={msg} isLatest={msg.id === lastId} onSend={handleSend} isTyping={isTyping} onSaveItem={onSaveItem} onOpenReport={onOpenReport} folders={folders} />
+                <MessageBubble key={msg.id} message={msg} isLatest={msg.id === lastId} onSend={handleSend} isTyping={isTyping} onSaveItem={onSaveItem} folders={folders} />
               ))}
               {isTyping && <TypingIndicator thinkingText={thinkingText} />}
               <div ref={endRef} />
@@ -1469,6 +1725,7 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, onStop
                 handleFileUpload={handleFileInput} isOver={isDragOver}
                 activeSkill={activeSkill} onDeactivateSkill={onDeactivateSkill}
                 skills={skills} onSlashSelect={handleSlashSelect} slashSkills={slashSkills} onRemoveSlashSkill={handleRemoveSlashSkill} onClearAllSlash={() => setSlashSkills([])}
+                onToggleSkill={onToggleSkill} onManageSkills={onManageSkills}
               />
             </div>
           </div>

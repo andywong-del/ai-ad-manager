@@ -175,7 +175,7 @@ export const useChatAgent = ({ token, adAccountId, accountName, language = 'en',
       } else {
         const tail = fullText.slice(-500);
         const confirmPatterns = [
-          /should I proceed/i, /shall I go ahead/i, /do you want me to/i,
+          /should I (proceed|create)/i, /shall I go ahead/i, /do you want me to/i,
           /would you like me to/i, /confirm.*\?/i, /ready to (apply|execute|proceed|make)/i,
           /want me to (pause|activate|delete|update|change|create|remove|upload|send)/i,
           /proceed with (creating|updating|deleting|pausing|activating)/i,
