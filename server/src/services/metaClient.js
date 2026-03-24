@@ -1208,10 +1208,11 @@ export const claimAdAccount = async (token, businessId, adAccountId) => {
 };
 
 export const getConnectedInstagramAccounts = async (token, adAccountId) => {
-  const allResults = []; // collect { id, username, profile_pic } from all sources
-  const addResult = (id, username, profilePic) => allResults.push({ id, username, profile_pic: profilePic });
+  const allResults = []; // collect { id, username, profile_pic, _needsResolve }
+  const addResult = (id, username, profilePic, needsResolve = false) =>
+    allResults.push({ id, username, profile_pic: profilePic, _needsResolve: needsResolve });
 
-  // Run Sources 1, 2, 3, 4 in parallel where possible
+  // Run all sources in parallel
   const source1 = metaApi.get(`/${adAccountId}/connected_instagram_accounts`, {
     params: { access_token: token, fields: 'id,username,profile_picture_url' }
   }).then(({ data }) => {
@@ -1229,7 +1230,7 @@ export const getConnectedInstagramAccounts = async (token, adAccountId) => {
     console.log(`[IG Discovery] Source 2 - Pages (${pages.length}): ${igFromPages.length} IG accounts`, igFromPages.map(a => a.username));
     igFromPages.forEach(ig => addResult(ig.id, ig.username, ig.profile_picture_url));
 
-    // Source 4: page-backed IG accounts + page instagram_accounts (parallel across pages)
+    // Source 4: page-backed + page instagram_accounts (parallel across pages)
     await Promise.allSettled(pages.map(async (page) => {
       const pageToken = page.access_token || token;
       // 4a: page_backed_instagram_accounts
@@ -1237,59 +1238,68 @@ export const getConnectedInstagramAccounts = async (token, adAccountId) => {
         const { data: igData } = await metaApi.get(`/${page.id}/page_backed_instagram_accounts`, {
           params: { access_token: pageToken, fields: 'id,username,name,profile_picture_url' }
         });
-        const pageIgs = igData.data || [];
-        if (pageIgs.length > 0) {
-          console.log(`[IG Discovery] Source 4a - Page "${page.name}": ${pageIgs.length} page-backed`, pageIgs.map(a => a.username || a.id));
-          pageIgs.forEach(a => addResult(a.id, a.username || page.name, a.profile_picture_url));
+        for (const a of (igData.data || [])) {
+          const hasRealUsername = a.username && a.username !== a.id;
+          console.log(`[IG Discovery] Source 4a - Page "${page.name}": id=${a.id}, username=${a.username || 'NONE'}`);
+          addResult(a.id, hasRealUsername ? a.username : page.name, a.profile_picture_url, !hasRealUsername);
         }
       } catch (_) { /* skip */ }
-      // 4b: instagram_accounts on page (may find accounts not in page_backed)
+      // 4b: instagram_accounts on page
       try {
         const { data: igData } = await metaApi.get(`/${page.id}/instagram_accounts`, {
           params: { access_token: pageToken, fields: 'id,username,profile_picture_url' }
         });
-        const pageIgs = igData.data || [];
-        if (pageIgs.length > 0) {
-          console.log(`[IG Discovery] Source 4b - Page "${page.name}": ${pageIgs.length} instagram_accounts`, pageIgs.map(a => a.username || a.id));
-          pageIgs.forEach(a => addResult(a.id, a.username || page.name, a.profile_picture_url));
+        for (const a of (igData.data || [])) {
+          if (a.username) {
+            console.log(`[IG Discovery] Source 4b - Page "${page.name}": ${a.username}`);
+            addResult(a.id, a.username, a.profile_picture_url);
+          }
         }
       } catch (_) { /* skip */ }
     }));
   }).catch(err => console.error('[IG Discovery] Source 2/4 ERROR:', err.response?.data?.error?.message || err.message));
 
-  // Wait for all sources to complete
   await Promise.allSettled([source1, source2and4]);
 
-  // Deduplicate by ID
-  const seenIds = new Set();
+  // Deduplicate by ID — prefer entries with real usernames (not needing resolution)
+  const seenIds = new Map(); // id -> index in accounts
   const accounts = [];
   for (const a of allResults) {
-    if (a.id && !seenIds.has(a.id)) {
-      seenIds.add(a.id);
+    if (!a.id) continue;
+    const existing = seenIds.get(a.id);
+    if (existing === undefined) {
+      seenIds.set(a.id, accounts.length);
       accounts.push(a);
+    } else if (accounts[existing]._needsResolve && !a._needsResolve) {
+      // Replace fallback entry with one that has a real username
+      accounts[existing] = a;
     }
   }
 
-  // Post-process: resolve usernames for page-backed accounts that only have page names
-  // (page-backed accounts have numeric-looking usernames or page display names as fallback)
-  const needsResolution = accounts.filter(a => !a.username || /^\d+$/.test(a.username) || !a.username.includes('.'));
-  if (needsResolution.length > 0) {
-    await Promise.allSettled(needsResolution.map(async (acct) => {
+  // Resolve usernames for accounts that still need it (page name fallbacks)
+  const toResolve = accounts.filter(a => a._needsResolve);
+  if (toResolve.length > 0) {
+    console.log(`[IG Discovery] Resolving usernames for ${toResolve.length} accounts...`);
+    await Promise.allSettled(toResolve.map(async (acct) => {
       try {
         const { data } = await metaApi.get(`/${acct.id}`, {
           params: { access_token: token, fields: 'id,username,profile_picture_url' }
         });
         if (data.username) {
-          console.log(`[IG Discovery] Resolved username for ${acct.id}: ${acct.username} -> ${data.username}`);
+          console.log(`[IG Discovery] Resolved: ${acct.username} -> @${data.username}`);
           acct.username = data.username;
           if (data.profile_picture_url) acct.profile_pic = data.profile_picture_url;
         }
-      } catch (_) { /* keep fallback name */ }
+      } catch (err) {
+        console.warn(`[IG Discovery] Could not resolve ${acct.id}: ${err.response?.data?.error?.message || err.message}`);
+      }
     }));
   }
 
-  console.log(`[IG Discovery] TOTAL: ${accounts.length} accounts`, accounts.map(a => a.username));
-  return accounts;
+  // Clean up internal flag before returning
+  const result = accounts.map(({ _needsResolve, ...rest }) => rest);
+  console.log(`[IG Discovery] TOTAL: ${result.length} accounts`, result.map(a => a.username));
+  return result;
 };
 
 // ─── Pages ───────────────────────────────────────────────────────────
