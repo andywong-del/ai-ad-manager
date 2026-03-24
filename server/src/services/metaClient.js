@@ -364,13 +364,25 @@ export const deleteAdImage = async (token, adAccountId, imageHash) => {
 // ─── Ad Videos ───────────────────────────────────────────────────────
 
 export const getAdVideos = async (token, adAccountId) => {
-  const { data } = await metaApi.get(`/${adAccountId}/advideos`, {
-    params: {
-      access_token: token,
-      fields: 'id,name,title,description,source,picture,length,status,created_time,updated_time,instagram_eligible,source_instagram_media_id'
-    }
-  });
-  return data.data;
+  try {
+    const { data } = await metaApi.get(`/${adAccountId}/advideos`, {
+      params: {
+        access_token: token,
+        fields: 'id,title,description,source,picture,length,status,created_time,updated_time,source_instagram_media_id'
+      }
+    });
+    return data.data;
+  } catch (err) {
+    // Fallback without source_instagram_media_id if field not supported
+    console.error('getAdVideos error (trying fallback):', err.response?.data?.error?.message || err.message);
+    const { data } = await metaApi.get(`/${adAccountId}/advideos`, {
+      params: {
+        access_token: token,
+        fields: 'id,title,description,source,picture,length,status,created_time,updated_time'
+      }
+    });
+    return data.data;
+  }
 };
 
 export const uploadAdVideo = async (token, adAccountId, params) => {
@@ -1151,7 +1163,7 @@ export const getBusinessOwnedIGAccounts = async (token, businessId) => {
   const { data } = await metaApi.get(`/${businessId}/owned_instagram_accounts`, {
     params: {
       access_token: token,
-      fields: 'id,username,profile_pic,followers_count'
+      fields: 'id,username,profile_picture_url'
     }
   });
   return data.data;
@@ -1226,7 +1238,7 @@ export const getConnectedInstagramAccounts = async (token, adAccountId) => {
       for (const a of (bizIgAccounts || [])) {
         if (!seenIds.has(a.id)) {
           seenIds.add(a.id);
-          accounts.push({ id: a.id, username: a.username, profile_pic: a.profile_pic });
+          accounts.push({ id: a.id, username: a.username, profile_pic: a.profile_picture_url });
         }
       }
     }
