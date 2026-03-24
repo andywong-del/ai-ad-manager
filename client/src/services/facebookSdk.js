@@ -73,7 +73,21 @@ export const login = () =>
           reject(new Error(`Facebook login cancelled or failed (status: ${response.status})`));
         }
       },
-      { config_id: FB_CONFIG_ID, response_type: 'token' }
+      {
+        scope: [
+          'public_profile',
+          'email',
+          'pages_show_list',
+          'pages_read_engagement',
+          'ads_read',
+          'ads_management',
+          'business_management',
+          'instagram_basic',
+          'instagram_manage_insights',
+          'read_insights'
+        ].join(','),
+        response_type: 'token'
+      }
     );
   });
 
