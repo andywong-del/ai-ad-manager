@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import { MessageSquare } from 'lucide-react';
 import { useChatSessions } from '../hooks/useChatSessions.js';
 import { useSkills } from '../hooks/useSkills.js';
@@ -39,7 +39,6 @@ export const Dashboard = ({
   const [chatLanguage, setChatLanguage] = useState(() => localStorage.getItem('aam_language') || 'en');
   const [activeView, setActiveView] = useState({ type: 'chat' });
   const [reportPanel, setReportPanel] = useState(null);
-  const slashSkillRef = useRef(null); // one-off skill context for next message
 
   const {
     skills, activeSkill, activeSkillId, toggleSkill,
@@ -65,23 +64,18 @@ export const Dashboard = ({
     setActiveView({ type: 'chat' });
   }, [onSwitchBusiness, onSwitchAccount]);
 
-  const handleSend = useCallback((text, attachments) => {
+  const handleSend = useCallback((text, attachments, slashIds) => {
     setActiveView({ type: 'chat' });
-    // Inject skill context: slash commands (one-off, may be multiple) take priority, then active skill
-    const slashIds = slashSkillRef.current;
-    slashSkillRef.current = null; // clear after use
+    // Inject skill context: slash commands take priority, then active skill
     let skillCtx = null;
     if (slashIds?.length) {
       skillCtx = slashIds.map(id => getSkillContextById(id)).filter(Boolean).join('\n\n---\n\n');
     }
     if (!skillCtx) skillCtx = getSkillContext();
     const fullText = skillCtx ? `${skillCtx}\n\n---\n\nUser message: ${text}` : text;
-    sendMessage(fullText, attachments);
+    // Send full text to API but only show user's message in chat
+    sendMessage(fullText, attachments, { displayText: text });
   }, [sendMessage, getSkillContext, getSkillContextById]);
-
-  const handleSlashInvoke = useCallback((skillIds) => {
-    slashSkillRef.current = skillIds; // array of skill IDs
-  }, []);
 
   const handleSwitchSession = useCallback((sessionId) => {
     setActiveView({ type: 'chat' });
@@ -231,7 +225,6 @@ export const Dashboard = ({
               activeSkill={activeSkill}
               onDeactivateSkill={() => activeSkill && toggleSkill(activeSkill.id)}
               skills={skills}
-              onSlashInvoke={handleSlashInvoke}
             />
           )}
         </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Bot, Send, Square, Paperclip, CheckCircle2, XCircle, ArrowUpRight, BarChart3, Target, TrendingDown, Search, FileText, DollarSign, AlertTriangle, Zap, X, Upload, Image, Film, TrendingUp, ChevronRight, Shield, Sparkles, Download, Bookmark } from 'lucide-react';
+import { Send, Square, Paperclip, CheckCircle2, XCircle, ArrowUpRight, BarChart3, Target, TrendingDown, Search, FileText, DollarSign, AlertTriangle, Zap, X, Upload, Image, Film, TrendingUp, ChevronRight, Shield, Sparkles, Download, Bookmark } from 'lucide-react';
 
 // ── Export utilities ─────────────────────────────────────────────────────────
 const downloadCSV = (title, rows) => {
@@ -33,7 +33,7 @@ const downloadCardAsImage = async (cardEl, title) => {
 const TypingIndicator = ({ thinkingText }) => (
   <div className="flex items-end gap-3 mb-6">
     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shrink-0">
-      <Bot size={15} className="text-white" />
+      <Zap size={15} className="text-white" />
     </div>
     <div className="bg-white/80 backdrop-blur-sm border border-slate-200 rounded-2xl rounded-bl-sm px-4 py-3 flex items-center gap-2.5 shadow-sm">
       <div className="flex gap-1">
@@ -622,7 +622,7 @@ const ReportMessage = ({ message, timestamp }) => {
   return (
     <div className="flex items-end gap-3 mb-6">
       <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shrink-0 mb-0.5">
-        <Bot size={15} className="text-white" />
+        <Zap size={15} className="text-white" />
       </div>
       <div className="flex-1 min-w-0">
         <div className="bg-white border border-slate-200 rounded-2xl rounded-bl-sm overflow-hidden shadow-sm">
@@ -681,7 +681,7 @@ const ReportMessage = ({ message, timestamp }) => {
 const TableMessage = ({ message }) => (
   <div className="flex items-end gap-3 mb-2">
     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shrink-0 mb-0.5">
-      <Bot size={15} className="text-white" />
+      <Zap size={15} className="text-white" />
     </div>
     <div className="max-w-[95%] w-full">
       <div className="bg-white border border-slate-200 rounded-2xl rounded-bl-sm overflow-hidden shadow-sm">
@@ -900,7 +900,7 @@ const MessageBubble = ({ message, isLatest, onSend, isTyping, onSaveItem, onOpen
       <>
         <div className="flex items-end gap-3 mb-2 group">
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shrink-0 mb-0.5">
-            <Bot size={15} className="text-white" />
+            <Zap size={15} className="text-white" />
           </div>
           <div className={hasWide ? 'max-w-[95%] flex-1 min-w-0' : 'max-w-[80%]'}>
             <div className="bg-white/80 backdrop-blur-sm border border-slate-200 text-slate-700 rounded-2xl rounded-bl-sm px-4 py-3 text-sm leading-relaxed shadow-sm relative">
@@ -1123,7 +1123,7 @@ const ChatInput = ({ input, setInput, onKeyDown, onSend, onStop, onFilesAdded, a
 };
 
 // ── Main component ────────────────────────────────────────────────────────────
-export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, onStop, suggestedActions = [], adAccountId, onSaveItem, onOpenReport, folders = [], activeSkill = null, onDeactivateSkill, skills = [], onSlashInvoke }) => {
+export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, onStop, suggestedActions = [], adAccountId, onSaveItem, onOpenReport, folders = [], activeSkill = null, onDeactivateSkill, skills = [] }) => {
   const [input, setInput] = useState('');
   const [attachments, setAttachments] = useState([]); // { id, file, preview, status, progress, result }
   const [isDragOver, setIsDragOver] = useState(false);
@@ -1305,11 +1305,8 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, onStop
     // Build message text with asset info
     let msgText = t;
 
-    // If slash skills were selected, notify parent to inject their context
-    if (slashSkills.length > 0 && onSlashInvoke) {
-      onSlashInvoke(slashSkills.map(s => s.id));
-    }
-    setSlashSkills([]);
+    // Pass slash skill IDs to parent so it injects their context (skills persist in input bar)
+    const currentSlashIds = slashSkills.map(s => s.id);
     const mediaAttachments = doneAttachments.filter(a => !a.isDoc);
     const docAttachments = doneAttachments.filter(a => a.isDoc && a.result?.text);
 
@@ -1345,11 +1342,11 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, onSend, onStop
       video_id: a.result?.video_id,
     }));
 
-    onSend(msgText, msgAttachments);
+    onSend(msgText, msgAttachments, currentSlashIds);
     setInput('');
     setAttachments([]);
     inputRef.current?.focus();
-  }, [input, isTyping, onSend, attachments]);
+  }, [input, isTyping, onSend, attachments, slashSkills]);
 
   const handleKeyDown = useCallback((e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }

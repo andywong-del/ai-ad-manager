@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Bot, Plus, MessageSquare, Trash2, Sparkles, ChevronDown, ChevronLeft, ChevronRight, LogOut, FileText, Lightbulb, FolderOpen, Building2, Check, Globe, GripVertical, FolderPlus, X, Users } from 'lucide-react';
+import { Zap, Plus, MessageSquare, Trash2, Sparkles, ChevronDown, ChevronLeft, ChevronRight, LogOut, FileText, Lightbulb, FolderOpen, Building2, Check, Globe, GripVertical, FolderPlus, X, Users } from 'lucide-react';
 import { groupSessionsByDate } from '../hooks/useChatSessions.js';
 import { useAdAccounts } from '../hooks/useAdAccounts.js';
 import { useBusinesses } from '../hooks/useBusinesses.js';
@@ -226,7 +226,7 @@ export const Sidebar = ({
       <div className="px-4 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-md shadow-orange-200/50">
-            <Bot size={18} className="text-white" />
+            <Zap size={18} className="text-white" />
           </div>
           <span className="text-[15px] font-bold text-slate-800 tracking-tight">AI Ad Manager</span>
         </div>

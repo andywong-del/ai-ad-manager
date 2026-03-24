@@ -82,11 +82,12 @@ export const useChatAgent = ({ token, adAccountId, accountName, language = 'en',
     return newId;
   }, [accountName, language]);
 
-  const sendMessage = useCallback(async (text, attachments) => {
+  const sendMessage = useCallback(async (text, attachments, { displayText } = {}) => {
     if (!text.trim() || isTyping) return;
 
     const now = Date.now();
-    const userMsg = { id: makeId(), role: 'user', text, timestamp: now, ...(attachments?.length && { attachments }) };
+    // Show only the user's actual message in chat, not the skill context
+    const userMsg = { id: makeId(), role: 'user', text: displayText || text, timestamp: now, ...(attachments?.length && { attachments }) };
     const agentMsgId = makeId();
 
     setMessages((prev) => [...prev, userMsg]);
@@ -105,7 +106,7 @@ export const useChatAgent = ({ token, adAccountId, accountName, language = 'en',
           ...(bearerToken && { Authorization: `Bearer ${bearerToken}` }),
         },
         body: JSON.stringify({
-          message: text,
+          message: text,  // Full text with skill context goes to the API
           sessionId: sessionIdRef.current,
           adAccountId,
           token,

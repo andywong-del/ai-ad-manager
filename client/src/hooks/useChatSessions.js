@@ -269,8 +269,8 @@ export const useChatSessions = ({ token, adAccountId, accountName, language = 'e
   }, []);
 
   // Send message (wraps agent.sendMessage and ensures session is tracked)
-  const sendMessage = useCallback((text, attachments) => {
-    agent.sendMessage(text, attachments);
+  const sendMessage = useCallback((text, attachments, opts) => {
+    agent.sendMessage(text, attachments, opts);
 
     // If this is a brand new session (no messages yet), add it to sessions list
     if (!sessions.find(s => s.id === activeSessionId)) {
