@@ -7,17 +7,19 @@ const metaApi = axios.create({ baseURL: `${BASE_URL}/${API_VERSION}`, timeout: 6
 
 // ─── Pagination Helper ───────────────────────────────────────────────
 
-async function fetchAll(url, token, params = {}) {
+async function fetchAll(url, token, params = {}, { maxPages = Infinity } = {}) {
   let results = [];
   let nextUrl = url;
   let isFullUrl = false;
-  while (nextUrl) {
+  let page = 0;
+  while (nextUrl && page < maxPages) {
     const { data } = isFullUrl
       ? await axios.get(nextUrl)
       : await metaApi.get(nextUrl, { params: { access_token: token, ...params } });
     if (data.data) results = results.concat(data.data);
     nextUrl = data.paging?.next || null;
     isFullUrl = true;
+    page++;
   }
   return results;
 }
@@ -1331,8 +1333,7 @@ export const getPageVideos = async (token, pageId, adAccountId) => {
   const pageToken = page?.access_token || token;
 
   try {
-    // Use page's video library (published videos on the page)
-    // Use limit=50 to avoid Meta's "reduce the amount of data" error on pages with many videos
+    // Use page's video library — paginate to get all videos
     const { data } = await metaApi.get(`/${pageId}/videos`, {
       params: {
         access_token: pageToken,
@@ -1384,22 +1385,19 @@ export const getIgMedia = async (token, igAccountId, { pageId } = {}) => {
     const pages = await getPages(token);
     const page = pages?.find(p => p.id === pageId);
     const pageToken = page?.access_token || token;
-    // Try with smaller limit first to avoid "reduce the amount of data" errors
-    for (const limit of [50, 25]) {
-      try {
-        const { data } = await metaApi.get(`/${pageId}/videos`, {
-          params: {
-            access_token: pageToken,
-            fields: 'id,title,description,source,picture,length,created_time,source_instagram_media_id',
-            limit
-          }
-        });
-        const videos = data.data || [];
-        console.log(`[getIgMedia] Page fallback: ${videos.length} videos from page ${pageId} (limit=${limit})`);
-        return videos;
-      } catch (err2) {
-        console.log(`[getIgMedia] Page fallback (limit=${limit}) failed: ${err2.response?.data?.error?.message || err2.message}`);
-      }
+    try {
+      const { data } = await metaApi.get(`/${pageId}/videos`, {
+        params: {
+          access_token: pageToken,
+          fields: 'id,title,description,source,picture,length,created_time,source_instagram_media_id',
+          limit: 50
+        }
+      });
+      const videos = data.data || [];
+      console.log(`[getIgMedia] Page fallback: ${videos.length} videos from page ${pageId}`);
+      return videos;
+    } catch (err2) {
+      console.log(`[getIgMedia] Page fallback failed: ${err2.response?.data?.error?.message || err2.message}`);
     }
   }
 
