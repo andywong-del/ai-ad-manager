@@ -1175,13 +1175,40 @@ export const claimAdAccount = async (token, businessId, adAccountId) => {
 };
 
 export const getConnectedInstagramAccounts = async (token, adAccountId) => {
-  const { data } = await metaApi.get(`/${adAccountId}/connected_instagram_accounts`, {
-    params: {
-      access_token: token,
-      fields: 'id,username,profile_pic'
+  // Try ad account's connected_instagram_accounts first
+  let accounts = [];
+  try {
+    const { data } = await metaApi.get(`/${adAccountId}/connected_instagram_accounts`, {
+      params: { access_token: token, fields: 'id,username,profile_pic' }
+    });
+    accounts = data.data || [];
+  } catch (err) {
+    console.error('connected_instagram_accounts error:', err.response?.data?.error?.message || err.message);
+  }
+
+  // Also fetch IG accounts connected via Pages (more reliable for many setups)
+  try {
+    const pages = await getPages(token);
+    const seenIds = new Set(accounts.map(a => a.id));
+    for (const page of (pages || [])) {
+      try {
+        const pageToken = page.access_token || token;
+        const { data } = await metaApi.get(`/${page.id}/instagram_accounts`, {
+          params: { access_token: pageToken, fields: 'id,username,profile_pic' }
+        });
+        for (const ig of (data.data || [])) {
+          if (!seenIds.has(ig.id)) {
+            seenIds.add(ig.id);
+            accounts.push(ig);
+          }
+        }
+      } catch {} // skip pages without IG
     }
-  });
-  return data.data;
+  } catch (err) {
+    console.error('Page IG accounts fallback error:', err.message);
+  }
+
+  return accounts;
 };
 
 // ─── Pages ───────────────────────────────────────────────────────────

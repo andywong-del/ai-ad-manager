@@ -373,6 +373,7 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
   const [campaignsLoading, setCampaignsLoading] = useState(false);
   // Video sort & date filter
   const [videoSort, setVideoSort] = useState('created_time'); // created_time | title
+  const [videoDatePreset, setVideoDatePreset] = useState(''); // '', 'today', 'yesterday', 'last_7d', 'last_14d', 'last_28d', 'this_month', 'this_quarter', 'custom'
   const [videoDateFrom, setVideoDateFrom] = useState('');
   const [videoDateTo, setVideoDateTo] = useState('');
 
@@ -901,21 +902,49 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
                       <input value={videoSearchQuery} onChange={e => setVideoSearchQuery(e.target.value)}
                         placeholder="Search videos..." className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300" />
                     </div>
-                    <div className="flex items-center gap-2 mb-1.5">
+                    <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                       <select value={videoSort} onChange={e => setVideoSort(e.target.value)}
                         className="px-2 py-1 rounded-md border border-slate-200 text-[11px] text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-200">
                         <option value="created_time">Newest first</option>
                         <option value="title">Title A–Z</option>
                       </select>
-                      <div className="flex items-center gap-1">
-                        <input type="date" value={videoDateFrom} onChange={e => setVideoDateFrom(e.target.value)}
-                          className="px-1.5 py-1 rounded-md border border-slate-200 text-[11px] text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-200" />
-                        <span className="text-[10px] text-slate-400">to</span>
-                        <input type="date" value={videoDateTo} onChange={e => setVideoDateTo(e.target.value)}
-                          className="px-1.5 py-1 rounded-md border border-slate-200 text-[11px] text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-200" />
-                      </div>
-                      {(videoDateFrom || videoDateTo) && (
-                        <button onClick={() => { setVideoDateFrom(''); setVideoDateTo(''); }} className="text-[10px] text-red-400 hover:text-red-500">Clear</button>
+                      <select value={videoDatePreset} onChange={e => {
+                        const v = e.target.value;
+                        setVideoDatePreset(v);
+                        const today = new Date(); today.setHours(0,0,0,0);
+                        const fmt = d => d.toISOString().slice(0, 10);
+                        if (v === 'today') { setVideoDateFrom(fmt(today)); setVideoDateTo(fmt(today)); }
+                        else if (v === 'yesterday') { const y = new Date(today); y.setDate(y.getDate()-1); setVideoDateFrom(fmt(y)); setVideoDateTo(fmt(y)); }
+                        else if (v === 'last_7d') { const d = new Date(today); d.setDate(d.getDate()-6); setVideoDateFrom(fmt(d)); setVideoDateTo(fmt(today)); }
+                        else if (v === 'last_14d') { const d = new Date(today); d.setDate(d.getDate()-13); setVideoDateFrom(fmt(d)); setVideoDateTo(fmt(today)); }
+                        else if (v === 'last_28d') { const d = new Date(today); d.setDate(d.getDate()-27); setVideoDateFrom(fmt(d)); setVideoDateTo(fmt(today)); }
+                        else if (v === 'this_month') { const d = new Date(today.getFullYear(), today.getMonth(), 1); setVideoDateFrom(fmt(d)); setVideoDateTo(fmt(today)); }
+                        else if (v === 'this_quarter') { const qm = Math.floor(today.getMonth()/3)*3; const d = new Date(today.getFullYear(), qm, 1); setVideoDateFrom(fmt(d)); setVideoDateTo(fmt(today)); }
+                        else if (v === 'custom') { /* show custom date inputs */ }
+                        else { setVideoDateFrom(''); setVideoDateTo(''); }
+                      }}
+                        className="px-2 py-1 rounded-md border border-slate-200 text-[11px] text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-200">
+                        <option value="">All dates</option>
+                        <option value="today">Today</option>
+                        <option value="yesterday">Yesterday</option>
+                        <option value="last_7d">Last 7 days</option>
+                        <option value="last_14d">Last 14 days</option>
+                        <option value="last_28d">Last 28 days</option>
+                        <option value="this_month">This month</option>
+                        <option value="this_quarter">This quarter</option>
+                        <option value="custom">Custom</option>
+                      </select>
+                      {videoDatePreset === 'custom' && (
+                        <div className="flex items-center gap-1">
+                          <input type="date" value={videoDateFrom} onChange={e => setVideoDateFrom(e.target.value)}
+                            className="px-1.5 py-1 rounded-md border border-slate-200 text-[11px] text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-200" />
+                          <span className="text-[10px] text-slate-400">to</span>
+                          <input type="date" value={videoDateTo} onChange={e => setVideoDateTo(e.target.value)}
+                            className="px-1.5 py-1 rounded-md border border-slate-200 text-[11px] text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-200" />
+                        </div>
+                      )}
+                      {(videoDateFrom || videoDateTo) && videoDatePreset !== '' && (
+                        <span className="text-[10px] text-slate-400">{videoDateFrom} – {videoDateTo}</span>
                       )}
                     </div>
                     <div className="max-h-[200px] overflow-y-auto space-y-1.5 border border-slate-200 rounded-lg p-2">
