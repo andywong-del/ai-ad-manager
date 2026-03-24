@@ -424,13 +424,13 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
       }
       if (!igAccounts.length && !igAccountsLoading) {
         setIgAccountsLoading(true);
-        api.get(`/meta/adaccounts/${adAccountId}/instagram-accounts`).then(r => setIgAccounts(r.data || [])).catch(() => {}).finally(() => setIgAccountsLoading(false));
+        api.get(`/meta/adaccounts/${adAccountId}/instagram-accounts`).then(r => { console.log('IG accounts:', r.data); setIgAccounts(r.data || []); }).catch(err => console.error('IG accounts fetch error:', err)).finally(() => setIgAccountsLoading(false));
       }
       // Videos loaded by separate effect below
     }
     if (tab === 'ig' && !igAccounts.length && !igAccountsLoading) {
       setIgAccountsLoading(true);
-      api.get(`/meta/adaccounts/${adAccountId}/instagram-accounts`).then(r => setIgAccounts(r.data || [])).catch(() => {}).finally(() => setIgAccountsLoading(false));
+      api.get(`/meta/adaccounts/${adAccountId}/instagram-accounts`).then(r => { console.log('IG accounts:', r.data); setIgAccounts(r.data || []); }).catch(err => console.error('IG accounts fetch error:', err)).finally(() => setIgAccountsLoading(false));
     }
     if ((tab === 'fb_page') && !pages.length && !pagesLoading) {
       setPagesLoading(true);

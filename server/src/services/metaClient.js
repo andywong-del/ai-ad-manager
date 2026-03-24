@@ -1175,37 +1175,40 @@ export const claimAdAccount = async (token, businessId, adAccountId) => {
 };
 
 export const getConnectedInstagramAccounts = async (token, adAccountId) => {
-  // Try ad account's connected_instagram_accounts first
   let accounts = [];
+  const seenIds = new Set();
+
+  // 1. Try ad account's connected_instagram_accounts
   try {
     const { data } = await metaApi.get(`/${adAccountId}/connected_instagram_accounts`, {
       params: { access_token: token, fields: 'id,username,profile_pic' }
     });
-    accounts = data.data || [];
+    for (const a of (data.data || [])) {
+      if (!seenIds.has(a.id)) { seenIds.add(a.id); accounts.push(a); }
+    }
   } catch (err) {
     console.error('connected_instagram_accounts error:', err.response?.data?.error?.message || err.message);
   }
 
-  // Also fetch IG accounts connected via Pages (more reliable for many setups)
+  // 2. Fetch IG business accounts linked to Pages (single API call)
+  //    Uses instagram_business_account field — the correct way to get IG professional accounts per Page
   try {
-    const pages = await getPages(token);
-    const seenIds = new Set(accounts.map(a => a.id));
-    for (const page of (pages || [])) {
-      try {
-        const pageToken = page.access_token || token;
-        const { data } = await metaApi.get(`/${page.id}/instagram_accounts`, {
-          params: { access_token: pageToken, fields: 'id,username,profile_pic' }
-        });
-        for (const ig of (data.data || [])) {
-          if (!seenIds.has(ig.id)) {
-            seenIds.add(ig.id);
-            accounts.push(ig);
-          }
-        }
-      } catch {} // skip pages without IG
+    const { data } = await metaApi.get('/me/accounts', {
+      params: {
+        access_token: token,
+        fields: 'id,name,instagram_business_account{id,username,profile_picture_url}',
+        limit: 100
+      }
+    });
+    for (const page of (data.data || [])) {
+      const ig = page.instagram_business_account;
+      if (ig && !seenIds.has(ig.id)) {
+        seenIds.add(ig.id);
+        accounts.push({ id: ig.id, username: ig.username, profile_pic: ig.profile_picture_url });
+      }
     }
   } catch (err) {
-    console.error('Page IG accounts fallback error:', err.message);
+    console.error('Page instagram_business_account fallback error:', err.response?.data?.error?.message || err.message);
   }
 
   return accounts;
