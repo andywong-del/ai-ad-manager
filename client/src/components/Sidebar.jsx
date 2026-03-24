@@ -12,7 +12,7 @@ const MetaIcon = () => (
 );
 
 // ── Meta Ads Account Picker (direct flow: click → business → account) ────────
-const SidebarAccountPicker = ({ selectedAccount, selectedBusiness, onSelect }) => {
+const SidebarAccountPicker = ({ selectedAccount, selectedBusiness, onSelect, token, onLogin }) => {
   const [open, setOpen] = useState(false);
   const [level, setLevel] = useState('business');
   const [activeBiz, setActiveBiz] = useState(null);
@@ -28,6 +28,11 @@ const SidebarAccountPicker = ({ selectedAccount, selectedBusiness, onSelect }) =
   }, []);
 
   const toggle = () => {
+    // If not logged in, trigger Facebook login instead of opening empty picker
+    if (!token && onLogin) {
+      onLogin();
+      return;
+    }
     if (!open) {
       setLevel(selectedBusiness ? 'accounts' : 'business');
       setActiveBiz(selectedBusiness || null);
@@ -49,13 +54,15 @@ const SidebarAccountPicker = ({ selectedAccount, selectedBusiness, onSelect }) =
           className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12px] font-medium transition-all border
             ${hasSelection
               ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
-              : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 animate-pulse-subtle'
+              : !token
+                ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
+                : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 animate-pulse-subtle'
             }`}>
           <MetaIcon />
           <span className="flex-1 text-left truncate">
-            {hasSelection ? `${selectedAccount.name}` : 'Meta Ads'}
+            {hasSelection ? `${selectedAccount.name}` : !token ? 'Connect Meta Ads' : 'Meta Ads'}
           </span>
-          <ChevronDown size={11} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+          {token && <ChevronDown size={11} className={`transition-transform ${open ? 'rotate-180' : ''}`} />}
         </button>
 
         {open && (
@@ -253,6 +260,8 @@ export const Sidebar = ({
         selectedAccount={selectedAccount}
         selectedBusiness={selectedBusiness}
         onSelect={onSelectAccount}
+        token={token}
+        onLogin={onLogin}
       />
 
       {/* Audiences */}
@@ -449,27 +458,26 @@ export const Sidebar = ({
 
       {/* User Profile */}
       <div className="px-3 pb-4 pt-2">
-        {token ? (
-          <div className="flex items-center gap-3 px-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shrink-0 shadow-sm">
-              <span className="text-white text-xs font-bold">A</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-slate-800 truncate">Andy Wong</p>
-              <p className="text-[11px] text-slate-400 truncate">andy.wong@presslogic.com</p>
-            </div>
-            {onLogout && (
-              <button onClick={onLogout} className="text-slate-400 hover:text-slate-600 transition-colors" title="Log out">
-                <LogOut size={16} />
-              </button>
-            )}
-          </div>
-        ) : (
-          <button onClick={onLogin}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold bg-blue-600 text-white hover:bg-blue-500 transition-colors">
-            <LogOut size={14} className="rotate-180" /> Connect Facebook
-          </button>
-        )}
+        <div className="flex items-center gap-3 px-2">
+          {token ? (
+            <>
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shrink-0 shadow-sm">
+                <span className="text-white text-xs font-bold">A</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-slate-800 truncate">Andy Wong</p>
+                <p className="text-[11px] text-slate-400 truncate">andy.wong@presslogic.com</p>
+              </div>
+              {onLogout && (
+                <button onClick={onLogout} className="text-slate-400 hover:text-slate-600 transition-colors" title="Log out">
+                  <LogOut size={16} />
+                </button>
+              )}
+            </>
+          ) : (
+            <p className="text-xs text-slate-400 text-center w-full">Connect Meta Ads above to get started</p>
+          )}
+        </div>
       </div>
     </aside>
   );
