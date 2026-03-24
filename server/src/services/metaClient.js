@@ -1176,32 +1176,48 @@ export const getConnectedInstagramAccounts = async (token, adAccountId) => {
 
 export const getPages = async (token) => {
   const { data } = await metaApi.get('/me/accounts', {
-    params: { access_token: token, fields: 'id,name,engagement,fan_count,category' }
+    params: { access_token: token, fields: 'id,name,engagement,fan_count,category,access_token' }
   });
   return data.data;
 };
 
 export const getPageVideos = async (token, pageId) => {
-  const { data } = await metaApi.get(`/${pageId}/videos`, {
-    params: {
-      access_token: token,
-      fields: 'id,title,description,source,picture,length,created_time',
-      limit: 100
-    }
-  });
-  return data.data;
+  // First get the page access token (required for /{pageId}/videos)
+  const pages = await getPages(token);
+  const page = pages?.find(p => p.id === pageId);
+  const pageToken = page?.access_token || token;
+
+  try {
+    const { data } = await metaApi.get(`/${pageId}/videos`, {
+      params: {
+        access_token: pageToken,
+        fields: 'id,title,description,source,picture,length,created_time',
+        limit: 100
+      }
+    });
+    return data.data || [];
+  } catch (err) {
+    console.error('getPageVideos error:', err.response?.data?.error?.message || err.message);
+    return [];
+  }
 };
 
 export const getIgMedia = async (token, igAccountId) => {
-  const { data } = await metaApi.get(`/${igAccountId}/media`, {
-    params: {
-      access_token: token,
-      fields: 'id,media_type,media_url,thumbnail_url,caption,timestamp',
-      limit: 100
-    }
-  });
-  // Filter to only VIDEO types
-  return (data.data || []).filter(m => m.media_type === 'VIDEO');
+  try {
+    const { data } = await metaApi.get(`/${igAccountId}/media`, {
+      params: {
+        access_token: token,
+        fields: 'id,media_type,media_url,thumbnail_url,caption,timestamp',
+        limit: 100
+      }
+    });
+    // Filter to only VIDEO types
+    return (data.data || []).filter(m => m.media_type === 'VIDEO');
+  } catch (err) {
+    console.error('getIgMedia error:', err.response?.data?.error?.message || err.message);
+    // Fallback: return empty array instead of crashing
+    return [];
+  }
 };
 
 export const getPageAds = async (token, pageId) => {

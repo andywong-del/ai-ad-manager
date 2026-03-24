@@ -352,7 +352,7 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
         setVideos(data);
       }
       setVideosLoading(false);
-    }).catch(() => setVideosLoading(false));
+    }).catch(err => { console.error('Video fetch error:', err); setVideosLoading(false); });
   }, [tab, videoSource, videoSourcePage, videoSourceIg, adAccountId]);
 
   // Fetch campaigns when video source is campaign
