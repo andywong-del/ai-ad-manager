@@ -372,7 +372,7 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
   const [selectedCampaignId, setSelectedCampaignId] = useState('');
   const [campaignsLoading, setCampaignsLoading] = useState(false);
   // Video sort & date filter
-  const [videoSort, setVideoSort] = useState('created_time'); // created_time | title
+  const [videoSort, setVideoSort] = useState('updated_time'); // updated_time (last used) | created_time (upload date)
   const [videoDatePreset, setVideoDatePreset] = useState(''); // '', 'today', 'yesterday', 'last_7d', 'last_14d', 'last_28d', 'this_month', 'this_quarter', 'custom'
   const [videoDateFrom, setVideoDateFrom] = useState('');
   const [videoDateTo, setVideoDateTo] = useState('');
@@ -905,8 +905,8 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
                     <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                       <select value={videoSort} onChange={e => setVideoSort(e.target.value)}
                         className="px-2 py-1 rounded-md border border-slate-200 text-[11px] text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-200">
-                        <option value="created_time">Newest first</option>
-                        <option value="title">Title A–Z</option>
+                        <option value="updated_time">Last used date</option>
+                        <option value="created_time">Uploaded date</option>
                       </select>
                       <select value={videoDatePreset} onChange={e => {
                         const v = e.target.value;
@@ -958,8 +958,8 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
                           return true;
                         })
                         .sort((a, b) => {
-                          if (videoSort === 'title') return (a.title || '').localeCompare(b.title || '');
-                          return (b.created_time || '').localeCompare(a.created_time || '');
+                          const field = videoSort === 'created_time' ? 'created_time' : 'updated_time';
+                          return (b[field] || b.created_time || '').localeCompare(a[field] || a.created_time || '');
                         })
                         .map(v => (
                         <button key={v.id} onClick={() => toggleVideo(v.id)}
