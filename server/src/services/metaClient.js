@@ -1187,63 +1187,54 @@ export const claimAdAccount = async (token, businessId, adAccountId) => {
 };
 
 export const getConnectedInstagramAccounts = async (token, adAccountId) => {
-  let accounts = [];
-  const seenIds = new Set();
+  const allResults = []; // collect { id, username, profile_pic } from all sources
+  const addResult = (id, username, profilePic) => allResults.push({ id, username, profile_pic: profilePic });
 
-  // 1. Try ad account's connected_instagram_accounts
-  try {
-    const { data } = await metaApi.get(`/${adAccountId}/connected_instagram_accounts`, {
-      params: { access_token: token, fields: 'id,username,profile_picture_url' }
-    });
+  // Run Sources 1, 2, 3, 4 in parallel where possible
+  const source1 = metaApi.get(`/${adAccountId}/connected_instagram_accounts`, {
+    params: { access_token: token, fields: 'id,username,profile_picture_url' }
+  }).then(({ data }) => {
     const found = data.data || [];
-    console.log(`[IG Discovery] Source 1 - connected_instagram_accounts: ${found.length} accounts`, found.map(a => a.username));
-    for (const a of found) {
-      if (!seenIds.has(a.id)) { seenIds.add(a.id); accounts.push({ id: a.id, username: a.username, profile_pic: a.profile_picture_url }); }
-    }
-  } catch (err) {
-    console.error('[IG Discovery] Source 1 ERROR:', err.response?.data?.error?.message || err.message);
-  }
+    console.log(`[IG Discovery] Source 1 - connected_instagram_accounts: ${found.length}`, found.map(a => a.username));
+    found.forEach(a => addResult(a.id, a.username, a.profile_picture_url));
+  }).catch(err => console.error('[IG Discovery] Source 1 ERROR:', err.response?.data?.error?.message || err.message));
 
-  // 2. Fetch IG business accounts linked to Pages
-  try {
-    const { data } = await metaApi.get('/me/accounts', {
-      params: {
-        access_token: token,
-        fields: 'id,name,instagram_business_account{id,username,profile_picture_url}',
-        limit: 100
-      }
-    });
+  const source2and4 = metaApi.get('/me/accounts', {
+    params: { access_token: token, fields: 'id,name,access_token,instagram_business_account{id,username,profile_picture_url}', limit: 100 }
+  }).then(async ({ data }) => {
     const pages = data.data || [];
+    // Source 2: IG business accounts linked to Pages
     const igFromPages = pages.filter(p => p.instagram_business_account).map(p => p.instagram_business_account);
-    console.log(`[IG Discovery] Source 2 - Pages (${pages.length} pages): ${igFromPages.length} IG accounts`, igFromPages.map(a => a.username));
-    for (const page of pages) {
-      const ig = page.instagram_business_account;
-      if (ig && !seenIds.has(ig.id)) {
-        seenIds.add(ig.id);
-        accounts.push({ id: ig.id, username: ig.username, profile_pic: ig.profile_picture_url });
-      }
-    }
-  } catch (err) {
-    console.error('[IG Discovery] Source 2 ERROR:', err.response?.data?.error?.message || err.message);
-  }
+    console.log(`[IG Discovery] Source 2 - Pages (${pages.length}): ${igFromPages.length} IG accounts`, igFromPages.map(a => a.username));
+    igFromPages.forEach(ig => addResult(ig.id, ig.username, ig.profile_picture_url));
 
-  // 3. Fetch business-owned IG accounts
-  try {
-    const adAccount = await getAdAccountDetails(token, adAccountId);
-    const businessId = adAccount?.business?.id;
-    console.log(`[IG Discovery] Source 3 - Ad account business ID: ${businessId || 'NONE'}`);
-    if (businessId) {
-      const bizIgAccounts = await getBusinessOwnedIGAccounts(token, businessId);
-      console.log(`[IG Discovery] Source 3 - Business owned: ${(bizIgAccounts || []).length} accounts`, (bizIgAccounts || []).map(a => a.username));
-      for (const a of (bizIgAccounts || [])) {
-        if (!seenIds.has(a.id)) {
-          seenIds.add(a.id);
-          accounts.push({ id: a.id, username: a.username, profile_pic: a.profile_picture_url });
+    // Source 4: page-backed IG accounts (parallel across pages)
+    await Promise.allSettled(pages.map(async (page) => {
+      try {
+        const pageToken = page.access_token || token;
+        const { data: igData } = await metaApi.get(`/${page.id}/page_backed_instagram_accounts`, {
+          params: { access_token: pageToken, fields: 'id,username,name,profile_picture_url' }
+        });
+        const pageIgs = igData.data || [];
+        if (pageIgs.length > 0) {
+          console.log(`[IG Discovery] Source 4 - Page "${page.name}": ${pageIgs.length} page-backed`, pageIgs.map(a => a.username || a.id));
+          pageIgs.forEach(a => addResult(a.id, a.username || page.name, a.profile_picture_url));
         }
-      }
+      } catch (_) { /* skip */ }
+    }));
+  }).catch(err => console.error('[IG Discovery] Source 2/4 ERROR:', err.response?.data?.error?.message || err.message));
+
+  // Wait for all sources to complete
+  await Promise.allSettled([source1, source2and4]);
+
+  // Deduplicate by ID
+  const seenIds = new Set();
+  const accounts = [];
+  for (const a of allResults) {
+    if (a.id && !seenIds.has(a.id)) {
+      seenIds.add(a.id);
+      accounts.push(a);
     }
-  } catch (err) {
-    console.error('[IG Discovery] Source 3 ERROR:', err.response?.data?.error?.message || err.message);
   }
 
   console.log(`[IG Discovery] TOTAL: ${accounts.length} accounts`, accounts.map(a => a.username));
