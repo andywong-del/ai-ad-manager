@@ -478,12 +478,8 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
 
     api.get(endpoint).then(r => {
       const data = r.data || [];
-      if (videoSource === 'ig_account') {
-        // Show all ad account videos but mark ones with IG source
-        setVideos(data.map(v => ({ ...v, is_ig: !!v.source_instagram_media_id })));
-      } else {
-        setVideos(data);
-      }
+      // Mark IG-sourced videos for all sources (not just ig_account)
+      setVideos(data.map(v => ({ ...v, is_ig: !!v.source_instagram_media_id })));
       setVideosLoading(false);
     }).catch(err => { console.error('Video fetch error:', err); setVideosLoading(false); });
   }, [tab, videoSource, videoSourcePage, videoSourceIg, adAccountId]);
@@ -951,7 +947,7 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
                     <div className="flex items-center gap-3 px-2 py-1.5 border-b-2 border-blue-600 text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
                       <span className="w-16 shrink-0">Thumbnail</span>
                       <span className="flex-1">Video details</span>
-                      <span className="w-20 text-right shrink-0">Uploaded</span>
+                      <span className="w-24 text-center shrink-0" title="3-second video views">3s views</span>
                       <span className="w-20 text-right shrink-0">Last used</span>
                       <span className="w-4 shrink-0"></span>
                     </div>
@@ -977,11 +973,17 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
                           <div className="flex-1 min-w-0">
                             <p className="text-[11px] font-medium text-slate-700 truncate">
                               {v.title || v.name || v.description?.slice(0, 60)}
-                              {(v.is_ig || v.source_instagram_media_id) && <span className="ml-1 inline-flex items-center px-1 py-0 rounded text-[9px] font-semibold bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700">IG</span>}
                             </p>
-                            <p className="text-[10px] text-slate-400">{v.length ? fmtDuration(v.length) : ''}</p>
+                            <p className="text-[10px] text-slate-400">{v.length ? `${fmtDuration(v.length)} · Uploaded: ${fmtVDate(v.created_time)}` : fmtVDate(v.created_time)}</p>
                           </div>
-                          <span className="w-20 text-[10px] text-slate-400 text-right shrink-0">{fmtVDate(v.created_time)}</span>
+                          <div className="w-24 text-center shrink-0 flex items-center justify-center gap-1">
+                            <span className="text-[11px] text-slate-600 font-medium">{v.three_second_views > 0 ? v.three_second_views.toLocaleString() : '—'}</span>
+                            {v.is_ig ? (
+                              <svg width="14" height="14" viewBox="0 0 24 24" className="text-slate-400 shrink-0"><circle cx="12" cy="12" r="11" fill="none" stroke="currentColor" strokeWidth="2"/><path d="M16.5 7.5h-9A1.5 1.5 0 006 9v6a1.5 1.5 0 001.5 1.5h9A1.5 1.5 0 0018 15V9a1.5 1.5 0 00-1.5-1.5z" fill="none" stroke="currentColor" strokeWidth="1.2"/><circle cx="12" cy="12" r="2" fill="none" stroke="currentColor" strokeWidth="1.2"/><circle cx="15.5" cy="8.5" r="0.8" fill="currentColor"/></svg>
+                            ) : (
+                              <svg width="14" height="14" viewBox="0 0 24 24" className="text-blue-500 shrink-0"><circle cx="12" cy="12" r="11" fill="currentColor"/><path d="M13.5 8H15V6h-2.5C11.12 6 10 7.12 10 8.5V10H8.5v2H10v6h2v-6h2l.5-2H12V8.5c0-.28.22-.5.5-.5h1z" fill="white"/></svg>
+                            )}
+                          </div>
                           <span className="w-20 text-[10px] text-slate-400 text-right shrink-0">{fmtVDate(v.updated_time)}</span>
                           <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0
                             ${selectedVideoIds.includes(v.id) ? 'bg-blue-600 border-blue-600' : 'border-slate-300'}`}>

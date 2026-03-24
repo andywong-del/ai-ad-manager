@@ -363,25 +363,46 @@ export const deleteAdImage = async (token, adAccountId, imageHash) => {
 
 // ─── Ad Videos ───────────────────────────────────────────────────────
 
+// Helper: extract 3-second video views from nested video_insights structure
+const extract3sViews = (video) => {
+  const insights = video.video_insights?.data;
+  if (!insights?.length) return 0;
+  const actions = insights[0]?.video_3_sec_watched_actions;
+  if (!actions?.length) return 0;
+  return actions.reduce((sum, a) => sum + (parseInt(a.value, 10) || 0), 0);
+};
+
 export const getAdVideos = async (token, adAccountId) => {
   try {
     const { data } = await metaApi.get(`/${adAccountId}/advideos`, {
       params: {
         access_token: token,
-        fields: 'id,title,description,source,picture,length,status,created_time,updated_time,source_instagram_media_id'
+        fields: 'id,title,description,source,picture,length,status,created_time,updated_time,source_instagram_media_id,video_insights{video_3_sec_watched_actions}'
       }
     });
-    return data.data;
+    return (data.data || []).map(v => ({ ...v, three_second_views: extract3sViews(v) }));
   } catch (err) {
-    // Fallback without source_instagram_media_id if field not supported
-    console.error('getAdVideos error (trying fallback):', err.response?.data?.error?.message || err.message);
-    const { data } = await metaApi.get(`/${adAccountId}/advideos`, {
-      params: {
-        access_token: token,
-        fields: 'id,title,description,source,picture,length,status,created_time,updated_time'
-      }
-    });
-    return data.data;
+    // Fallback: try without video_insights but keep source_instagram_media_id
+    console.error('getAdVideos insights error (trying without insights):', err.response?.data?.error?.message || err.message);
+    try {
+      const { data } = await metaApi.get(`/${adAccountId}/advideos`, {
+        params: {
+          access_token: token,
+          fields: 'id,title,description,source,picture,length,status,created_time,updated_time,source_instagram_media_id'
+        }
+      });
+      return data.data || [];
+    } catch (err2) {
+      // Final fallback: basic fields only
+      console.error('getAdVideos fallback error:', err2.response?.data?.error?.message || err2.message);
+      const { data } = await metaApi.get(`/${adAccountId}/advideos`, {
+        params: {
+          access_token: token,
+          fields: 'id,title,description,source,picture,length,status,created_time,updated_time'
+        }
+      });
+      return data.data || [];
+    }
   }
 };
 
