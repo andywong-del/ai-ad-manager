@@ -1229,16 +1229,28 @@ export const getConnectedInstagramAccounts = async (token, adAccountId) => {
     console.log(`[IG Discovery] Source 2 - Pages (${pages.length}): ${igFromPages.length} IG accounts`, igFromPages.map(a => a.username));
     igFromPages.forEach(ig => addResult(ig.id, ig.username, ig.profile_picture_url));
 
-    // Source 4: page-backed IG accounts (parallel across pages)
+    // Source 4: page-backed IG accounts + page instagram_accounts (parallel across pages)
     await Promise.allSettled(pages.map(async (page) => {
+      const pageToken = page.access_token || token;
+      // 4a: page_backed_instagram_accounts
       try {
-        const pageToken = page.access_token || token;
         const { data: igData } = await metaApi.get(`/${page.id}/page_backed_instagram_accounts`, {
           params: { access_token: pageToken, fields: 'id,username,name,profile_picture_url' }
         });
         const pageIgs = igData.data || [];
         if (pageIgs.length > 0) {
-          console.log(`[IG Discovery] Source 4 - Page "${page.name}": ${pageIgs.length} page-backed`, pageIgs.map(a => a.username || a.id));
+          console.log(`[IG Discovery] Source 4a - Page "${page.name}": ${pageIgs.length} page-backed`, pageIgs.map(a => a.username || a.id));
+          pageIgs.forEach(a => addResult(a.id, a.username || page.name, a.profile_picture_url));
+        }
+      } catch (_) { /* skip */ }
+      // 4b: instagram_accounts on page (may find accounts not in page_backed)
+      try {
+        const { data: igData } = await metaApi.get(`/${page.id}/instagram_accounts`, {
+          params: { access_token: pageToken, fields: 'id,username,profile_picture_url' }
+        });
+        const pageIgs = igData.data || [];
+        if (pageIgs.length > 0) {
+          console.log(`[IG Discovery] Source 4b - Page "${page.name}": ${pageIgs.length} instagram_accounts`, pageIgs.map(a => a.username || a.id));
           pageIgs.forEach(a => addResult(a.id, a.username || page.name, a.profile_picture_url));
         }
       } catch (_) { /* skip */ }
@@ -1256,6 +1268,24 @@ export const getConnectedInstagramAccounts = async (token, adAccountId) => {
       seenIds.add(a.id);
       accounts.push(a);
     }
+  }
+
+  // Post-process: resolve usernames for page-backed accounts that only have page names
+  // (page-backed accounts have numeric-looking usernames or page display names as fallback)
+  const needsResolution = accounts.filter(a => !a.username || /^\d+$/.test(a.username) || !a.username.includes('.'));
+  if (needsResolution.length > 0) {
+    await Promise.allSettled(needsResolution.map(async (acct) => {
+      try {
+        const { data } = await metaApi.get(`/${acct.id}`, {
+          params: { access_token: token, fields: 'id,username,profile_picture_url' }
+        });
+        if (data.username) {
+          console.log(`[IG Discovery] Resolved username for ${acct.id}: ${acct.username} -> ${data.username}`);
+          acct.username = data.username;
+          if (data.profile_picture_url) acct.profile_pic = data.profile_picture_url;
+        }
+      } catch (_) { /* keep fallback name */ }
+    }));
   }
 
   console.log(`[IG Discovery] TOTAL: ${accounts.length} accounts`, accounts.map(a => a.username));
