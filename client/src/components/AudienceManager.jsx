@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Users, Plus, RefreshCw, Trash2, Copy, Target, Globe, Hash, X, AlertTriangle, Search, Film, ClipboardCopy, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, SlidersHorizontal, FolderOpen, Smartphone, ShoppingBag, BookOpen, Sparkles, CalendarDays, Database, FileText } from 'lucide-react';
+import { Users, Plus, RefreshCw, Trash2, Copy, Target, Globe, Hash, X, AlertTriangle, Search, Film, ClipboardCopy, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, SlidersHorizontal, FolderOpen, Smartphone, ShoppingBag, BookOpen, CalendarDays, Database, FileText } from 'lucide-react';
 import api from '../services/api.js';
 
 // ── Confirm Dialog ──────────────────────────────────────────────────────────
@@ -33,8 +33,7 @@ const SUBTYPE_LABELS = {
   LOOKALIKE: 'Lookalike', OFFLINE_CONVERSION: 'Offline',
   IG_BUSINESS: 'Instagram', IG_BUSINESS_PROFILE: 'Instagram',
   APP: 'Mobile App', VIDEO: 'Video', LEAD_AD: 'Lead Ad',
-  SHOPPING: 'Shopping', CATALOGUE: 'Catalogue', AR_EXPERIENCE: 'AR',
-  FB_EVENT: 'FB Event', PAGE: 'Page',
+  SHOPPING: 'Shopping', CATALOGUE: 'Catalogue',   FB_EVENT: 'FB Event', PAGE: 'Page',
 };
 
 const fmtDate = (ts) => {
@@ -80,7 +79,6 @@ const getTypeDisplay = (aud) => {
     APP: 'Mobile app',
     SHOPPING: 'Shopping',
     CATALOGUE: 'Catalogue',
-    AR_EXPERIENCE: 'Augmented reality',
     FB_EVENT: 'Facebook event',
   };
   return { main: 'Custom Audience', detail: detailMap[sub] || null };
@@ -168,11 +166,10 @@ const META_SOURCES = [
   { id: 'video', label: 'Video', icon: Film },
   { id: 'ig', label: 'Instagram account', icon: Hash },
   { id: 'fb_page', label: 'Facebook Page', icon: FileText },
-  { id: 'lead_ad', label: 'Lead Ad', icon: ClipboardCopy },
+  { id: 'lead_ad', label: 'Lead Ad', icon: ClipboardCopy, developing: true },
   { id: 'fb_event', label: 'Facebook event', icon: CalendarDays, developing: true },
   { id: 'shopping', label: 'Shopping', icon: ShoppingBag, developing: true },
   { id: 'catalogue', label: 'Catalogue', icon: BookOpen, developing: true },
-  { id: 'ar', label: 'Augmented reality', icon: Sparkles, developing: true },
 ];
 const OTHER_SOURCES = [
   { id: 'lookalike', label: 'Lookalike audience', icon: Copy },
@@ -705,8 +702,6 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
     if (tab === 'mobile_app') return `Create a mobile app custom audience${audName ? ` called ${audName}` : ''}${descPart} from app activity, ${retentionDays} day retention`;
     if (tab === 'shopping') return `Create a shopping custom audience${audName ? ` called ${audName}` : ''}${descPart} from people who interacted with your shop, ${retentionDays} day retention`;
     if (tab === 'catalogue') return `Create a catalogue custom audience${audName ? ` called ${audName}` : ''}${descPart} from people who interacted with items in your catalogue, ${retentionDays} day retention`;
-    if (tab === 'ar') return `Create an augmented reality custom audience${audName ? ` called ${audName}` : ''}${descPart} from people who interacted with your AR experience, ${retentionDays} day retention`;
-
     if (tab === 'lookalike') {
       const srcAud = existingAudiences.find(a => a.id === sourceAudienceId);
       const srcName = srcAud?.name || sourceAudienceId;
@@ -716,7 +711,7 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
   };
 
   // Validation — returns error message or null if valid
-  const MAX_RETENTION = { website: 180, video: 365, ig: 365, fb_page: 365, lead_ad: 90, offline: 180, fb_event: 365, mobile_app: 180, shopping: 365, catalogue: 365, ar: 365 };
+  const MAX_RETENTION = { website: 180, video: 365, ig: 365, fb_page: 365, lead_ad: 90, offline: 180, fb_event: 365, mobile_app: 180, shopping: 365, catalogue: 365 };
   const getValidationError = () => {
     const maxRet = MAX_RETENTION[tab];
     if (maxRet && retentionDays > maxRet) return `Retention cannot exceed ${maxRet} days for this source`;
@@ -836,7 +831,7 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
   };
 
   // Sources that use a simple retention-only config via chat
-  const SIMPLE_SOURCES = ['offline', 'fb_event', 'mobile_app', 'shopping', 'catalogue', 'ar'];
+  const SIMPLE_SOURCES = ['offline', 'fb_event', 'mobile_app', 'shopping', 'catalogue'];
   const simpleSourceLabel = SOURCE_LIST.find(s => s.id === tab)?.label || tab;
 
   return (
@@ -1215,6 +1210,23 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
           {/* ── Customer List ── */}
           {tab === 'customer_list' && (
             <div className="space-y-4">
+              {/* TOS acceptance — required before creating customer list audiences */}
+              {!tosAccepted && !tosChecking && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertTriangle size={14} className="text-amber-500 shrink-0" />
+                    <p className="text-xs font-semibold text-amber-800">Custom Audience Terms Required</p>
+                  </div>
+                  <p className="text-[11px] text-amber-600 mb-3">You must accept Meta's Custom Audience Terms before uploading customer data.</p>
+                  <button onClick={acceptTos}
+                    className="w-full px-3 py-2 rounded-lg text-xs font-semibold bg-amber-600 text-white hover:bg-amber-500 transition-colors">
+                    Accept Custom Audience Terms
+                  </button>
+                  <p className="text-[10px] text-amber-500 mt-2 text-center">
+                    If this doesn't work, <a href="https://www.facebook.com/ads/manage/customaudiences/tos/" target="_blank" rel="noopener noreferrer" className="underline font-medium">accept terms in Meta Ads Manager</a>
+                  </p>
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1.5">Data Type</label>
                 <select value={customerDataType} onChange={e => setCustomerDataType(e.target.value)} className={INPUT_CLS}>
@@ -1508,7 +1520,6 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
                     {tab === 'mobile_app' && 'Create an audience from people who used your mobile app.'}
                     {tab === 'shopping' && 'Create an audience from people who interacted with your Facebook/Instagram shop.'}
                     {tab === 'catalogue' && 'Create an audience from people who interacted with items in your product catalogue.'}
-                    {tab === 'ar' && 'Create an audience from people who interacted with your augmented reality experience.'}
                   </p>
                 </div>
               </div>
@@ -1817,22 +1828,7 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack }) => {
           </div>
         </div>
 
-        {/* TOS Banner — shown if custom audience TOS not yet accepted */}
-        {!tosAccepted && !tosChecking && (
-          <div className="mx-6 mb-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <AlertTriangle size={14} className="text-amber-500 shrink-0" />
-              <div>
-                <p className="text-xs font-semibold text-amber-800">Custom Audience Terms Required</p>
-                <p className="text-[11px] text-amber-600 mt-0.5">Accept Meta's Custom Audience Terms to create customer list audiences.</p>
-              </div>
-            </div>
-            <button onClick={acceptTos}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-600 text-white hover:bg-amber-500 transition-colors shrink-0 ml-3">
-              Accept Terms
-            </button>
-          </div>
-        )}
+        {/* TOS banner removed — acceptance now happens inline in customer list creation flow */}
 
         {/* Search + Filter row */}
         {audiences.length > 0 && (

@@ -210,6 +210,11 @@ function deleteAdImage({ image_hash }, c) {
 function getAdVideoStatus({ video_id }, c) {
   return meta.getAdVideoStatus(ctx(c).token, video_id);
 }
+function getPageVideos({ page_id }, c) {
+  const { token, adAccountId } = ctx(c);
+  if (!page_id) return { error: 'page_id is required.' };
+  return meta.getPageVideos(token, page_id, adAccountId);
+}
 
 // ─── Insights ───────────────────────────────────────────────────────────────
 function getAccountInsights({ date_preset = 'last_7d', since, until }, c) {
@@ -838,6 +843,8 @@ const adTools = [
   T('get_pages', 'List all Facebook pages the user manages.', getPages),
   T('get_page_posts', 'List recent posts from a Facebook Page. Use this when user wants to promote/boost an existing post as an ad.', getPagePosts,
     obj({ page_id: str('Facebook Page ID') }, ['page_id'])),
+  T('get_page_videos', 'List videos from a Facebook Page. Use this when creating video engagement audiences — show the video list so users can pick which videos to target. Returns video IDs, titles, descriptions, and thumbnails.', getPageVideos,
+    obj({ page_id: str('Facebook Page ID') }, ['page_id'])),
 
   // ── Catalogs ──────────────────────────────────────────────────────────
   T('get_catalogs', 'List product catalogs for a business.', getCatalogs,
@@ -1056,15 +1063,16 @@ Meta auction mechanics, CBO vs ABO, bidding strategies, audience segmentation, l
 # CRITICAL RULES FOR SPECIFIC FLOWS
 
 ## Audience Creation — Chat-Based Flow
-Users can create custom audiences simply by chatting. The flow should be conversational and efficient — gather all required info, confirm once, then create.
+Users can create custom audiences simply by chatting. The flow should be interactive with clickable options — NOT walls of text.
 
-**GOLDEN RULE: Gather ALL info in as few messages as possible, then confirm and create.**
+**GOLDEN RULES:**
+1. **ALWAYS use \`\`\`options blocks** for presenting choices — NEVER list options as plain text bullets
+2. **ALWAYS call API tools first** to get real data (pages, videos, IG accounts) before presenting options — NEVER ask users to provide IDs manually
+3. **Use \`get_page_videos\`** to list actual videos when creating video audiences — show video titles and IDs as clickable options
+4. Gather info efficiently — use smart defaults (retention=30d website, 365d engagement). Auto-generate names if not provided.
+5. When user provides enough info upfront, skip to confirmation — don't re-ask what you already know.
 
 - \`special_ad_categories\` is a CAMPAIGN-level field. NEVER ask about it when creating audiences.
-- Do NOT ask one question at a time. Batch related questions together.
-- When user says "create audience" or similar, ask what TYPE they want in ONE message with all options listed.
-- Use smart defaults: retention=30d for website, 365d for engagement/IG/page. Auto-generate name if not provided.
-- When user provides enough info (e.g. "create video audience for 3s viewers of my TopGlow videos"), go straight to confirming details and creating — don't ask questions you already have answers to.
 
 ### Chat-based audience creation flow:
 1. **Detect intent** — user mentions audience, retargeting, custom audience, lookalike, etc.
@@ -1094,21 +1102,45 @@ Audiences created via API do NOT appear in Meta Ads Manager's audience dropdown 
 ### ENGAGEMENT audience (video viewers):
 Video sources: Facebook Page videos, Instagram videos, Campaign video ads, or direct Video IDs.
 
-**Efficient chat flow:**
-- If user says "create video audience", ask in ONE message: which videos (or page), engagement type, and retention days
-- If user provides video IDs directly, you already have enough — just confirm and create
-- Auto-default: retention=365 days, engagement=video_watched (3s views), auto-generate name if not provided
+**IMPORTANT: Use interactive options — NOT walls of text.** Present choices as clickable options cards.
 
 **Steps:**
-1. Get video source — ask which videos to target. User may provide:
-   - Page name → call \`get_pages\` to get Page ID, then offer to list videos or let user specify
-   - IG account → call \`get_connected_instagram_accounts\` to get IG ID (use as event_source type "ig_business")
-   - Video IDs directly → use as-is
-   - Campaign → ask which campaign, extract video IDs from ad creatives
-2. Get the Page ID — REQUIRED as event_source for video rules. Call \`get_pages\` if not known.
-3. Get engagement type — 3s view (video_watched), 10s (video_watched), ThruPlay/15s (video_completed), 25%/50%/75%/95%
-4. Get retention (default 365, max 365)
-5. Confirm summary, then call \`create_custom_audience\` with subtype="ENGAGEMENT" and full rule
+1. **Get pages** — call \`get_pages\` immediately. Then present pages as options:
+\`\`\`options
+{"title":"Which Page's videos do you want to target?","options":[
+  {"id":"PAGE_ID_1","title":"Page Name 1","description":"Select this page"},
+  {"id":"PAGE_ID_2","title":"Page Name 2","description":"Select this page"}
+]}
+\`\`\`
+
+2. **Show videos** — after user picks a page, call \`get_page_videos\` with that page_id. Present the video list as options so user can pick:
+\`\`\`options
+{"title":"Select videos to target (or choose All Videos)","options":[
+  {"id":"all","title":"All Videos","description":"Target viewers of any video on this page"},
+  {"id":"VIDEO_ID_1","title":"Video Title 1","description":"Posted Jan 15, 2025 · 12.5K views"},
+  {"id":"VIDEO_ID_2","title":"Video Title 2","description":"Posted Feb 3, 2025 · 8.2K views"}
+]}
+\`\`\`
+
+3. **Engagement type** — present as options:
+\`\`\`options
+{"title":"What level of engagement?","options":[
+  {"id":"3s","title":"3 seconds viewed","description":"Broadest audience — anyone who watched at least 3 seconds"},
+  {"id":"10s","title":"10 seconds viewed","description":"More engaged viewers"},
+  {"id":"thruplay","title":"ThruPlay / 15 seconds","description":"Completed or watched at least 15 seconds"},
+  {"id":"25pct","title":"25% viewed","description":"Watched at least a quarter of the video"},
+  {"id":"50pct","title":"50% viewed","description":"Watched at least half"},
+  {"id":"75pct","title":"75% viewed","description":"Highly engaged viewers"},
+  {"id":"95pct","title":"95% viewed","description":"Nearly completed — most engaged"}
+]}
+\`\`\`
+
+4. Auto-default retention=365 days. Confirm summary, then call \`create_custom_audience\`.
+
+**Key rules:**
+- ALWAYS call \`get_pages\` and \`get_page_videos\` to show real data — never ask users to provide IDs manually
+- Use \`\`\`options blocks for EVERY choice — do NOT present choices as bullet-point text
+- If user provides video IDs directly, skip to step 3
 
 **You MUST build the full rule for engagement audiences:**
 \`\`\`json
@@ -1125,12 +1157,20 @@ Video sources: Facebook Page videos, Instagram videos, Campaign video ads, or di
 - Then use \`add_users_to_audience\` to upload hashed data
 
 ### INSTAGRAM engagement audience:
-**Efficient chat flow:** If user says "create IG audience" or "Instagram retargeting", ask in ONE message: which IG account, engagement type, and retention.
+**Use options cards for every choice.**
 
-1. Call \`get_connected_instagram_accounts\` to list IG accounts (show as options)
-2. Ask engagement type + retention in the SAME message. Defaults: all engagement, 365 days
-3. Optionally ask about exclusion rules (e.g., include visitors BUT exclude people who already messaged)
-4. Confirm summary, then create
+1. Call \`get_connected_instagram_accounts\` then present as \`\`\`options block
+2. Present engagement types as \`\`\`options:
+\`\`\`options
+{"title":"What type of IG engagement?","options":[
+  {"id":"all","title":"All engagement","description":"Anyone who interacted with your profile or content"},
+  {"id":"visit","title":"Profile visitors","description":"People who visited your profile"},
+  {"id":"post","title":"Post/ad engagement","description":"Reactions, comments, shares, saves"},
+  {"id":"message","title":"Sent a message","description":"People who DM'd your account"},
+  {"id":"saved","title":"Saved a post","description":"People who saved your posts or ads"}
+]}
+\`\`\`
+3. Auto-default retention=365. Confirm and create.
 
 **Build rule with event_sources type "ig_business":**
 \`\`\`json
@@ -1148,12 +1188,20 @@ Video sources: Facebook Page videos, Instagram videos, Campaign video ads, or di
 - ig_user_interacted_ad_or_organic (engaged with post/ad)
 
 ### FACEBOOK PAGE engagement audience:
-**Efficient chat flow:** If user says "create page audience" or "FB page retargeting", ask in ONE message: which page, engagement type, and retention.
+**Use options cards for every choice.**
 
-1. Call \`get_pages\` to list pages (show as options)
-2. Ask engagement type + retention in the SAME message. Defaults: all engagement, 365 days
-3. Optionally ask about exclusion rules
-4. Confirm summary, then create
+1. Call \`get_pages\` then present as \`\`\`options block
+2. Present engagement types as \`\`\`options:
+\`\`\`options
+{"title":"What type of Page engagement?","options":[
+  {"id":"engaged","title":"Any engagement","description":"Reactions, shares, comments, link clicks on posts/ads"},
+  {"id":"liked","title":"Page likes/follows","description":"People who currently like or follow your Page"},
+  {"id":"visited","title":"Page visitors","description":"Anyone who visited your Page"},
+  {"id":"cta","title":"CTA button clicks","description":"People who clicked Call, Message, etc."},
+  {"id":"messaged","title":"Sent a message","description":"People who messaged your Page"}
+]}
+\`\`\`
+3. Auto-default retention=365. Confirm and create.
 
 **Build rule with event_sources type "page":**
 \`\`\`json
