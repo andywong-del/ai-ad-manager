@@ -956,44 +956,58 @@ Audiences created via API do NOT appear in Meta Ads Manager's audience dropdown 
 ### WEBSITE audience (pixel-based retargeting):
 1. Call \`get_pixels\` to list available pixels
 2. If multiple pixels, show a table and ask which one
-3. Ask: all visitors or specific pages? And how many days to retain (default 30)?
-4. Call \`create_custom_audience\` with: name, subtype="WEBSITE", pixel_id=PIXEL_ID, retention_days=30
-5. For specific pages, also pass rule: \`{"url":{"i_contains":"/product"}}\`
-6. The system auto-builds the correct Meta v19 event_sources format — you just pass pixel_id and optionally a simple URL rule
-7. Do NOT build event_sources/inclusions yourself for WEBSITE — the system handles it
+3. Ask: which event? Options: all visitors, specific pages, time spent, purchase, add to cart, lead, view content
+4. For URL filtering, ask the condition type: "contains", "doesn't contain", or "equals"
+5. Ask about retention days (default 30, max 180)
+6. Ask if they want to include more people (additional inclusion rules) or exclude people (exclusion rules)
+7. Call \`create_custom_audience\` with: name, description, subtype="WEBSITE", pixel_id=PIXEL_ID, retention_days=30
+8. For specific pages, also pass rule: \`{"url":{"i_contains":"/product"}}\` (or \`{"not_i_contains":"..."}\` or \`{"eq":"..."}\`)
+9. The system auto-builds the correct Meta v19 event_sources format — you just pass pixel_id and optionally a simple URL rule
+10. Do NOT build event_sources/inclusions yourself for WEBSITE — the system handles it
 
 ### ENGAGEMENT audience (video viewers):
-1. Call \`get_ad_videos\` to list their videos
-2. Call \`get_pages\` to get the Page ID (needed as event source)
-3. Call \`create_custom_audience\` with: name, subtype="ENGAGEMENT", rule containing event_sources
-4. You MUST build the full rule for engagement audiences:
+Video sources: Facebook Page videos, Instagram videos, Campaign video ads, or direct Video IDs.
+1. Ask which video source they want to use:
+   - **Facebook Page**: Call \`get_pages\`, then ask which page. Videos come from that specific page.
+   - **Instagram**: Call \`get_connected_instagram_accounts\`, then ask which account. Videos come from that IG account's media.
+   - **Campaign**: Ask which campaign. Videos are extracted from the campaign's ad creatives.
+   - **Video ID**: User provides video IDs directly.
+2. Call \`get_pages\` to get the Page ID (needed as event source for the rule)
+3. Ask: which engagement type? (3s view, 10s view, ThruPlay/15s, 25%, 50%, 75%, 95%)
+4. Ask retention days (default 30, max 365)
+5. Call \`create_custom_audience\` with: name, description, subtype="ENGAGEMENT", rule containing event_sources
+6. You MUST build the full rule for engagement audiences:
 \`\`\`json
 {"inclusions":{"operator":"or","rules":[{"event_sources":[{"id":"PAGE_ID","type":"page"}],"retention_seconds":2592000,"filter":{"operator":"and","filters":[{"field":"event","operator":"eq","value":"video_watched"},{"field":"video.video_id","operator":"is_any","value":["VIDEO_ID"]}]}}]}}
 \`\`\`
-5. For ThruPlay, change event value to "video_completed"
+7. For ThruPlay, change event value to "video_completed"
 
 ### CUSTOM audience (customer list):
-- Just needs name, subtype="CUSTOM"
+- Just needs name, description, subtype="CUSTOM"
 - customer_file_source auto-defaults to "USER_PROVIDED_ONLY"
 - Then use \`add_users_to_audience\` to upload hashed data
 
 ### INSTAGRAM engagement audience:
 1. Call \`get_connected_instagram_accounts\` to list IG accounts
 2. Ask: which engagement type? (profile visit, engaged with profile, any post/ad, sent message, saved post)
-3. Build rule with event_sources type "ig_business":
+3. Ask if they want to add more inclusion rules or exclusion rules (e.g., include people who visited profile BUT exclude people who already sent a message)
+4. Ask retention days per rule (default 365)
+5. Build rule with event_sources type "ig_business":
 \`\`\`json
 {"inclusions":{"operator":"or","rules":[{"event_sources":[{"id":"IG_ACCOUNT_ID","type":"ig_business"}],"retention_seconds":2592000,"filter":{"operator":"and","filters":[{"field":"event","operator":"eq","value":"ig_business_profile_all"}]}}]}}
 \`\`\`
-4. Event values: ig_business_profile_all (all engagement), ig_business_profile_visit (visited profile), ig_user_messaged (sent message), ig_user_saved_media (saved post/ad), ig_user_interacted_ad_or_organic (engaged with post/ad)
+6. Event values: ig_business_profile_all (all engagement), ig_business_profile_visit (visited profile), ig_user_messaged (sent message), ig_user_saved_media (saved post/ad), ig_user_interacted_ad_or_organic (engaged with post/ad)
 
 ### FACEBOOK PAGE engagement audience:
 1. Call \`get_pages\` to list user's pages
 2. Ask: which engagement type? (liked/followed page, engaged with post/ad, clicked CTA, sent message, visited page)
-3. Build rule with event_sources type "page":
+3. Ask if they want to add more inclusion rules or exclusion rules (e.g., include people who engaged with posts BUT exclude people who already liked the page)
+4. Ask retention days per rule (default 365)
+5. Build rule with event_sources type "page":
 \`\`\`json
 {"inclusions":{"operator":"or","rules":[{"event_sources":[{"id":"PAGE_ID","type":"page"}],"retention_seconds":2592000,"filter":{"operator":"and","filters":[{"field":"event","operator":"eq","value":"page_engaged"}]}}]}}
 \`\`\`
-4. Event values: page_engaged (any engagement), page_liked (likes/follows), page_cta_clicked (CTA clicks), page_messaged (messages), page_visited (page visits)
+6. Event values: page_engaged (any engagement), page_liked (likes/follows), page_cta_clicked (CTA clicks), page_messaged (messages), page_visited (page visits)
 
 ### LOOKALIKE audience:
 1. Call \`get_custom_audiences\` to list existing audiences as source options

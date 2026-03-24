@@ -172,16 +172,85 @@ const SOURCE_LIST = [...YOUR_SOURCES, ...META_SOURCES, ...OTHER_SOURCES];
 
 const INPUT_CLS = 'w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100';
 
+// ── Include/Exclude Rule Component ──────────────────────────────────────────
+const WEBSITE_EVENTS = [
+  { value: 'all_visitors', label: 'All website visitors' },
+  { value: 'specific_pages', label: 'People who visited specific web pages' },
+  { value: 'time_spent', label: 'Visitors by time spent (top 25%)' },
+  { value: 'purchase', label: 'People who completed a purchase' },
+  { value: 'add_to_cart', label: 'People who added to cart' },
+  { value: 'lead', label: 'People who completed a lead form' },
+  { value: 'view_content', label: 'People who viewed content' },
+];
+
+const URL_CONDITIONS = [
+  { value: 'contains', label: 'Contains' },
+  { value: 'not_contains', label: "Doesn't contain" },
+  { value: 'equals', label: 'Equals' },
+];
+
+const WebsiteRuleCard = ({ rule, onChange, onRemove, isOnly, type }) => (
+  <div className="border border-slate-200 rounded-lg p-3 space-y-2 bg-white relative">
+    {!isOnly && (
+      <button onClick={onRemove} className="absolute top-2 right-2 text-slate-300 hover:text-red-400 transition-colors"><X size={14} /></button>
+    )}
+    <div className="flex items-center gap-1.5 mb-1">
+      <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${type === 'include' ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-600'}`}>
+        {type === 'include' ? 'Include' : 'Exclude'}
+      </span>
+    </div>
+    <select value={rule.event} onChange={e => onChange({ ...rule, event: e.target.value })} className={INPUT_CLS}>
+      {WEBSITE_EVENTS.map(ev => <option key={ev.value} value={ev.value}>{ev.label}</option>)}
+    </select>
+    {(rule.event === 'specific_pages' || rule.event === 'purchase' || rule.event === 'add_to_cart' || rule.event === 'lead' || rule.event === 'view_content') && (
+      <div className="flex gap-2">
+        <select value={rule.urlCondition || 'contains'} onChange={e => onChange({ ...rule, urlCondition: e.target.value })} className="px-2 py-1.5 rounded-lg border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-100 w-36 shrink-0">
+          {URL_CONDITIONS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+        </select>
+        <input value={rule.urlFilter || ''} onChange={e => onChange({ ...rule, urlFilter: e.target.value })} placeholder="e.g., /products or /checkout" className={INPUT_CLS} />
+      </div>
+    )}
+    <div className="flex items-center gap-2">
+      <label className="text-[10px] text-slate-500 shrink-0">In the past</label>
+      <input type="number" value={rule.retentionDays} onChange={e => onChange({ ...rule, retentionDays: Number(e.target.value) })} min={1} max={180} className="w-16 px-2 py-1.5 rounded-lg border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-100" />
+      <span className="text-[10px] text-slate-500">days</span>
+    </div>
+  </div>
+);
+
+const EngagementRuleCard = ({ rule, onChange, onRemove, isOnly, type, engagementOptions }) => (
+  <div className="border border-slate-200 rounded-lg p-3 space-y-2 bg-white relative">
+    {!isOnly && (
+      <button onClick={onRemove} className="absolute top-2 right-2 text-slate-300 hover:text-red-400 transition-colors"><X size={14} /></button>
+    )}
+    <div className="flex items-center gap-1.5 mb-1">
+      <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${type === 'include' ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-600'}`}>
+        {type === 'include' ? 'Include' : 'Exclude'}
+      </span>
+    </div>
+    <select value={rule.engagement} onChange={e => onChange({ ...rule, engagement: e.target.value })} className={INPUT_CLS}>
+      <option value="">Choose an engagement type</option>
+      {engagementOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+    </select>
+    <div className="flex items-center gap-2">
+      <label className="text-[10px] text-slate-500 shrink-0">In the past</label>
+      <input type="number" value={rule.retentionDays} onChange={e => onChange({ ...rule, retentionDays: Number(e.target.value) })} min={1} max={365} className="w-16 px-2 py-1.5 rounded-lg border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-100" />
+      <span className="text-[10px] text-slate-500">days</span>
+    </div>
+  </div>
+);
+
 const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab = 'website' }) => {
   const [tab, setTab] = useState(defaultTab);
   const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const [retentionDays, setRetentionDays] = useState(30);
 
-  // Website
+  // Website — Include/Exclude rules
   const [pixels, setPixels] = useState([]);
   const [selectedPixelId, setSelectedPixelId] = useState('');
-  const [websiteEvent, setWebsiteEvent] = useState('all_visitors');
-  const [urlFilter, setUrlFilter] = useState('');
+  const [websiteInclusions, setWebsiteInclusions] = useState([{ event: 'all_visitors', urlCondition: 'contains', urlFilter: '', retentionDays: 30 }]);
+  const [websiteExclusions, setWebsiteExclusions] = useState([]);
 
   // Video
   const [videoSource, setVideoSource] = useState('fb_page');
@@ -193,6 +262,11 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
   const [selectedVideoIds, setSelectedVideoIds] = useState([]);
   const [videoSearchQuery, setVideoSearchQuery] = useState('');
   const [engagementType, setEngagementType] = useState('');
+  // Campaign source for video
+  const [campaigns, setCampaigns] = useState([]);
+  const [campaignSearch, setCampaignSearch] = useState('');
+  const [selectedCampaignId, setSelectedCampaignId] = useState('');
+  const [campaignsLoading, setCampaignsLoading] = useState(false);
 
   // Customer List
   const [customerFile, setCustomerFile] = useState(null); // { name, rows, preview }
@@ -202,12 +276,16 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
   // Instagram
   const [igAccounts, setIgAccounts] = useState([]);
   const [selectedIgId, setSelectedIgId] = useState('');
-  const [igEngagement, setIgEngagement] = useState('');
+  // IG include/exclude
+  const [igInclusions, setIgInclusions] = useState([{ engagement: '', retentionDays: 365 }]);
+  const [igExclusions, setIgExclusions] = useState([]);
 
   // FB Page
   const [pages, setPages] = useState([]);
   const [selectedPageId, setSelectedPageId] = useState('');
-  const [pageEngagement, setPageEngagement] = useState('');
+  // FB Page include/exclude
+  const [pageInclusions, setPageInclusions] = useState([{ engagement: '', retentionDays: 365 }]);
+  const [pageExclusions, setPageExclusions] = useState([]);
 
   // Lookalike
   const [existingAudiences, setExistingAudiences] = useState([]);
@@ -245,16 +323,73 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
     }
   }, [tab, adAccountId]);
 
-  // Fetch videos when video source changes
+  // Fetch videos when video source changes — use correct endpoint per source
   useEffect(() => {
     if (tab !== 'video' || !adAccountId) return;
     if (videoSource === 'video_id') { setVideos([]); return; }
+    if (videoSource === 'campaign') { setVideos([]); setVideosLoading(false); return; }
+
+    // FB Page: need a page selected first
+    if (videoSource === 'fb_page' && !videoSourcePage) { setVideos([]); setVideosLoading(false); return; }
+    // IG: need an account selected first
+    if (videoSource === 'ig_account' && !videoSourceIg) { setVideos([]); setVideosLoading(false); return; }
+
     setVideosLoading(true);
     setVideos([]);
     setSelectedVideoIds([]);
-    // All sources use the ad account videos endpoint — Meta returns all videos associated with the account
-    api.get(`/meta/adaccounts/${adAccountId}/videos`).then(r => { setVideos(r.data || []); setVideosLoading(false); }).catch(() => setVideosLoading(false));
+
+    let endpoint;
+    if (videoSource === 'fb_page') {
+      endpoint = `/meta/pages/${videoSourcePage}/videos`;
+    } else if (videoSource === 'ig_account') {
+      endpoint = `/meta/instagram/${videoSourceIg}/media`;
+    } else {
+      endpoint = `/meta/adaccounts/${adAccountId}/videos`;
+    }
+
+    api.get(endpoint).then(r => {
+      const data = r.data || [];
+      // Normalize IG media to match video shape
+      if (videoSource === 'ig_account') {
+        setVideos(data.map(m => ({ id: m.id, title: m.caption?.slice(0, 60) || `Video ${m.id}`, picture: m.thumbnail_url, source: m.media_url })));
+      } else {
+        setVideos(data);
+      }
+      setVideosLoading(false);
+    }).catch(() => setVideosLoading(false));
+  }, [tab, videoSource, videoSourcePage, videoSourceIg, adAccountId]);
+
+  // Fetch campaigns when video source is campaign
+  useEffect(() => {
+    if (tab !== 'video' || videoSource !== 'campaign' || !adAccountId) return;
+    if (campaigns.length) return;
+    setCampaignsLoading(true);
+    api.get('/campaigns', { params: { adAccountId } }).then(r => {
+      setCampaigns(r.data || []);
+      setCampaignsLoading(false);
+    }).catch(() => setCampaignsLoading(false));
   }, [tab, videoSource, adAccountId]);
+
+  // Fetch ads/videos when a campaign is selected
+  useEffect(() => {
+    if (videoSource !== 'campaign' || !selectedCampaignId) return;
+    setVideosLoading(true);
+    setVideos([]);
+    setSelectedVideoIds([]);
+    api.get(`/campaigns/${selectedCampaignId}/ads`).then(r => {
+      const ads = r.data || [];
+      // Extract video creatives from ads
+      const videoAds = ads.filter(a => a.creative?.video_id).map(a => ({
+        id: a.creative.video_id,
+        title: a.name || `Ad ${a.id}`,
+        picture: a.creative.thumbnail_url || null,
+      }));
+      // Deduplicate by video ID
+      const unique = [...new Map(videoAds.map(v => [v.id, v])).values()];
+      setVideos(unique);
+      setVideosLoading(false);
+    }).catch(() => setVideosLoading(false));
+  }, [videoSource, selectedCampaignId]);
 
   const toggleVideo = (id) => {
     setSelectedVideoIds(prev => prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id]);
@@ -285,20 +420,37 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
 
   const buildPrompt = () => {
     const audName = name ? `"${name}"` : '';
+    const descPart = description ? `, description: "${description}"` : '';
+
+    const webEventLabels = {
+      all_visitors: 'all website visitors',
+      specific_pages: 'visitors to specific web pages',
+      time_spent: 'visitors by time spent (top 25%)',
+      purchase: 'people who completed a purchase',
+      add_to_cart: 'people who added to cart',
+      lead: 'people who completed a lead form',
+      view_content: 'people who viewed content',
+    };
+
+    const fmtWebRule = (rule) => {
+      let desc = webEventLabels[rule.event] || rule.event;
+      if (rule.urlFilter) {
+        const cond = rule.urlCondition === 'not_contains' ? "doesn't contain" : rule.urlCondition === 'equals' ? 'equals' : 'contains';
+        desc += ` (URL ${cond} "${rule.urlFilter}")`;
+      }
+      return `${desc}, ${rule.retentionDays} day retention`;
+    };
+
     if (tab === 'website') {
       const pixelName = pixels.find(p => p.id === selectedPixelId)?.name || '';
-      const webEventLabels = {
-        all_visitors: 'all website visitors',
-        specific_pages: `visitors to pages containing "${urlFilter}"`,
-        time_spent: 'visitors by time spent (top 25%)',
-        purchase: 'people who completed a purchase',
-        add_to_cart: 'people who added to cart',
-        lead: 'people who completed a lead form',
-        view_content: 'people who viewed content',
-      };
-      const eventDesc = webEventLabels[websiteEvent] || 'all website visitors';
-      return `Create a website custom audience${audName ? ` called ${audName}` : ''} using pixel "${pixelName}" (ID: ${selectedPixelId}), targeting ${eventDesc}, ${retentionDays} day retention`;
+      const inclParts = websiteInclusions.map(r => fmtWebRule(r));
+      const exclParts = websiteExclusions.map(r => fmtWebRule(r));
+      let prompt = `Create a website custom audience${audName ? ` called ${audName}` : ''}${descPart} using pixel "${pixelName}" (ID: ${selectedPixelId})`;
+      prompt += `. Include: ${inclParts.join(' OR ')}`;
+      if (exclParts.length) prompt += `. Exclude: ${exclParts.join(' OR ')}`;
+      return prompt;
     }
+
     if (tab === 'video') {
       const videoIds = videoSource === 'video_id' ? videoIdInput.split(/[,\s]+/).filter(Boolean) : selectedVideoIds;
       const vidNames = videoIds.map(id => videos.find(v => v.id === id)?.title || id).join(', ');
@@ -312,60 +464,61 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
         video_watched_95pct: 'viewed at least 95%',
       };
       const engDesc = engLabels[engagementType] || engagementType;
-      return `Create a video engagement custom audience${audName ? ` called ${audName}` : ''} for people who ${engDesc} of these videos: ${vidNames} (IDs: ${videoIds.join(', ')}), ${retentionDays} day retention`;
+      return `Create a video engagement custom audience${audName ? ` called ${audName}` : ''}${descPart} for people who ${engDesc} of these videos: ${vidNames} (IDs: ${videoIds.join(', ')}), ${retentionDays} day retention`;
     }
+
     if (tab === 'customer_list') {
       if (customerFile) {
         const typeLabel = { email: 'emails', phone: 'phone numbers', fn_ln: 'first + last names', madid: 'mobile advertiser IDs' }[customerDataType] || customerDataType;
-        return `Create a customer list custom audience${audName ? ` called ${audName}` : ''} using ${customerFile.rows} ${typeLabel} from file "${customerFile.name}"`;
+        return `Create a customer list custom audience${audName ? ` called ${audName}` : ''}${descPart} using ${customerFile.rows} ${typeLabel} from file "${customerFile.name}"`;
       }
-      return `Create a customer list custom audience${audName ? ` called ${audName}` : ''}. I will provide the customer data.`;
+      return `Create a customer list custom audience${audName ? ` called ${audName}` : ''}${descPart}. I will provide the customer data.`;
     }
+
+    const igEngLabels = {
+      ig_profile_visit: 'visited your profile',
+      ig_profile_engaged: 'engaged with your profile',
+      ig_ad_interact: 'engaged with any post or ad',
+      ig_message_sent: 'sent a message to your account',
+      ig_post_saved: 'saved any post or ad',
+    };
+
     if (tab === 'ig') {
       const igName = igAccounts.find(a => a.id === selectedIgId)?.username || selectedIgId;
-      const igEngLabels = {
-        ig_profile_visit: 'visited your profile',
-        ig_profile_engaged: 'engaged with your profile',
-        ig_ad_interact: 'engaged with any post or ad',
-        ig_message_sent: 'sent a message to your account',
-        ig_post_saved: 'saved any post or ad',
-      };
-      const igEngDesc = igEngLabels[igEngagement] || '';
-      return `Create an Instagram engagement custom audience${audName ? ` called ${audName}` : ''} from Instagram account @${igName} (ID: ${selectedIgId})${igEngDesc ? `, targeting people who ${igEngDesc}` : ''}, ${retentionDays} day retention`;
+      const inclParts = igInclusions.filter(r => r.engagement).map(r => `people who ${igEngLabels[r.engagement] || r.engagement} (${r.retentionDays}d)`);
+      const exclParts = igExclusions.filter(r => r.engagement).map(r => `people who ${igEngLabels[r.engagement] || r.engagement} (${r.retentionDays}d)`);
+      let prompt = `Create an Instagram engagement custom audience${audName ? ` called ${audName}` : ''}${descPart} from Instagram account @${igName} (ID: ${selectedIgId})`;
+      if (inclParts.length) prompt += `. Include: ${inclParts.join(' OR ')}`;
+      if (exclParts.length) prompt += `. Exclude: ${exclParts.join(' OR ')}`;
+      return prompt;
     }
+
+    const pageEngLabels = {
+      page_liked: 'currently like or follow your Page',
+      page_engaged: 'engaged with any post or ad',
+      page_cta_clicked: 'clicked any call-to-action button',
+      page_message_sent: 'sent a message to your Page',
+      page_visited: 'visited your Page',
+    };
+
     if (tab === 'fb_page') {
       const pageName = pages.find(p => p.id === selectedPageId)?.name || selectedPageId;
-      const pageEngLabels = {
-        page_liked: 'currently like or follow your Page',
-        page_engaged: 'engaged with any post or ad',
-        page_cta_clicked: 'clicked any call-to-action button',
-        page_message_sent: 'sent a message to your Page',
-        page_visited: 'visited your Page',
-      };
-      const pageEngDesc = pageEngLabels[pageEngagement] || '';
-      return `Create a Facebook Page engagement custom audience${audName ? ` called ${audName}` : ''} from page "${pageName}" (ID: ${selectedPageId})${pageEngDesc ? `, targeting people who ${pageEngDesc}` : ''}, ${retentionDays} day retention`;
+      const inclParts = pageInclusions.filter(r => r.engagement).map(r => `people who ${pageEngLabels[r.engagement] || r.engagement} (${r.retentionDays}d)`);
+      const exclParts = pageExclusions.filter(r => r.engagement).map(r => `people who ${pageEngLabels[r.engagement] || r.engagement} (${r.retentionDays}d)`);
+      let prompt = `Create a Facebook Page engagement custom audience${audName ? ` called ${audName}` : ''}${descPart} from page "${pageName}" (ID: ${selectedPageId})`;
+      if (inclParts.length) prompt += `. Include: ${inclParts.join(' OR ')}`;
+      if (exclParts.length) prompt += `. Exclude: ${exclParts.join(' OR ')}`;
+      return prompt;
     }
-    if (tab === 'lead_ad') {
-      return `Create a lead ad custom audience${audName ? ` called ${audName}` : ''} from people who opened or completed a lead form, ${retentionDays} day retention`;
-    }
-    if (tab === 'offline') {
-      return `Create an offline events custom audience${audName ? ` called ${audName}` : ''} from offline conversion data, ${retentionDays} day retention`;
-    }
-    if (tab === 'fb_event') {
-      return `Create a Facebook event custom audience${audName ? ` called ${audName}` : ''} from people who interacted with your events, ${retentionDays} day retention`;
-    }
-    if (tab === 'mobile_app') {
-      return `Create a mobile app custom audience${audName ? ` called ${audName}` : ''} from app activity, ${retentionDays} day retention`;
-    }
-    if (tab === 'shopping') {
-      return `Create a shopping custom audience${audName ? ` called ${audName}` : ''} from people who interacted with your shop, ${retentionDays} day retention`;
-    }
-    if (tab === 'catalogue') {
-      return `Create a catalogue custom audience${audName ? ` called ${audName}` : ''} from people who interacted with items in your catalogue, ${retentionDays} day retention`;
-    }
-    if (tab === 'ar') {
-      return `Create an augmented reality custom audience${audName ? ` called ${audName}` : ''} from people who interacted with your AR experience, ${retentionDays} day retention`;
-    }
+
+    if (tab === 'lead_ad') return `Create a lead ad custom audience${audName ? ` called ${audName}` : ''}${descPart} from people who opened or completed a lead form, ${retentionDays} day retention`;
+    if (tab === 'offline') return `Create an offline events custom audience${audName ? ` called ${audName}` : ''}${descPart} from offline conversion data, ${retentionDays} day retention`;
+    if (tab === 'fb_event') return `Create a Facebook event custom audience${audName ? ` called ${audName}` : ''}${descPart} from people who interacted with your events, ${retentionDays} day retention`;
+    if (tab === 'mobile_app') return `Create a mobile app custom audience${audName ? ` called ${audName}` : ''}${descPart} from app activity, ${retentionDays} day retention`;
+    if (tab === 'shopping') return `Create a shopping custom audience${audName ? ` called ${audName}` : ''}${descPart} from people who interacted with your shop, ${retentionDays} day retention`;
+    if (tab === 'catalogue') return `Create a catalogue custom audience${audName ? ` called ${audName}` : ''}${descPart} from people who interacted with items in your catalogue, ${retentionDays} day retention`;
+    if (tab === 'ar') return `Create an augmented reality custom audience${audName ? ` called ${audName}` : ''}${descPart} from people who interacted with your AR experience, ${retentionDays} day retention`;
+
     if (tab === 'lookalike') {
       const srcAud = existingAudiences.find(a => a.id === sourceAudienceId);
       const srcName = srcAud?.name || sourceAudienceId;
@@ -381,11 +534,18 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
     if (maxRet && retentionDays > maxRet) return `Retention cannot exceed ${maxRet} days for this source`;
     if (maxRet && retentionDays < 1) return 'Retention must be at least 1 day';
     if (tab === 'website' && !selectedPixelId) return 'Please select a pixel';
-    if (tab === 'video' && videoSource !== 'video_id' && selectedVideoIds.length === 0) return 'Please select at least one video';
+    if (tab === 'website' && websiteInclusions.length === 0) return 'Please add at least one inclusion rule';
+    if (tab === 'video' && videoSource === 'fb_page' && !videoSourcePage) return 'Please select a Facebook Page';
+    if (tab === 'video' && videoSource === 'ig_account' && !videoSourceIg) return 'Please select an Instagram account';
+    if (tab === 'video' && videoSource === 'campaign' && !selectedCampaignId) return 'Please select a campaign';
+    if (tab === 'video' && videoSource !== 'video_id' && videoSource !== 'campaign' && selectedVideoIds.length === 0) return 'Please select at least one video';
+    if (tab === 'video' && videoSource === 'campaign' && selectedCampaignId && selectedVideoIds.length === 0 && !videosLoading) return 'Please select at least one video';
     if (tab === 'video' && videoSource === 'video_id' && !videoIdInput.trim()) return 'Please enter at least one video ID';
     if (tab === 'video' && !engagementType) return 'Please choose an engagement type';
     if (tab === 'ig' && !selectedIgId) return 'Please select an Instagram account';
+    if (tab === 'ig' && igInclusions.every(r => !r.engagement)) return 'Please choose at least one engagement type';
     if (tab === 'fb_page' && !selectedPageId) return 'Please select a Facebook Page';
+    if (tab === 'fb_page' && pageInclusions.every(r => !r.engagement)) return 'Please choose at least one engagement type';
     if (tab === 'lookalike' && !sourceAudienceId) return 'Please select a source audience';
     return null;
   };
@@ -461,12 +621,17 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
               <label className="block text-xs font-semibold text-slate-600 mb-1">Audience Name</label>
               <input value={name} onChange={e => setName(e.target.value)} placeholder="Optional — auto-generated if empty" className={INPUT_CLS} />
             </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Description <span className="text-slate-400 font-normal">(optional)</span></label>
+              <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Describe this audience..." rows={2}
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 resize-none" />
+            </div>
 
           {/* ── Website ── */}
           {tab === 'website' && (
             <>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Pixel</label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Source</label>
                 {pixels.length === 0 ? (
                   <p className="text-xs text-slate-400 italic">Loading pixels...</p>
                 ) : (
@@ -476,29 +641,42 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
                   </select>
                 )}
               </div>
+
+              {/* Include rules */}
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Website Event</label>
-                <select value={websiteEvent} onChange={e => setWebsiteEvent(e.target.value)} className={INPUT_CLS}>
-                  <option value="all_visitors">All website visitors</option>
-                  <option value="specific_pages">People who visited specific web pages</option>
-                  <option value="time_spent">Visitors by time spent (top 25%)</option>
-                  <option value="purchase">People who completed a purchase</option>
-                  <option value="add_to_cart">People who added to cart</option>
-                  <option value="lead">People who completed a lead form</option>
-                  <option value="view_content">People who viewed content</option>
-                </select>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Include people who meet</label>
+                <div className="space-y-2">
+                  {websiteInclusions.map((rule, i) => (
+                    <WebsiteRuleCard key={`inc-${i}`} rule={rule} type="include"
+                      isOnly={websiteInclusions.length === 1 && websiteExclusions.length === 0}
+                      onChange={updated => setWebsiteInclusions(prev => prev.map((r, j) => j === i ? updated : r))}
+                      onRemove={() => setWebsiteInclusions(prev => prev.filter((_, j) => j !== i))} />
+                  ))}
+                </div>
+                <button onClick={() => setWebsiteInclusions(prev => [...prev, { event: 'all_visitors', urlCondition: 'contains', urlFilter: '', retentionDays: 30 }])}
+                  className="mt-2 flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-700">
+                  <Plus size={12} /> Include More People
+                </button>
               </div>
-              {websiteEvent === 'specific_pages' && (
+
+              {/* Exclude rules */}
+              {websiteExclusions.length > 0 && (
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">URL Contains</label>
-                  <input value={urlFilter} onChange={e => setUrlFilter(e.target.value)} placeholder="e.g., /products or /checkout" className={INPUT_CLS} />
-                  <p className="text-[10px] text-slate-400 mt-1">Only include visitors to URLs containing this text</p>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">Exclude people who meet</label>
+                  <div className="space-y-2">
+                    {websiteExclusions.map((rule, i) => (
+                      <WebsiteRuleCard key={`exc-${i}`} rule={rule} type="exclude"
+                        isOnly={false}
+                        onChange={updated => setWebsiteExclusions(prev => prev.map((r, j) => j === i ? updated : r))}
+                        onRemove={() => setWebsiteExclusions(prev => prev.filter((_, j) => j !== i))} />
+                    ))}
+                  </div>
                 </div>
               )}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Retention (days)</label>
-                <input type="number" value={retentionDays} onChange={e => setRetentionDays(Number(e.target.value))} min={1} max={180} className={INPUT_CLS} />
-              </div>
+              <button onClick={() => setWebsiteExclusions(prev => [...prev, { event: 'all_visitors', urlCondition: 'contains', urlFilter: '', retentionDays: 30 }])}
+                className="flex items-center gap-1 text-[11px] font-semibold text-red-500 hover:text-red-600">
+                <Plus size={12} /> Exclude People
+              </button>
             </>
           )}
 
@@ -523,7 +701,7 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
                       <p className="text-xs text-slate-400 italic py-2">Loading...</p>
                     ) : (
                       <select value={videoSourcePage} onChange={e => setVideoSourcePage(e.target.value)} className={INPUT_CLS}>
-                        <option value="">All pages</option>
+                        <option value="">Select a page</option>
                         {pages.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                       </select>
                     )}
@@ -542,7 +720,39 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
                     )}
                   </div>
                 )}
+                {videoSource === 'campaign' && (
+                  <div className="flex-1">
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">Campaign</label>
+                    {campaignsLoading ? (
+                      <p className="text-xs text-slate-400 italic py-2">Loading...</p>
+                    ) : (
+                      <>
+                        <input value={campaignSearch} onChange={e => setCampaignSearch(e.target.value)} placeholder="Search campaigns..." className={INPUT_CLS} />
+                        <div className="max-h-[120px] overflow-y-auto mt-1 border border-slate-200 rounded-lg">
+                          {campaigns.filter(c => !campaignSearch || c.name?.toLowerCase().includes(campaignSearch.toLowerCase())).map(c => (
+                            <button key={c.id} onClick={() => setSelectedCampaignId(c.id)}
+                              className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${selectedCampaignId === c.id ? 'bg-blue-50 text-blue-700 font-medium' : 'hover:bg-slate-50 text-slate-600'}`}>
+                              {c.name}
+                            </button>
+                          ))}
+                          {campaigns.length === 0 && <p className="text-xs text-slate-400 italic py-3 text-center">No campaigns found</p>}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
+
+              {/* Empty state prompts */}
+              {videoSource === 'fb_page' && !videoSourcePage && (
+                <p className="text-xs text-slate-400 italic text-center py-4">Select a Facebook Page to see its videos</p>
+              )}
+              {videoSource === 'ig_account' && !videoSourceIg && (
+                <p className="text-xs text-slate-400 italic text-center py-4">Select an Instagram account to see its videos</p>
+              )}
+              {videoSource === 'campaign' && !selectedCampaignId && (
+                <p className="text-xs text-slate-400 italic text-center py-4">Select a campaign to see its video ads</p>
+              )}
 
               {/* Video ID manual input */}
               {videoSource === 'video_id' ? (
@@ -551,7 +761,7 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
                   <input value={videoIdInput} onChange={e => setVideoIdInput(e.target.value)} placeholder="Paste video IDs, comma separated" className={INPUT_CLS} />
                   <p className="text-[10px] text-slate-400 mt-1">Enter one or more video IDs separated by commas</p>
                 </div>
-              ) : (
+              ) : (videoSource === 'fb_page' && !videoSourcePage) || (videoSource === 'ig_account' && !videoSourceIg) || (videoSource === 'campaign' && !selectedCampaignId) ? null : (
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1.5">
                     Select Videos <span className="text-slate-400 font-normal">({selectedVideoIds.length} selected)</span>
@@ -712,21 +922,56 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
                   </div>
                 )}
               </div>
+
+              {/* Include rules */}
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Engagement Type</label>
-                <select value={igEngagement} onChange={e => setIgEngagement(e.target.value)} className={INPUT_CLS}>
-                  <option value="">Choose an engagement type</option>
-                  <option value="ig_profile_visit">People who visited your profile</option>
-                  <option value="ig_profile_engaged">People who engaged with your profile</option>
-                  <option value="ig_ad_interact">People who engaged with any post or ad</option>
-                  <option value="ig_message_sent">People who sent a message to your account</option>
-                  <option value="ig_post_saved">People who saved any post or ad</option>
-                </select>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Include people who</label>
+                <div className="space-y-2">
+                  {igInclusions.map((rule, i) => (
+                    <EngagementRuleCard key={`ig-inc-${i}`} rule={rule} type="include"
+                      isOnly={igInclusions.length === 1 && igExclusions.length === 0}
+                      engagementOptions={[
+                        { value: 'ig_profile_visit', label: 'Visited your profile' },
+                        { value: 'ig_profile_engaged', label: 'Engaged with your profile' },
+                        { value: 'ig_ad_interact', label: 'Engaged with any post or ad' },
+                        { value: 'ig_message_sent', label: 'Sent a message to your account' },
+                        { value: 'ig_post_saved', label: 'Saved any post or ad' },
+                      ]}
+                      onChange={updated => setIgInclusions(prev => prev.map((r, j) => j === i ? updated : r))}
+                      onRemove={() => setIgInclusions(prev => prev.filter((_, j) => j !== i))} />
+                  ))}
+                </div>
+                <button onClick={() => setIgInclusions(prev => [...prev, { engagement: '', retentionDays: 365 }])}
+                  className="mt-2 flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-700">
+                  <Plus size={12} /> Include More People
+                </button>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Retention (days)</label>
-                <input type="number" value={retentionDays} onChange={e => setRetentionDays(Number(e.target.value))} min={1} max={365} className={INPUT_CLS} />
-              </div>
+
+              {/* Exclude rules */}
+              {igExclusions.length > 0 && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">Exclude people who</label>
+                  <div className="space-y-2">
+                    {igExclusions.map((rule, i) => (
+                      <EngagementRuleCard key={`ig-exc-${i}`} rule={rule} type="exclude"
+                        isOnly={false}
+                        engagementOptions={[
+                          { value: 'ig_profile_visit', label: 'Visited your profile' },
+                          { value: 'ig_profile_engaged', label: 'Engaged with your profile' },
+                          { value: 'ig_ad_interact', label: 'Engaged with any post or ad' },
+                          { value: 'ig_message_sent', label: 'Sent a message to your account' },
+                          { value: 'ig_post_saved', label: 'Saved any post or ad' },
+                        ]}
+                        onChange={updated => setIgExclusions(prev => prev.map((r, j) => j === i ? updated : r))}
+                        onRemove={() => setIgExclusions(prev => prev.filter((_, j) => j !== i))} />
+                    ))}
+                  </div>
+                </div>
+              )}
+              <button onClick={() => setIgExclusions(prev => [...prev, { engagement: '', retentionDays: 365 }])}
+                className="flex items-center gap-1 text-[11px] font-semibold text-red-500 hover:text-red-600">
+                <Plus size={12} /> Exclude People
+              </button>
             </>
           )}
 
@@ -756,21 +1001,55 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
                   </div>
                 )}
               </div>
+              {/* Include rules */}
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Engagement Type</label>
-                <select value={pageEngagement} onChange={e => setPageEngagement(e.target.value)} className={INPUT_CLS}>
-                  <option value="">Choose an engagement type</option>
-                  <option value="page_liked">People who currently like or follow your Page</option>
-                  <option value="page_engaged">People who engaged with any post or ad</option>
-                  <option value="page_cta_clicked">People who clicked any call-to-action button</option>
-                  <option value="page_message_sent">People who sent a message to your Page</option>
-                  <option value="page_visited">People who visited your Page</option>
-                </select>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Include people who</label>
+                <div className="space-y-2">
+                  {pageInclusions.map((rule, i) => (
+                    <EngagementRuleCard key={`pg-inc-${i}`} rule={rule} type="include"
+                      isOnly={pageInclusions.length === 1 && pageExclusions.length === 0}
+                      engagementOptions={[
+                        { value: 'page_liked', label: 'Currently like or follow your Page' },
+                        { value: 'page_engaged', label: 'Engaged with any post or ad' },
+                        { value: 'page_cta_clicked', label: 'Clicked any call-to-action button' },
+                        { value: 'page_message_sent', label: 'Sent a message to your Page' },
+                        { value: 'page_visited', label: 'Visited your Page' },
+                      ]}
+                      onChange={updated => setPageInclusions(prev => prev.map((r, j) => j === i ? updated : r))}
+                      onRemove={() => setPageInclusions(prev => prev.filter((_, j) => j !== i))} />
+                  ))}
+                </div>
+                <button onClick={() => setPageInclusions(prev => [...prev, { engagement: '', retentionDays: 365 }])}
+                  className="mt-2 flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-700">
+                  <Plus size={12} /> Include More People
+                </button>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Retention (days)</label>
-                <input type="number" value={retentionDays} onChange={e => setRetentionDays(Number(e.target.value))} min={1} max={365} className={INPUT_CLS} />
-              </div>
+
+              {/* Exclude rules */}
+              {pageExclusions.length > 0 && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">Exclude people who</label>
+                  <div className="space-y-2">
+                    {pageExclusions.map((rule, i) => (
+                      <EngagementRuleCard key={`pg-exc-${i}`} rule={rule} type="exclude"
+                        isOnly={false}
+                        engagementOptions={[
+                          { value: 'page_liked', label: 'Currently like or follow your Page' },
+                          { value: 'page_engaged', label: 'Engaged with any post or ad' },
+                          { value: 'page_cta_clicked', label: 'Clicked any call-to-action button' },
+                          { value: 'page_message_sent', label: 'Sent a message to your Page' },
+                          { value: 'page_visited', label: 'Visited your Page' },
+                        ]}
+                        onChange={updated => setPageExclusions(prev => prev.map((r, j) => j === i ? updated : r))}
+                        onRemove={() => setPageExclusions(prev => prev.filter((_, j) => j !== i))} />
+                    ))}
+                  </div>
+                </div>
+              )}
+              <button onClick={() => setPageExclusions(prev => [...prev, { engagement: '', retentionDays: 365 }])}
+                className="flex items-center gap-1 text-[11px] font-semibold text-red-500 hover:text-red-600">
+                <Plus size={12} /> Exclude People
+              </button>
             </>
           )}
 

@@ -1181,6 +1181,29 @@ export const getPages = async (token) => {
   return data.data;
 };
 
+export const getPageVideos = async (token, pageId) => {
+  const { data } = await metaApi.get(`/${pageId}/videos`, {
+    params: {
+      access_token: token,
+      fields: 'id,title,description,source,picture,length,created_time',
+      limit: 100
+    }
+  });
+  return data.data;
+};
+
+export const getIgMedia = async (token, igAccountId) => {
+  const { data } = await metaApi.get(`/${igAccountId}/media`, {
+    params: {
+      access_token: token,
+      fields: 'id,media_type,media_url,thumbnail_url,caption,timestamp',
+      limit: 100
+    }
+  });
+  // Filter to only VIDEO types
+  return (data.data || []).filter(m => m.media_type === 'VIDEO');
+};
+
 export const getPageAds = async (token, pageId) => {
   const { data } = await metaApi.get(`/${pageId}/ads`, {
     params: { access_token: token, fields: 'id,name,status,effective_status', limit: 25 }

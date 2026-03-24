@@ -121,6 +121,28 @@ router.get('/pages/:id/ads', async (req, res, next) => {
   }
 });
 
+// Page videos — videos uploaded to a specific Facebook Page
+router.get('/pages/:id/videos', async (req, res, next) => {
+  try {
+    const data = await metaClient.getPageVideos(req.token, req.params.id);
+    res.json(data);
+  } catch (err) {
+    const metaErr = err.response?.data?.error;
+    res.status(err.response?.status || 500).json({ error: metaErr?.message || err.message, code: metaErr?.code });
+  }
+});
+
+// Instagram media (videos) for a connected IG account
+router.get('/instagram/:id/media', async (req, res, next) => {
+  try {
+    const data = await metaClient.getIgMedia(req.token, req.params.id);
+    res.json(data);
+  } catch (err) {
+    const metaErr = err.response?.data?.error;
+    res.status(err.response?.status || 500).json({ error: metaErr?.message || err.message, code: metaErr?.code });
+  }
+});
+
 // --- Ad Account Details ---
 router.get('/adaccounts/:id/details', async (req, res, next) => {
   try {
