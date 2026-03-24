@@ -140,10 +140,14 @@ const getAvailability = (aud) => {
     return { label: 'Expired', color: 'text-slate-400', dot: 'bg-slate-400', sub: null, tooltip: op?.description || null };
   }
   if (opCode >= 400) {
-    // Check if description suggests populating rather than actual error
+    // Check if this is actually still populating rather than a real error
     const desc = (op?.description || '').toLowerCase();
-    if (desc.includes('populating') || desc.includes('not yet ready') || desc.includes('being built')) {
-      return { label: 'Populating', color: 'text-amber-600', dot: 'bg-amber-400', sub: 'Audience is being built', tooltip: op?.description };
+    const isPopulating = desc.includes('populating') || desc.includes('not yet ready') || desc.includes('being built')
+      || desc.includes('too few') || desc.includes('too small');
+    // Also treat very recently created audiences (< 24h) as populating, not error
+    const ageHours = aud.time_created ? (Date.now() / 1000 - aud.time_created) / 3600 : Infinity;
+    if (isPopulating || ageHours < 24) {
+      return { label: 'Populating', color: 'text-amber-600', dot: 'bg-amber-400', sub: 'Audience is being built', tooltip: op?.description || 'This audience is still being populated. It may take up to 24 hours.' };
     }
     return { label: 'Error', color: 'text-red-500', dot: 'bg-red-500', sub: null, tooltip: op?.description || 'Something went wrong with this audience' };
   }
