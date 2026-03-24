@@ -86,6 +86,40 @@ const getTypeDisplay = (aud) => {
   return { main: 'Custom Audience', detail: detailMap[sub] || null };
 };
 
+// Extract retention days and engagement type from audience rule
+const getAudienceRule = (aud) => {
+  let retention = aud.retention_days || null;
+  let engagement = null;
+  try {
+    const rule = typeof aud.rule === 'string' ? JSON.parse(aud.rule) : aud.rule;
+    if (!rule) return { retention, engagement };
+    // Rule can have inclusions array or be a flat object
+    const inclusions = rule.inclusions || (rule.event_sources ? [rule] : []);
+    for (const inc of inclusions) {
+      if (inc.retention_seconds && !retention) {
+        retention = Math.round(inc.retention_seconds / 86400);
+      }
+      // Extract event type for engagement audiences
+      const filters = inc.filters || inc.rules || [];
+      for (const f of (Array.isArray(filters) ? filters : [filters])) {
+        if (f.field === 'event' && f.value) engagement = engagement || f.value;
+      }
+    }
+  } catch { /* rule parsing failed */ }
+  return { retention, engagement };
+};
+
+const ENGAGEMENT_LABELS = {
+  video_watched: '3s views', video_watched_3s: '3s views', 'video_view': '3s views',
+  video_watched_10s: '10s views', video_watched_15s: 'ThruPlay',
+  video_watched_25pct: '25% viewed', video_watched_50pct: '50% viewed',
+  video_watched_75pct: '75% viewed', video_watched_95pct: '95% viewed',
+  page_liked: 'Page like/follow', page_engaged: 'Page engaged', page_visited: 'Page visit',
+  page_cta_clicked: 'CTA clicked', page_message_sent: 'Message sent',
+  ig_profile_visit: 'Profile visit', ig_profile_engaged: 'Profile engaged',
+  ig_ad_interact: 'Ad interaction', ig_message_sent: 'Message sent', ig_post_saved: 'Post saved',
+};
+
 // Get availability display matching Meta's real UI
 const getAvailability = (aud) => {
   const op = aud.operation_status;
@@ -100,12 +134,17 @@ const getAvailability = (aud) => {
     return { label: 'Ready', color: 'text-emerald-600', dot: 'bg-emerald-500', sub: fmtEdited(aud.time_updated), tooltip: null };
   }
   if (opCode === 411 || opCode === 412 || opCode === 415) {
-    return { label: 'Ready', color: 'text-emerald-600', dot: 'bg-emerald-500', sub: fmtEdited(aud.time_updated), tooltip: null };
+    return { label: 'Populating', color: 'text-amber-600', dot: 'bg-amber-400', sub: 'Audience is being built', tooltip: op?.description || 'This audience is still being populated. It may take up to 24 hours.' };
   }
   if (opCode === 300) {
     return { label: 'Expired', color: 'text-slate-400', dot: 'bg-slate-400', sub: null, tooltip: op?.description || null };
   }
   if (opCode >= 400) {
+    // Check if description suggests populating rather than actual error
+    const desc = (op?.description || '').toLowerCase();
+    if (desc.includes('populating') || desc.includes('not yet ready') || desc.includes('being built')) {
+      return { label: 'Populating', color: 'text-amber-600', dot: 'bg-amber-400', sub: 'Audience is being built', tooltip: op?.description };
+    }
     return { label: 'Error', color: 'text-red-500', dot: 'bg-red-500', sub: null, tooltip: op?.description || 'Something went wrong with this audience' };
   }
   // Fallback — treat as Ready (saved audiences, unknown states, etc.)
@@ -1811,6 +1850,8 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack }) => {
                   <span className="inline-flex items-center gap-1 justify-end">Est. audience size <SortIcon col="size" /></span>
                 </th>
                 <th className="text-left py-1.5 px-2 font-semibold w-[130px]">Availability</th>
+                <th className="text-center py-1.5 px-2 font-semibold w-[70px]">Retention</th>
+                <th className="text-left py-1.5 px-2 font-semibold w-[110px]">Engagement</th>
                 <th className="text-left py-1.5 px-2 font-semibold w-[110px]">Audience ID</th>
                 <th className="text-right py-1.5 px-2 font-semibold w-[90px] cursor-pointer hover:text-slate-600 select-none" onClick={() => toggleSort('time_created')}>
                   <span className="inline-flex items-center gap-1 justify-end">Created <SortIcon col="time_created" /></span>
@@ -1865,6 +1906,25 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack }) => {
                         )}
                       </div>
                     </td>
+                    {/* Retention Days */}
+                    <td className="py-2 px-2 text-center">
+                      {(() => {
+                        const { retention } = getAudienceRule(aud);
+                        return retention ? (
+                          <span className="text-[11px] text-slate-600 font-medium">{retention}d</span>
+                        ) : <span className="text-[11px] text-slate-300">—</span>;
+                      })()}
+                    </td>
+                    {/* Engagement */}
+                    <td className="py-2 px-2">
+                      {(() => {
+                        const { engagement } = getAudienceRule(aud);
+                        const label = engagement ? (ENGAGEMENT_LABELS[engagement] || engagement.replace(/_/g, ' ')) : null;
+                        return label ? (
+                          <span className="text-[10px] text-slate-500 capitalize">{label}</span>
+                        ) : <span className="text-[11px] text-slate-300">—</span>;
+                      })()}
+                    </td>
                     {/* Audience ID */}
                     <td className="py-2 px-2">
                       <CopyableId id={aud.id} />
@@ -1895,7 +1955,7 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack }) => {
                   </tr>
                   {isExpanded && (
                     <tr className="bg-slate-50/80 border-t border-slate-100">
-                      <td colSpan={7} className="px-6 py-3">
+                      <td colSpan={9} className="px-6 py-3">
                         {bullets && bullets.length > 0 ? (
                           <div className="space-y-1">
                             <p className="text-[11px] font-semibold text-slate-600 mb-1.5">Audience Configuration</p>

@@ -496,7 +496,7 @@ export const getCustomAudiences = async (token, adAccountId) => {
   const { data } = await metaApi.get(`/${adAccountId}/customaudiences`, {
     params: {
       access_token: token,
-      fields: 'id,name,subtype,description,delivery_status,operation_status,approximate_count_lower_bound,approximate_count_upper_bound,time_created,time_updated,is_value_based',
+      fields: 'id,name,subtype,description,delivery_status,operation_status,approximate_count_lower_bound,approximate_count_upper_bound,time_created,time_updated,is_value_based,rule,retention_days',
       limit: 50
     }
   });
