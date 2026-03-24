@@ -534,6 +534,115 @@ async function applyTemplate({ template_id, campaign_name, daily_budget }, c) {
   };
 }
 
+// ─── Pre-Flight Checklist ───────────────────────────────────────────────────
+async function preflightCheck({ campaign_id }, c) {
+  const { token, adAccountId } = ctx(c);
+  if (!adAccountId) return { error: 'No ad account selected.' };
+  if (!campaign_id) return { error: 'campaign_id is required.' };
+
+  const checks = [];
+  const pass = (name, detail) => checks.push({ name, status: 'pass', detail });
+  const fail = (name, detail, fix) => checks.push({ name, status: 'fail', detail, fix });
+  const warn = (name, detail, fix) => checks.push({ name, status: 'warn', detail, fix });
+
+  try {
+    // 1. Get campaign
+    const campaign = await meta.getCampaign(token, campaign_id);
+    pass('Campaign exists', `"${campaign.name}" — objective: ${campaign.objective}`);
+
+    // 2. Check special_ad_categories
+    const cats = campaign.special_ad_categories || [];
+    if (cats.length && !cats.includes('NONE')) {
+      pass('Special Ad Categories', cats.join(', '));
+    } else {
+      pass('Special Ad Categories', 'None declared');
+    }
+
+    // 3. Get ad sets
+    const adSets = await meta.getAdSets(token, adAccountId, campaign_id);
+    const adSetList = adSets?.data || adSets || [];
+    if (!adSetList.length) {
+      fail('Ad Sets', 'No ad sets found in this campaign', 'Create at least one ad set with targeting and budget');
+    } else {
+      pass('Ad Sets', `${adSetList.length} ad set(s) found`);
+
+      // Check each ad set
+      for (const adSet of adSetList) {
+        const targeting = typeof adSet.targeting === 'string' ? JSON.parse(adSet.targeting) : adSet.targeting;
+        // Location check
+        if (targeting?.geo_locations?.countries?.length || targeting?.geo_locations?.cities?.length || targeting?.geo_locations?.regions?.length) {
+          pass(`Ad Set "${adSet.name}" — Location`, 'Targeting location set');
+        } else {
+          fail(`Ad Set "${adSet.name}" — Location`, 'No location targeting set', 'Add at least one country, city, or region');
+        }
+        // Budget check
+        const budget = adSet.daily_budget || adSet.lifetime_budget;
+        if (budget && Number(budget) >= 100) { // 100 cents = $1
+          pass(`Ad Set "${adSet.name}" — Budget`, `$${(Number(budget) / 100).toFixed(2)}/day`);
+        } else if (budget) {
+          warn(`Ad Set "${adSet.name}" — Budget`, `$${(Number(budget) / 100).toFixed(2)}/day — below Meta's recommended minimum`, 'Consider increasing budget to at least $1/day');
+        } else {
+          fail(`Ad Set "${adSet.name}" — Budget`, 'No budget set', 'Set a daily or lifetime budget');
+        }
+      }
+    }
+
+    // 4. Get ads
+    const ads = await meta.getAds(token, adAccountId, campaign_id);
+    const adList = ads?.data || ads || [];
+    if (!adList.length) {
+      fail('Ads', 'No ads found in this campaign', 'Create at least one ad with a creative');
+    } else {
+      pass('Ads', `${adList.length} ad(s) found`);
+    }
+
+    // 5. Pixel check for conversion objectives
+    const convObjectives = ['OUTCOME_SALES', 'OUTCOME_LEADS'];
+    if (convObjectives.includes(campaign.objective)) {
+      try {
+        const pixels = await meta.getPixels(token, adAccountId);
+        const pixelList = pixels?.data || pixels || [];
+        if (pixelList.length) {
+          pass('Pixel (required for conversions)', `${pixelList.length} pixel(s) available`);
+        } else {
+          fail('Pixel (required for conversions)', 'No pixel found for this conversion-based campaign', 'Create a Meta Pixel and install it on your website');
+        }
+      } catch {
+        warn('Pixel check', 'Could not verify pixel status', 'Manually verify your pixel is installed and firing');
+      }
+    }
+
+    // 6. TOS check
+    try {
+      const tos = await meta.checkCustomAudienceTos(token, adAccountId);
+      if (tos.accepted) {
+        pass('Custom Audience TOS', 'Accepted');
+      } else {
+        warn('Custom Audience TOS', 'Not yet accepted — required if using customer list targeting', 'Accept Custom Audience Terms in your Audience Manager');
+      }
+    } catch {
+      // Non-critical — skip
+    }
+
+    const totalFails = checks.filter(c => c.status === 'fail').length;
+    const totalWarns = checks.filter(c => c.status === 'warn').length;
+    const totalPassed = checks.filter(c => c.status === 'pass').length;
+
+    return {
+      campaign_id,
+      campaign_name: campaign.name,
+      summary: totalFails === 0
+        ? (totalWarns === 0 ? 'All checks passed — ready to launch!' : `${totalWarns} warning(s) — review before launching`)
+        : `${totalFails} issue(s) must be fixed before launching`,
+      ready_to_launch: totalFails === 0,
+      checks,
+      totals: { pass: totalPassed, fail: totalFails, warn: totalWarns },
+    };
+  } catch (err) {
+    return { error: `Pre-flight check failed: ${err.message}` };
+  }
+}
+
 // ─── Build FunctionTool instances ───────────────────────────────────────────
 const T = (name, description, execute, parameters) => {
   const opts = { name, description, execute: safe(execute) };
@@ -771,6 +880,10 @@ const adTools = [
     obj({ template_id: str('Template ID') }, ['template_id'])),
   T('apply_campaign_template', 'Create a new campaign from a saved template. CONFIRM with user first.', applyTemplate,
     obj({ template_id: str('Template ID to use'), campaign_name: str('Name for the new campaign (optional)'), daily_budget: num('Daily budget in dollars (optional, overrides template)') }, ['template_id'])),
+
+  // ── Pre-Flight Checklist ──────────────────────────────────────────────
+  T('preflight_check', 'Run a pre-launch checklist on a campaign to validate it is ready to go live. Checks: campaign objective, ad sets with targeting & budget, ads with creatives, pixel (for conversion campaigns), and TOS acceptance. Call this BEFORE activating any campaign. Present results as a checklist with pass/fail/warn status.', preflightCheck,
+    obj({ campaign_id: str('Campaign ID to validate') }, ['campaign_id'])),
 ];
 
 // ── System instruction ──────────────────────────────────────────────────────
@@ -1184,6 +1297,16 @@ Then ask: **"Should I proceed?"**
 - create_ad_set: targeting must include targeting_optimization field (set to "none" to disable Advantage Audience)
 - create_ad_set: daily_budget is in CENTS (multiply dollars by 100)
 - create_ad_creative: object_story_spec must include page_id
+
+### Step 5: Pre-Flight Check before activation
+Before activating ANY campaign, ALWAYS run \`preflight_check\` with the campaign_id.
+Present results as a checklist to the user. Format each check as:
+- Pass: "Campaign objective set"
+- Fail: "No ads found" — Fix: Create at least one ad with a creative
+- Warn: "Budget below recommended minimum"
+
+If there are any FAIL items, do NOT activate — help the user fix them first.
+If all pass (with possible warnings), ask the user: **"Pre-flight check passed. Ready to go live?"**
 
 ## Asset Upload
 - Images: user provides base64 data via \`upload_ad_image\`

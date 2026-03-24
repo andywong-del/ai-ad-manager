@@ -121,22 +121,27 @@ router.post('/', async (req, res) => {
   }
 });
 
-// PUT /api/skills/:id — update a custom skill
+// PUT /api/skills/:id — update a skill (default or custom)
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { name, description, content, icon } = req.body;
-    const filepath = path.join(CUSTOM_DIR, `${id}.md`);
 
-    // Only allow editing custom skills
+    // Check if it's a default or custom skill
+    let filepath = path.join(CUSTOM_DIR, `${id}.md`);
+    let isDefault = false;
     try { await fs.access(filepath); } catch {
-      return res.status(403).json({ error: 'Cannot edit default skills' });
+      // Not in custom — check default
+      filepath = path.join(DEFAULT_DIR, `${id}.md`);
+      try { await fs.access(filepath); isDefault = true; } catch {
+        return res.status(404).json({ error: 'Skill not found' });
+      }
     }
 
     const md = buildMd({ name: name || id, description: description || '', content: content || '', icon: icon || 'sparkles' });
     await fs.writeFile(filepath, md, 'utf-8');
 
-    res.json({ id, name: name || id, description: description || '', content: content || '', icon: icon || 'sparkles', isDefault: false });
+    res.json({ id, name: name || id, description: description || '', content: content || '', icon: icon || 'sparkles', isDefault });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -370,7 +370,9 @@ router.delete('/customaudiences/:id', async (req, res, next) => {
 
 router.post('/customaudiences/:id/users', async (req, res, next) => {
   try {
-    const data = await metaClient.addUsersToAudience(req.token, req.params.id, req.body);
+    // If raw: true, server will normalize + SHA256 hash the data before sending to Meta
+    const { raw, ...payload } = req.body;
+    const data = await metaClient.addUsersToAudience(req.token, req.params.id, payload, { raw: !!raw });
     res.json(data);
   } catch (err) {
     const metaErr = err.response?.data?.error;
@@ -467,6 +469,31 @@ router.post('/block-lists', async (req, res, next) => {
 router.delete('/block-lists/:id', async (req, res, next) => {
   try {
     const data = await metaClient.deletePublisherBlockList(req.token, req.params.id);
+    res.json(data);
+  } catch (err) {
+    const metaErr = err.response?.data?.error;
+    res.status(err.response?.status || 500).json({ error: metaErr?.message || err.message, code: metaErr?.code });
+  }
+});
+
+// --- Custom Audience TOS ---
+router.get('/tos/custom-audience', async (req, res, next) => {
+  try {
+    const adAccountId = req.query.adAccountId;
+    if (!adAccountId) return res.status(400).json({ error: 'adAccountId required' });
+    const data = await metaClient.checkCustomAudienceTos(req.token, adAccountId);
+    res.json(data);
+  } catch (err) {
+    const metaErr = err.response?.data?.error;
+    res.status(err.response?.status || 500).json({ error: metaErr?.message || err.message, code: metaErr?.code });
+  }
+});
+
+router.post('/tos/custom-audience', async (req, res, next) => {
+  try {
+    const { adAccountId } = req.body;
+    if (!adAccountId) return res.status(400).json({ error: 'adAccountId required' });
+    const data = await metaClient.acceptCustomAudienceTos(req.token, adAccountId);
     res.json(data);
   } catch (err) {
     const metaErr = err.response?.data?.error;

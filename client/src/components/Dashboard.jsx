@@ -8,6 +8,7 @@ import { SavedItemView } from './SavedItemView.jsx';
 import { DashboardPage } from './DashboardPage.jsx';
 import { ReportPanel } from './ReportPanel.jsx';
 import { SkillsLibrary } from './SkillsLibrary.jsx';
+import { StrategistConfig } from './StrategistConfig.jsx';
 import { AudienceManager } from './AudienceManager.jsx';
 
 const SUGGESTED_ACTIONS = [
@@ -183,15 +184,24 @@ export const Dashboard = ({
             </button>
           )}
 
-          {activeView.type === 'skills' ? (
+          {activeView.type === 'skillConfig' && activeView.skill ? (
+            <StrategistConfig
+              strategist={activeView.skill}
+              onUpdate={async (id, updates) => {
+                await updateSkill(id, updates);
+              }}
+              onAddDoc={() => {}}
+              onRemoveDoc={() => {}}
+              onBack={() => setActiveView({ type: 'skills' })}
+            />
+          ) : activeView.type === 'skills' ? (
             <SkillsLibrary
               skills={skills}
-              activeSkillId={activeSkillId}
-              onToggle={toggleSkill}
               onCreate={createSkill}
               onUpdate={updateSkill}
               onDelete={deleteSkill}
               onBack={() => setActiveView({ type: 'chat' })}
+              onConfigure={(skill) => setActiveView({ type: 'skillConfig', skill })}
             />
           ) : activeView.type === 'funnel' ? (
             <DashboardPage

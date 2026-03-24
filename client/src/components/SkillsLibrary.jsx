@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, Plus, Sparkles, BarChart3, Palette, DollarSign, Users, Zap, Trash2, Edit3, Save, X, ChevronRight, Check } from 'lucide-react';
+import { ArrowLeft, Plus, Sparkles, BarChart3, Palette, DollarSign, Users, Zap, Trash2, Edit3, Save, X } from 'lucide-react';
 
 const ICON_MAP = {
   funnel: BarChart3,
@@ -11,39 +11,32 @@ const ICON_MAP = {
   zap: Zap,
 };
 
-const SkillCard = ({ skill, isActive, onToggle, onEdit, onDelete }) => {
+const SkillCard = ({ skill, onEdit, onDelete }) => {
   const Icon = ICON_MAP[skill.icon] || Sparkles;
   return (
-    <div className={`group relative rounded-xl border transition-all ${isActive ? 'border-indigo-300 bg-indigo-50/50 shadow-sm' : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'}`}>
+    <div onClick={() => onEdit(skill)}
+      className="group relative rounded-xl border border-slate-200 bg-white hover:border-indigo-300 hover:shadow-sm transition-all cursor-pointer">
       <div className="px-4 py-4">
         <div className="flex items-start gap-3">
-          <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${isActive ? 'bg-indigo-100' : 'bg-slate-100'}`}>
-            <Icon size={18} className={isActive ? 'text-indigo-600' : 'text-slate-500'} />
+          <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-slate-100 group-hover:bg-indigo-100 transition-colors">
+            <Icon size={18} className="text-slate-500 group-hover:text-indigo-600 transition-colors" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <h3 className={`text-sm font-semibold truncate ${isActive ? 'text-indigo-800' : 'text-slate-800'}`}>{skill.name}</h3>
+              <h3 className="text-sm font-semibold truncate text-slate-800">{skill.name}</h3>
               {skill.isDefault && <span className="text-[9px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full font-semibold shrink-0">Default</span>}
-              {isActive && <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" />}
             </div>
             <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2">{skill.description}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 mt-3">
-          <button onClick={() => onToggle(skill.id)}
-            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-colors
-              ${isActive ? 'bg-indigo-600 text-white hover:bg-indigo-500' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
-            {isActive ? <><Check size={12} /> Active</> : <><Zap size={12} /> Activate</>}
-          </button>
+        <div className="flex items-center justify-between mt-3">
+          <span className="text-[10px] text-slate-400 group-hover:text-indigo-500 transition-colors flex items-center gap-1">
+            <Edit3 size={10} /> Click to configure
+          </span>
           {!skill.isDefault && (
-            <>
-              <button onClick={() => onEdit(skill)} className="p-1.5 rounded-lg text-slate-300 hover:text-blue-500 hover:bg-blue-50 transition-colors" title="Edit">
-                <Edit3 size={13} />
-              </button>
-              <button onClick={() => onDelete(skill)} className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors" title="Delete">
-                <Trash2 size={13} />
-              </button>
-            </>
+            <button onClick={(e) => { e.stopPropagation(); onDelete(skill); }} className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100" title="Delete">
+              <Trash2 size={13} />
+            </button>
           )}
         </div>
       </div>
@@ -131,7 +124,7 @@ const DeleteConfirm = ({ skill, onConfirm, onCancel }) => (
 );
 
 // ── Main Skills Library ──────────────────────────────────────────────────────
-export const SkillsLibrary = ({ skills, activeSkillId, onToggle, onCreate, onUpdate, onDelete, onBack }) => {
+export const SkillsLibrary = ({ skills, onCreate, onUpdate, onDelete, onBack, onConfigure }) => {
   const [showEditor, setShowEditor] = useState(false);
   const [editingSkill, setEditingSkill] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -158,8 +151,13 @@ export const SkillsLibrary = ({ skills, activeSkillId, onToggle, onCreate, onUpd
   };
 
   const handleEdit = (skill) => {
-    setEditingSkill(skill);
-    setShowEditor(true);
+    // Navigate to StrategistConfig for this skill
+    if (onConfigure) {
+      onConfigure(skill);
+    } else {
+      setEditingSkill(skill);
+      setShowEditor(true);
+    }
   };
 
   const handleDelete = async () => {
@@ -194,11 +192,11 @@ export const SkillsLibrary = ({ skills, activeSkillId, onToggle, onCreate, onUpd
         <div className="max-w-3xl mx-auto">
           {/* How to use */}
           <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3 mb-6">
-            <p className="text-[12px] font-semibold text-indigo-700 mb-1">How to use skills</p>
+            <p className="text-[12px] font-semibold text-indigo-700 mb-1">How skills work</p>
             <ul className="text-[11px] text-indigo-600 space-y-0.5">
-              <li><strong>Activate</strong> a skill here — it stays on for all messages until you deactivate it</li>
-              <li><strong>Type /</strong> in the chat to invoke any skill for a single message</li>
-              <li>The AI agent will follow the skill's instructions when responding</li>
+              <li><strong>Click a skill</strong> to configure its instructions and knowledge base</li>
+              <li>Skills are saved as MD files — the AI agent references them automatically</li>
+              <li>Upload PDFs or documents to build domain expertise</li>
             </ul>
           </div>
 
@@ -207,8 +205,8 @@ export const SkillsLibrary = ({ skills, activeSkillId, onToggle, onCreate, onUpd
             <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Default Skills</h2>
             <div className="grid grid-cols-2 gap-3">
               {defaultSkills.map(skill => (
-                <SkillCard key={skill.id} skill={skill} isActive={skill.id === activeSkillId}
-                  onToggle={onToggle} onEdit={handleEdit} onDelete={setDeleteTarget} />
+                <SkillCard key={skill.id} skill={skill}
+                  onEdit={handleEdit} onDelete={setDeleteTarget} />
               ))}
             </div>
           </div>

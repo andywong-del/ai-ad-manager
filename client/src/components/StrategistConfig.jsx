@@ -3,14 +3,23 @@ import { ArrowLeft, Upload, X, FileText, Sparkles, Save } from 'lucide-react';
 
 export const StrategistConfig = ({ strategist, onUpdate, onAddDoc, onRemoveDoc, onBack }) => {
   const [name, setName] = useState(strategist.name);
-  const [instructions, setInstructions] = useState(strategist.instructions || '');
+  const [description, setDescription] = useState(strategist.description || '');
+  const [instructions, setInstructions] = useState(strategist.content || strategist.instructions || '');
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
   const fileRef = useRef(null);
 
-  const handleSave = () => {
-    onUpdate(strategist.id, { name, instructions });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await onUpdate(strategist.id, { name, description, content: instructions, icon: strategist.icon });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      console.error('Failed to save skill:', err);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleFileUpload = async (e) => {
@@ -60,10 +69,10 @@ export const StrategistConfig = ({ strategist, onUpdate, onAddDoc, onRemoveDoc, 
           <Sparkles size={18} className="text-indigo-500" />
           <span className="text-lg font-bold text-slate-900">Configure Skill</span>
         </div>
-        <button onClick={handleSave}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all ${saved ? 'bg-emerald-500 text-white' : 'bg-indigo-600 hover:bg-indigo-500 text-white'}`}>
+        <button onClick={handleSave} disabled={saving}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all ${saved ? 'bg-emerald-500 text-white' : 'bg-indigo-600 hover:bg-indigo-500 text-white'} disabled:opacity-50`}>
           <Save size={14} />
-          {saved ? 'Saved!' : 'Save'}
+          {saving ? 'Saving...' : saved ? 'Saved!' : 'Save'}
         </button>
       </div>
 
@@ -78,6 +87,20 @@ export const StrategistConfig = ({ strategist, onUpdate, onAddDoc, onRemoveDoc, 
               onChange={(e) => setName(e.target.value)}
               className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300"
               placeholder="e.g., Inception Funnel Auditor"
+            />
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+              Description
+              <span className="text-xs font-normal text-slate-400 ml-2">Short summary shown in the library</span>
+            </label>
+            <input
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300"
+              placeholder="e.g., Deep-dive into campaign metrics, ROAS, CPA, CTR trends"
             />
           </div>
 

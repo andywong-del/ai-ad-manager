@@ -168,14 +168,14 @@ const META_SOURCES = [
   { id: 'video', label: 'Video', icon: Film },
   { id: 'ig', label: 'Instagram account', icon: Hash },
   { id: 'fb_page', label: 'Facebook Page', icon: FileText },
-  { id: 'lead_ad', label: 'Lead Ad', icon: ClipboardCopy, developing: true },
+  { id: 'lead_ad', label: 'Lead Ad', icon: ClipboardCopy },
   { id: 'fb_event', label: 'Facebook event', icon: CalendarDays, developing: true },
   { id: 'shopping', label: 'Shopping', icon: ShoppingBag, developing: true },
   { id: 'catalogue', label: 'Catalogue', icon: BookOpen, developing: true },
   { id: 'ar', label: 'Augmented reality', icon: Sparkles, developing: true },
 ];
 const OTHER_SOURCES = [
-  { id: 'lookalike', label: 'Lookalike audience', icon: Copy, developing: true },
+  { id: 'lookalike', label: 'Lookalike audience', icon: Copy },
 ];
 const SOURCE_LIST = [...YOUR_SOURCES, ...META_SOURCES, ...OTHER_SOURCES];
 
@@ -218,6 +218,12 @@ const IG_ENGAGEMENTS = [
   { value: 'ig_ad_interact', label: 'People who engaged with any post or ad', desc: 'Includes people who have engaged with a post or ad, such as reactions, shares, comments, or saves.' },
   { value: 'ig_message_sent', label: 'People who sent a message to your professional account', desc: 'Includes only the people who sent a message to your professional account.' },
   { value: 'ig_post_saved', label: 'People who saved any post or ad', desc: 'Includes only the people who saved a post or ad.' },
+];
+
+const LEAD_AD_ENGAGEMENTS = [
+  { value: 'lead_form_opened', label: 'Anyone who opened this form', desc: 'Includes people who opened your lead form, whether or not they submitted it.' },
+  { value: 'lead_form_submitted', label: 'People who opened and submitted this form', desc: 'Includes only people who opened your lead form and submitted it.' },
+  { value: 'lead_form_opened_not_submitted', label: 'People who opened but did not submit this form', desc: 'Includes people who opened your lead form but didn\'t complete and submit it.' },
 ];
 
 const WebsiteRuleCard = ({ rule, onChange, onRemove, isOnly, type, pixelEvents = [] }) => {
@@ -413,6 +419,9 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
   // FB Page include/exclude
   const [pageInclusions, setPageInclusions] = useState([{ engagement: '', retentionDays: 365 }]);
   const [pageExclusions, setPageExclusions] = useState([]);
+
+  // Lead Ad engagement
+  const [leadEngagement, setLeadEngagement] = useState('lead_form_opened');
 
   // Lookalike
   const [existingAudiences, setExistingAudiences] = useState([]);
@@ -645,7 +654,7 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
 
     if (tab === 'customer_list') {
       if (customerFile) {
-        const typeLabel = { email: 'emails', phone: 'phone numbers', fn_ln: 'first + last names', madid: 'mobile advertiser IDs' }[customerDataType] || customerDataType;
+        const typeLabel = { email: 'emails', phone: 'phone numbers', fn_ln: 'first + last names', madid: 'mobile advertiser IDs', psid: 'Messenger PSIDs (Page-Scoped IDs)' }[customerDataType] || customerDataType;
         return `Create a customer list custom audience${audName ? ` called ${audName}` : ''}${descPart} using ${customerFile.rows} ${typeLabel} from file "${customerFile.name}"`;
       }
       return `Create a customer list custom audience${audName ? ` called ${audName}` : ''}${descPart}. I will provide the customer data.`;
@@ -687,7 +696,10 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
       return prompt;
     }
 
-    if (tab === 'lead_ad') return `Create a lead ad custom audience${audName ? ` called ${audName}` : ''}${descPart} from people who opened or completed a lead form, ${retentionDays} day retention`;
+    if (tab === 'lead_ad') {
+      const engLabel = LEAD_AD_ENGAGEMENTS.find(e => e.value === leadEngagement)?.label || leadEngagement;
+      return `Create a lead ad custom audience${audName ? ` called ${audName}` : ''}${descPart} from ${engLabel.toLowerCase()}, ${retentionDays} day retention`;
+    }
     if (tab === 'offline') return `Create an offline events custom audience${audName ? ` called ${audName}` : ''}${descPart} from offline conversion data, ${retentionDays} day retention`;
     if (tab === 'fb_event') return `Create a Facebook event custom audience${audName ? ` called ${audName}` : ''}${descPart} from people who interacted with your events, ${retentionDays} day retention`;
     if (tab === 'mobile_app') return `Create a mobile app custom audience${audName ? ` called ${audName}` : ''}${descPart} from app activity, ${retentionDays} day retention`;
@@ -824,7 +836,7 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
   };
 
   // Sources that use a simple retention-only config via chat
-  const SIMPLE_SOURCES = ['lead_ad', 'offline', 'fb_event', 'mobile_app', 'shopping', 'catalogue', 'ar'];
+  const SIMPLE_SOURCES = ['offline', 'fb_event', 'mobile_app', 'shopping', 'catalogue', 'ar'];
   const simpleSourceLabel = SOURCE_LIST.find(s => s.id === tab)?.label || tab;
 
   return (
@@ -1210,7 +1222,14 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
                   <option value="phone">Phone Numbers</option>
                   <option value="fn_ln">First Name + Last Name</option>
                   <option value="madid">Mobile Advertiser IDs</option>
+                  <option value="psid">Messenger PSIDs (Page-Scoped IDs)</option>
                 </select>
+                {customerDataType === 'psid' && (
+                  <div className="mt-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2.5">
+                    <p className="text-[11px] font-semibold text-emerald-700 mb-1">100% Match Accuracy</p>
+                    <p className="text-[10px] text-emerald-600">Page-Scoped IDs from Messenger conversations are directly linked to Facebook profiles, ensuring perfect match rates. PSIDs are unique per Page — select the correct Page below.</p>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -1258,6 +1277,10 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
                   <li>Emails: user@example.com</li>
                   <li>Phones: include country code, e.g. +852XXXXXXXX</li>
                 </ul>
+                <p className="text-[10px] text-blue-500 mt-2 flex items-center gap-1">
+                  <span className="inline-block w-3 h-3 rounded bg-blue-200 text-blue-700 text-center text-[8px] leading-3 font-bold shrink-0">i</span>
+                  Data is automatically normalized and SHA-256 hashed before upload for privacy and optimal match rates.
+                </p>
               </div>
             </div>
           )}
@@ -1433,7 +1456,44 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
             </>
           )}
 
-          {/* ── Simple sources (Lead Ad, Offline, FB Event, Mobile App, Shopping, Catalogue, AR) ── */}
+          {/* ── Lead Ad engagement ── */}
+          {tab === 'lead_ad' && (
+            <>
+              <div className="flex items-start gap-3 bg-slate-50 rounded-xl px-4 py-3">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0 mt-0.5">
+                  <ClipboardCopy size={16} className="text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-700">Lead Ad</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">Create an audience from people who interacted with your lead forms.</p>
+                </div>
+              </div>
+              <div className="border border-slate-200 rounded-lg overflow-hidden">
+                {LEAD_AD_ENGAGEMENTS.map((ev, i) => (
+                  <button key={ev.value} onClick={() => setLeadEngagement(ev.value)}
+                    className={`w-full flex items-start gap-3 px-3 py-2.5 text-left transition-colors
+                      ${leadEngagement === ev.value ? 'bg-blue-50' : 'hover:bg-slate-50'}
+                      ${i > 0 ? 'border-t border-slate-100' : ''}`}>
+                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5
+                      ${leadEngagement === ev.value ? 'border-blue-600' : 'border-slate-300'}`}>
+                      {leadEngagement === ev.value && <div className="w-2 h-2 rounded-full bg-blue-600" />}
+                    </div>
+                    <div>
+                      <p className={`text-xs font-medium ${leadEngagement === ev.value ? 'text-blue-700' : 'text-slate-700'}`}>{ev.label}</p>
+                      {ev.desc && <p className="text-[10px] text-slate-400 mt-0.5">{ev.desc}</p>}
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Retention (days)</label>
+                <input type="number" value={retentionDays} onChange={e => setRetentionDays(Number(e.target.value))} min={1} max={90} className={INPUT_CLS} />
+                <p className="text-[10px] text-slate-400 mt-1">Maximum 90 days for lead ad audiences.</p>
+              </div>
+            </>
+          )}
+
+          {/* ── Simple sources (Offline, FB Event, Mobile App, Shopping, Catalogue, AR) ── */}
           {SIMPLE_SOURCES.includes(tab) && (
             <>
               <div className="flex items-start gap-3 bg-slate-50 rounded-xl px-4 py-3">
@@ -1443,7 +1503,6 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
                 <div>
                   <p className="text-xs font-semibold text-slate-700">{simpleSourceLabel}</p>
                   <p className="text-[11px] text-slate-500 mt-0.5">
-                    {tab === 'lead_ad' && 'Create an audience from people who opened or completed your lead forms.'}
                     {tab === 'offline' && 'Create an audience from people in your offline event data (in-store, phone, etc.).'}
                     {tab === 'fb_event' && 'Create an audience from people who interacted with your Facebook events.'}
                     {tab === 'mobile_app' && 'Create an audience from people who used your mobile app.'}
@@ -1525,6 +1584,35 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack }) => {
   const [filterType, setFilterType] = useState([]);
   const [filterAvailability, setFilterAvailability] = useState([]);
   const [expandedAudienceId, setExpandedAudienceId] = useState(null);
+  // TOS acceptance
+  const [tosAccepted, setTosAccepted] = useState(() => {
+    try { return localStorage.getItem('ca_tos_accepted') === 'true'; } catch { return false; }
+  });
+  const [tosChecking, setTosChecking] = useState(false);
+  useEffect(() => {
+    if (!adAccountId || tosAccepted) return;
+    setTosChecking(true);
+    api.get('/meta/tos/custom-audience', { params: { adAccountId } })
+      .then(r => {
+        if (r.data?.accepted) {
+          setTosAccepted(true);
+          localStorage.setItem('ca_tos_accepted', 'true');
+        }
+      })
+      .catch(() => {})
+      .finally(() => setTosChecking(false));
+  }, [adAccountId, tosAccepted]);
+
+  const acceptTos = async () => {
+    try {
+      await api.post('/meta/tos/custom-audience', { adAccountId });
+      setTosAccepted(true);
+      localStorage.setItem('ca_tos_accepted', 'true');
+    } catch (err) {
+      console.error('TOS accept failed:', err);
+    }
+  };
+
   const getAudienceSummary = (audName) => {
     try {
       const stored = JSON.parse(localStorage.getItem('audience_summaries') || '{}');
@@ -1729,6 +1817,23 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack }) => {
           </div>
         </div>
 
+        {/* TOS Banner — shown if custom audience TOS not yet accepted */}
+        {!tosAccepted && !tosChecking && (
+          <div className="mx-6 mb-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertTriangle size={14} className="text-amber-500 shrink-0" />
+              <div>
+                <p className="text-xs font-semibold text-amber-800">Custom Audience Terms Required</p>
+                <p className="text-[11px] text-amber-600 mt-0.5">Accept Meta's Custom Audience Terms to create customer list audiences.</p>
+              </div>
+            </div>
+            <button onClick={acceptTos}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-600 text-white hover:bg-amber-500 transition-colors shrink-0 ml-3">
+              Accept Terms
+            </button>
+          </div>
+        )}
+
         {/* Search + Filter row */}
         {audiences.length > 0 && (
           <div className="px-6 pb-3 flex items-center gap-3">
@@ -1886,12 +1991,19 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack }) => {
                       <p className="text-[11px] text-slate-700">{typeInfo.main}</p>
                       {typeInfo.detail && <p className="text-[10px] text-slate-400">{typeInfo.detail}</p>}
                     </td>
-                    {/* Size */}
+                    {/* Size + Match Quality */}
                     <td className="py-2 px-2 text-right">
                       {sizeInfo ? (
                         <div>
                           <span className="text-[12px] font-bold text-slate-900 tabular-nums whitespace-nowrap">{sizeInfo.text}</span>
                           {sizeInfo.sub && <p className="text-[10px] text-slate-400">{sizeInfo.sub}</p>}
+                          {subtype === 'CUSTOM' && aud.approximate_count_lower_bound > 0 && (() => {
+                            // Approximate match quality based on audience population vs "Below 1,000" threshold
+                            const size = aud.approximate_count_lower_bound;
+                            if (size >= 1000) return <span className="text-[9px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded mt-0.5 inline-block" title="Good data quality — audience matched well with Meta users">Great Match</span>;
+                            if (size >= 100) return <span className="text-[9px] font-semibold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded mt-0.5 inline-block" title="Consider adding more identifiers (email + phone) to improve match rate">Good Match</span>;
+                            return <span className="text-[9px] font-semibold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded mt-0.5 inline-block" title="Low match rate — try adding multiple identifiers per customer and ensure data is recent">Needs Improvement</span>;
+                          })()}
                         </div>
                       ) : (
                         <span className="text-[12px] text-slate-300">—</span>

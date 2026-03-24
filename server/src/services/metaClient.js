@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { buildAudiencePayload } from '../utils/customerDataNormalizer.js';
 
 const BASE_URL = process.env.META_BASE_URL || 'https://graph.facebook.com';
 const API_VERSION = process.env.FB_API_VERSION || 'v19.0';
@@ -619,9 +620,14 @@ export const deleteCustomAudience = async (token, audienceId) => {
   return data;
 };
 
-export const addUsersToAudience = async (token, audienceId, payload) => {
+export const addUsersToAudience = async (token, audienceId, payload, { raw } = {}) => {
+  // If raw customer data provided, normalize + SHA256 hash before sending
+  let finalPayload = payload;
+  if (raw && payload.schema && payload.data) {
+    finalPayload = buildAudiencePayload(payload.data, payload.schema);
+  }
   const { data } = await metaApi.post(`/${audienceId}/users`, null, {
-    params: { access_token: token, payload: JSON.stringify(payload) }
+    params: { access_token: token, payload: JSON.stringify(finalPayload) }
   });
   return data;
 };
@@ -629,6 +635,27 @@ export const addUsersToAudience = async (token, audienceId, payload) => {
 export const removeUsersFromAudience = async (token, audienceId, payload) => {
   const { data } = await metaApi.delete(`/${audienceId}/users`, {
     params: { access_token: token, payload: JSON.stringify(payload) }
+  });
+  return data;
+};
+
+// --- Custom Audience TOS ---
+export const checkCustomAudienceTos = async (token, adAccountId) => {
+  try {
+    const { data } = await metaApi.get(`/${adAccountId}`, {
+      params: { access_token: token, fields: 'tos_accepted' }
+    });
+    const tosAccepted = data.tos_accepted?.custom_audience_tos === 1;
+    return { accepted: tosAccepted };
+  } catch {
+    // If we can't check, assume not accepted to be safe
+    return { accepted: false };
+  }
+};
+
+export const acceptCustomAudienceTos = async (token, adAccountId) => {
+  const { data } = await metaApi.post(`/${adAccountId}/tos_accepted`, null, {
+    params: { access_token: token, custom_audience_tos: 1 }
   });
   return data;
 };
