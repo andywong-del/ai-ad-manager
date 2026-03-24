@@ -1183,14 +1183,16 @@ export const getConnectedInstagramAccounts = async (token, adAccountId) => {
     const { data } = await metaApi.get(`/${adAccountId}/connected_instagram_accounts`, {
       params: { access_token: token, fields: 'id,username,profile_pic' }
     });
-    for (const a of (data.data || [])) {
+    const found = data.data || [];
+    console.log(`[IG Discovery] Source 1 - connected_instagram_accounts: ${found.length} accounts`, found.map(a => a.username));
+    for (const a of found) {
       if (!seenIds.has(a.id)) { seenIds.add(a.id); accounts.push(a); }
     }
   } catch (err) {
-    console.error('connected_instagram_accounts error:', err.response?.data?.error?.message || err.message);
+    console.error('[IG Discovery] Source 1 ERROR:', err.response?.data?.error?.message || err.message);
   }
 
-  // 2. Fetch IG business accounts linked to Pages (single API call)
+  // 2. Fetch IG business accounts linked to Pages
   try {
     const { data } = await metaApi.get('/me/accounts', {
       params: {
@@ -1199,7 +1201,10 @@ export const getConnectedInstagramAccounts = async (token, adAccountId) => {
         limit: 100
       }
     });
-    for (const page of (data.data || [])) {
+    const pages = data.data || [];
+    const igFromPages = pages.filter(p => p.instagram_business_account).map(p => p.instagram_business_account);
+    console.log(`[IG Discovery] Source 2 - Pages (${pages.length} pages): ${igFromPages.length} IG accounts`, igFromPages.map(a => a.username));
+    for (const page of pages) {
       const ig = page.instagram_business_account;
       if (ig && !seenIds.has(ig.id)) {
         seenIds.add(ig.id);
@@ -1207,15 +1212,17 @@ export const getConnectedInstagramAccounts = async (token, adAccountId) => {
       }
     }
   } catch (err) {
-    console.error('Page instagram_business_account error:', err.response?.data?.error?.message || err.message);
+    console.error('[IG Discovery] Source 2 ERROR:', err.response?.data?.error?.message || err.message);
   }
 
-  // 3. Fetch business-owned IG accounts (covers accounts not linked to user's Pages)
+  // 3. Fetch business-owned IG accounts
   try {
     const adAccount = await getAdAccountDetails(token, adAccountId);
     const businessId = adAccount?.business?.id;
+    console.log(`[IG Discovery] Source 3 - Ad account business ID: ${businessId || 'NONE'}`);
     if (businessId) {
       const bizIgAccounts = await getBusinessOwnedIGAccounts(token, businessId);
+      console.log(`[IG Discovery] Source 3 - Business owned: ${(bizIgAccounts || []).length} accounts`, (bizIgAccounts || []).map(a => a.username));
       for (const a of (bizIgAccounts || [])) {
         if (!seenIds.has(a.id)) {
           seenIds.add(a.id);
@@ -1224,9 +1231,10 @@ export const getConnectedInstagramAccounts = async (token, adAccountId) => {
       }
     }
   } catch (err) {
-    console.error('Business owned IG accounts error:', err.response?.data?.error?.message || err.message);
+    console.error('[IG Discovery] Source 3 ERROR:', err.response?.data?.error?.message || err.message);
   }
 
+  console.log(`[IG Discovery] TOTAL: ${accounts.length} accounts`, accounts.map(a => a.username));
   return accounts;
 };
 
