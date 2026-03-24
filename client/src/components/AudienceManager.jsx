@@ -398,6 +398,37 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
   const [customerDataType, setCustomerDataType] = useState('email');
   const customerFileRef = useRef(null);
 
+  // TOS acceptance for customer list
+  const [tosAccepted, setTosAccepted] = useState(() => {
+    try { return localStorage.getItem('ca_tos_accepted') === 'true'; } catch { return false; }
+  });
+  const [tosChecking, setTosChecking] = useState(false);
+  useEffect(() => {
+    if (!adAccountId || tosAccepted || tab !== 'customer_list') return;
+    setTosChecking(true);
+    api.get('/meta/tos/custom-audience', { params: { adAccountId } })
+      .then(r => {
+        if (r.data?.accepted) {
+          setTosAccepted(true);
+          localStorage.setItem('ca_tos_accepted', 'true');
+        }
+      })
+      .catch(() => {})
+      .finally(() => setTosChecking(false));
+  }, [adAccountId, tosAccepted, tab]);
+
+  const acceptTos = async () => {
+    try {
+      await api.post('/meta/tos/custom-audience', { adAccountId });
+      setTosAccepted(true);
+      localStorage.setItem('ca_tos_accepted', 'true');
+    } catch (err) {
+      console.error('TOS accept failed:', err);
+      // Fallback — open Meta Ads Manager TOS page
+      window.open('https://www.facebook.com/ads/manage/customaudiences/tos/', '_blank');
+    }
+  };
+
   // Match type: ANY or ALL
   const [matchType, setMatchType] = useState('any');
 
@@ -1595,34 +1626,6 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack }) => {
   const [filterType, setFilterType] = useState([]);
   const [filterAvailability, setFilterAvailability] = useState([]);
   const [expandedAudienceId, setExpandedAudienceId] = useState(null);
-  // TOS acceptance
-  const [tosAccepted, setTosAccepted] = useState(() => {
-    try { return localStorage.getItem('ca_tos_accepted') === 'true'; } catch { return false; }
-  });
-  const [tosChecking, setTosChecking] = useState(false);
-  useEffect(() => {
-    if (!adAccountId || tosAccepted) return;
-    setTosChecking(true);
-    api.get('/meta/tos/custom-audience', { params: { adAccountId } })
-      .then(r => {
-        if (r.data?.accepted) {
-          setTosAccepted(true);
-          localStorage.setItem('ca_tos_accepted', 'true');
-        }
-      })
-      .catch(() => {})
-      .finally(() => setTosChecking(false));
-  }, [adAccountId, tosAccepted]);
-
-  const acceptTos = async () => {
-    try {
-      await api.post('/meta/tos/custom-audience', { adAccountId });
-      setTosAccepted(true);
-      localStorage.setItem('ca_tos_accepted', 'true');
-    } catch (err) {
-      console.error('TOS accept failed:', err);
-    }
-  };
 
   const getAudienceSummary = (audName) => {
     try {
