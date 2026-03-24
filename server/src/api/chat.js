@@ -16,6 +16,61 @@ router.post('/parse-doc', async (req, res) => {
       const pdfParse = (await import('pdf-parse')).default;
       const pdf = await pdfParse(buffer);
       text = pdf.text;
+    } else if (name?.endsWith('.xlsx') || name?.endsWith('.xls') || type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
+      // Excel: convert each sheet to a markdown table
+      const XLSX = (await import('xlsx')).default;
+      const workbook = XLSX.read(buffer, { type: 'buffer' });
+      const parts = [];
+      for (const sheetName of workbook.SheetNames) {
+        const sheet = workbook.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+        if (rows.length === 0) continue;
+        parts.push(`## Sheet: ${sheetName}\n`);
+        // Header row
+        const header = rows[0].map(String);
+        parts.push('| ' + header.join(' | ') + ' |');
+        parts.push('| ' + header.map(() => '---').join(' | ') + ' |');
+        // Data rows
+        for (let i = 1; i < rows.length; i++) {
+          parts.push('| ' + rows[i].map(c => String(c ?? '')).join(' | ') + ' |');
+        }
+        parts.push('');
+      }
+      text = parts.join('\n');
+    } else if (name?.endsWith('.csv') || type === 'text/csv') {
+      // CSV: parse and convert to markdown table
+      const raw = buffer.toString('utf-8');
+      const lines = raw.split(/\r?\n/).filter(l => l.trim());
+      if (lines.length > 0) {
+        const parseCSVLine = (line) => {
+          const result = [];
+          let current = '';
+          let inQuotes = false;
+          for (let i = 0; i < line.length; i++) {
+            const ch = line[i];
+            if (inQuotes) {
+              if (ch === '"' && line[i + 1] === '"') { current += '"'; i++; }
+              else if (ch === '"') { inQuotes = false; }
+              else { current += ch; }
+            } else {
+              if (ch === '"') { inQuotes = true; }
+              else if (ch === ',') { result.push(current.trim()); current = ''; }
+              else { current += ch; }
+            }
+          }
+          result.push(current.trim());
+          return result;
+        };
+        const rows = lines.map(parseCSVLine);
+        const parts = [];
+        const header = rows[0];
+        parts.push('| ' + header.join(' | ') + ' |');
+        parts.push('| ' + header.map(() => '---').join(' | ') + ' |');
+        for (let i = 1; i < rows.length; i++) {
+          parts.push('| ' + rows[i].join(' | ') + ' |');
+        }
+        text = parts.join('\n');
+      }
     } else {
       // TXT, DOCX (plain text extraction), or fallback
       text = buffer.toString('utf-8');

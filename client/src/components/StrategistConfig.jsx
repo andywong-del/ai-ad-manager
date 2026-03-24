@@ -27,8 +27,9 @@ export const StrategistConfig = ({ strategist, onUpdate, onAddDoc, onRemoveDoc, 
     for (const file of files) {
       try {
         let text = '';
-        if (file.name.endsWith('.pdf')) {
-          // Parse PDF via server
+        const needsServerParse = file.name.endsWith('.pdf') || file.name.endsWith('.xlsx') || file.name.endsWith('.xls') || file.name.endsWith('.csv');
+        if (needsServerParse) {
+          // Parse PDF/Excel/CSV via server
           const base64 = await new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result.split(',')[1]);
@@ -124,7 +125,7 @@ export const StrategistConfig = ({ strategist, onUpdate, onAddDoc, onRemoveDoc, 
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-1.5">
               Knowledge Base
-              <span className="text-xs font-normal text-slate-400 ml-2">Upload PDF or TXT files as context</span>
+              <span className="text-xs font-normal text-slate-400 ml-2">Upload PDF, TXT, Excel, or CSV files as context</span>
             </label>
 
             {/* Uploaded docs */}
@@ -150,9 +151,9 @@ export const StrategistConfig = ({ strategist, onUpdate, onAddDoc, onRemoveDoc, 
             <button onClick={() => fileRef.current?.click()}
               className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed border-slate-200 text-sm font-medium text-slate-400 hover:text-indigo-500 hover:border-indigo-300 transition-colors">
               <Upload size={16} />
-              Upload PDF or TXT
+              Upload PDF, TXT, Excel, or CSV
             </button>
-            <input ref={fileRef} type="file" accept=".pdf,.txt,.doc,.docx" multiple className="hidden" onChange={handleFileUpload} />
+            <input ref={fileRef} type="file" accept=".pdf,.txt,.doc,.docx,.xlsx,.xls,.csv" multiple className="hidden" onChange={handleFileUpload} />
           </div>
         </div>
       </div>

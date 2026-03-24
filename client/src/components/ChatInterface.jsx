@@ -1017,6 +1017,25 @@ const SlashPicker = ({ skills, filter, onSelect, selectedIndex }) => {
 };
 
 // ── Input box with drag & drop + slash commands ─────────────────────────────
+// Keyword-based skill suggestion — match user input against skill descriptions
+const useSuggestedSkill = (input, skills, activeSkill, slashSkills) => {
+  if (!input || input.startsWith('/') || input.length < 8 || activeSkill || slashSkills.length) return null;
+  const lower = input.toLowerCase();
+  const KEYWORD_MAP = {
+    performance_analyst: ['performance', 'roas', 'cpa', 'ctr', 'cpc', 'metrics', 'report', 'kpi', 'spend', 'impressions', 'clicks', 'conversions'],
+    creative_strategist: ['creative', 'ad copy', 'headline', 'fatigue', 'copy', 'variations', 'a/b test', 'design', 'image', 'video ad'],
+    budget_optimizer: ['budget', 'spend', 'allocat', 'scaling', 'scale up', 'cost', 'optimize budget', 'reallocat', 'waste'],
+    audience_strategist: ['audience', 'targeting', 'lookalike', 'overlap', 'retarget', 'custom audience', 'interest', 'demographic'],
+    inception_funnel_audit: ['funnel', 'tofu', 'mofu', 'bofu', 'awareness', 'consideration', 'conversion funnel', 'full funnel', 'audit'],
+  };
+  for (const [skillId, keywords] of Object.entries(KEYWORD_MAP)) {
+    if (keywords.some(kw => lower.includes(kw))) {
+      return skills.find(s => s.id === skillId) || null;
+    }
+  }
+  return null;
+};
+
 const ChatInput = ({ input, setInput, onKeyDown, onSend, onStop, onFilesAdded, attachments, onRemoveAttachment, fileRef, isTyping, handleFileUpload, isOver, activeSkill, onDeactivateSkill, skills = [], onSlashSelect, slashSkills = [], onRemoveSlashSkill, onClearAllSlash }) => {
   // Slash command detection — show picker when input starts with "/"
   const showSlash = input.startsWith('/');
@@ -1026,6 +1045,10 @@ const ChatInput = ({ input, setInput, onKeyDown, onSend, onStop, onFilesAdded, a
     (!slashFilter || s.name.toLowerCase().includes(slashFilter.toLowerCase()) || s.id.includes(slashFilter.toLowerCase()))
   ) : [];
   const [slashIndex, setSlashIndex] = useState(0);
+
+  // Context-aware skill suggestion
+  const suggestedSkill = useSuggestedSkill(input, skills, activeSkill, slashSkills);
+  const [dismissedSuggestion, setDismissedSuggestion] = useState(null);
 
   const handleChange = (e) => {
     setInput(e.target.value);
@@ -1081,12 +1104,29 @@ const ChatInput = ({ input, setInput, onKeyDown, onSend, onStop, onFilesAdded, a
             )}
           </div>
         )}
+        {/* Context-aware skill suggestion */}
+        {suggestedSkill && suggestedSkill.id !== dismissedSuggestion && !hasChips && (
+          <div className="px-4 pt-3 pb-0">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-[11px]">
+              <Sparkles size={11} className="text-amber-500" />
+              <span className="text-amber-700"><strong>{suggestedSkill.name}</strong> might help</span>
+              <button onClick={() => { onSlashSelect(suggestedSkill); setDismissedSuggestion(null); }}
+                className="px-2 py-0.5 rounded-full bg-amber-200 text-amber-800 font-semibold hover:bg-amber-300 transition-colors">
+                Use
+              </button>
+              <button onClick={() => setDismissedSuggestion(suggestedSkill.id)}
+                className="text-amber-400 hover:text-amber-600 transition-colors">
+                <X size={11} />
+              </button>
+            </div>
+          </div>
+        )}
         <div className="px-4 pt-4 pb-3">
           <textarea
             value={input}
-            onChange={handleChange}
+            onChange={(e) => { handleChange(e); if (dismissedSuggestion) setDismissedSuggestion(null); }}
             onKeyDown={handleSlashKeyDown}
-            placeholder={slashSkills.length ? 'Type your message...' : activeSkill ? `Ask with ${activeSkill.name} active...` : attachments.length ? 'Describe what to do with these files...' : 'Ask anything about your ads... (type / for skills)'}
+            placeholder={slashSkills.length ? 'Type your message...' : activeSkill ? `Ask with ${activeSkill.name} active...` : attachments.length ? 'Describe what to do with these files...' : 'Ask anything about your ads... (type / for experts)'}
             rows={1}
             disabled={isTyping}
             className="w-full resize-none text-sm bg-transparent text-slate-800 placeholder:text-slate-400 focus:outline-none disabled:text-slate-400 max-h-32 overflow-y-auto"

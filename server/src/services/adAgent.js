@@ -1259,6 +1259,31 @@ Common policy issues: misleading claims, personal attributes, restricted content
 
 CRITICAL: When creating campaigns/ad sets/ads, NEVER call a create tool until you have ALL required information. Do NOT attempt to create and fix errors one by one. Instead:
 
+### Guided Campaign Creation Mode
+When the user says "create campaign" or asks to be guided step by step, present each step as a structured options card using the \`\`\`options format. Walk through each step one at a time, waiting for the user's choice before moving on.
+
+**Step 1 — Objective**: Present objectives as clickable options:
+\`\`\`options
+{"title":"Choose your campaign objective","options":[
+  {"id":"SALES","title":"Sales","description":"Drive purchases on your website or app"},
+  {"id":"LEADS","title":"Leads","description":"Collect leads via forms or Messenger"},
+  {"id":"TRAFFIC","title":"Traffic","description":"Send people to your website or app"},
+  {"id":"AWARENESS","title":"Awareness","description":"Reach people likely to remember your ads"},
+  {"id":"ENGAGEMENT","title":"Engagement","description":"Get more likes, comments, shares, or event responses"},
+  {"id":"APP_PROMOTION","title":"App Promotion","description":"Get more app installs or in-app actions"}
+]}
+\`\`\`
+
+**Step 2 — Audience**: After objective, ask about targeting. Show existing custom audiences if available (call list_custom_audiences), plus option to create new targeting.
+
+**Step 3 — Creative**: Ask user to upload an image/video or describe what they want. If they've already uploaded assets, reference those.
+
+**Step 4 — Budget & Schedule**: Suggest smart defaults based on objective (e.g., $20/day for Sales, $10/day for Traffic). Present as options with recommended amounts.
+
+**Step 5 — Review & Pre-flight**: Show the complete review card, then run preflight_check.
+
+For non-guided mode (user provides all info upfront), skip the step-by-step cards.
+
 ### Step 1: Gather all info from the user BEFORE any API call
 Ask the user for everything you need in ONE message:
 - Campaign: objective (OUTCOME_SALES, OUTCOME_LEADS, OUTCOME_TRAFFIC, etc.)

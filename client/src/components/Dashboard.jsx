@@ -12,6 +12,16 @@ import { StrategistConfig } from './StrategistConfig.jsx';
 import { AudienceManager } from './AudienceManager.jsx';
 
 const SUGGESTED_ACTIONS = [
+  { icon: 'Zap',           label: 'Create Campaign',                desc: 'Launch a new ad campaign step by step — objective, audience, creative, budget.',
+    prompt: `I want to create a new ad campaign. Please guide me through the process step by step:
+
+Step 1: Ask me to choose a campaign objective (Awareness, Traffic, Engagement, Leads, App Promotion, or Sales)
+Step 2: Help me select or create a target audience
+Step 3: Ask me to upload or describe my ad creative (image/video + copy)
+Step 4: Help me set budget and schedule with smart defaults
+Step 5: Show a pre-flight checklist validating everything before launch
+
+Present each step as a clear card with options. Wait for my input before proceeding to the next step.` },
   { icon: 'BarChart3',     label: 'Weekly Performance Report',      desc: 'Spend, ROAS, CTR, CPA across all campaigns — with trends vs last week.',
     prompt: 'Show my weekly performance report for the last 7 days with all campaigns, spend, ROAS, CTR, CPA. Compare to previous week.' },
   { icon: 'AlertTriangle', label: 'Problems & Quick Wins',          desc: 'Find issues, wasted spend, and actionable fixes you can apply today.',
@@ -22,8 +32,6 @@ const SUGGESTED_ACTIONS = [
     prompt: 'Create a budget optimization plan. Show spend vs ROAS per campaign and recommend specific budget reallocations.' },
   { icon: 'Target',        label: 'Audience & Targeting Review',    desc: 'Audience sizes, overlap issues, and expansion opportunities.',
     prompt: 'Review my audiences and targeting. Show sizes, find overlap, suggest new audiences to test.' },
-  { icon: 'BarChart3',     label: 'Full Account Health Audit',      desc: 'Pixel, CAPI, campaign structure, exclusions — scored with fix priorities.',
-    prompt: 'Run a full account health audit. Check pixel, structure, budget, overlaps. Give me a score out of 10.' },
 ];
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────

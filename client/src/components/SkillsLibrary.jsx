@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, Plus, Sparkles, BarChart3, Palette, DollarSign, Users, Zap, Trash2, Edit3, Save, X } from 'lucide-react';
+import { ArrowLeft, Plus, Sparkles, BarChart3, Palette, DollarSign, Users, Zap, Trash2, Edit3, Save, X, Target, TrendingUp } from 'lucide-react';
 
 const ICON_MAP = {
   funnel: BarChart3,
@@ -9,6 +9,24 @@ const ICON_MAP = {
   users: Users,
   sparkles: Sparkles,
   zap: Zap,
+  target: Target,
+  trending: TrendingUp,
+};
+
+// Category mapping for organizing skills
+const SKILL_CATEGORIES = {
+  performance_analyst: 'Analysis',
+  inception_funnel_audit: 'Analysis',
+  creative_strategist: 'Creative',
+  budget_optimizer: 'Strategy',
+  audience_strategist: 'Targeting',
+};
+
+const CATEGORY_ORDER = ['Analysis', 'Strategy', 'Creative', 'Targeting', 'Custom'];
+
+const getCategoryForSkill = (skill) => {
+  if (!skill.isDefault) return 'Custom';
+  return SKILL_CATEGORIES[skill.id] || 'Custom';
 };
 
 const SkillCard = ({ skill, onEdit, onDelete }) => {
@@ -130,8 +148,14 @@ export const SkillsLibrary = ({ skills, onCreate, onUpdate, onDelete, onBack, on
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  const defaultSkills = skills.filter(s => s.isDefault);
-  const customSkills = skills.filter(s => !s.isDefault);
+  // Group skills by category
+  const grouped = {};
+  skills.forEach(skill => {
+    const cat = getCategoryForSkill(skill);
+    if (!grouped[cat]) grouped[cat] = [];
+    grouped[cat].push(skill);
+  });
+  const orderedCategories = CATEGORY_ORDER.filter(c => grouped[c]?.length);
 
   const handleSave = async (data) => {
     setSaving(true);
@@ -179,7 +203,7 @@ export const SkillsLibrary = ({ skills, onCreate, onUpdate, onDelete, onBack, on
         </button>
         <div className="flex items-center gap-2 flex-1">
           <Sparkles size={18} className="text-indigo-500" />
-          <span className="text-lg font-bold text-slate-900">Skills Library</span>
+          <span className="text-lg font-bold text-slate-900">Expertise Library</span>
         </div>
         <button onClick={() => { setEditingSkill(null); setShowEditor(true); }}
           className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-500 transition-colors shadow-sm">
@@ -192,56 +216,49 @@ export const SkillsLibrary = ({ skills, onCreate, onUpdate, onDelete, onBack, on
         <div className="max-w-3xl mx-auto">
           {/* How to use */}
           <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3 mb-6">
-            <p className="text-[12px] font-semibold text-indigo-700 mb-1">How skills work</p>
+            <p className="text-[12px] font-semibold text-indigo-700 mb-1">How AI Experts work</p>
             <ul className="text-[11px] text-indigo-600 space-y-0.5">
-              <li><strong>Click a skill</strong> to configure its instructions and knowledge base</li>
-              <li>Skills are saved as MD files — the AI agent references them automatically</li>
+              <li><strong>Click an expert</strong> to configure its instructions and knowledge base</li>
+              <li>Experts are saved as MD files — the AI agent references them automatically</li>
               <li>Upload PDFs or documents to build domain expertise</li>
             </ul>
           </div>
 
-          {/* Default Skills */}
-          <div className="mb-6">
-            <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Default Skills</h2>
-            <div className="grid grid-cols-2 gap-3">
-              {defaultSkills.map(skill => (
-                <SkillCard key={skill.id} skill={skill}
-                  onEdit={handleEdit} onDelete={setDeleteTarget} />
-              ))}
+          {/* Category-grouped skills */}
+          {orderedCategories.map(category => (
+            <div key={category} className="mb-6">
+              <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">{category}</h2>
+              <div className="grid grid-cols-2 gap-3">
+                {grouped[category].map(skill => (
+                  <SkillCard key={skill.id} skill={skill}
+                    onEdit={handleEdit} onDelete={setDeleteTarget} />
+                ))}
+                {category === 'Custom' && (
+                  <button onClick={() => { setEditingSkill(null); setShowEditor(true); }}
+                    className="rounded-xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center py-6 text-slate-400 hover:text-indigo-500 hover:border-indigo-300 transition-colors">
+                    <Plus size={20} />
+                    <span className="text-xs font-medium mt-1">New Expert</span>
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
+          ))}
 
-          {/* Custom Skills */}
-          <div>
-            <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
-              My Skills
-              {customSkills.length > 0 && <span className="ml-2 text-slate-300 font-normal normal-case">({customSkills.length})</span>}
-            </h2>
-            {customSkills.length === 0 ? (
+          {/* Show create button if no custom category yet */}
+          {!grouped['Custom'] && (
+            <div className="mb-6">
+              <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Custom</h2>
               <div className="text-center py-8 border-2 border-dashed border-slate-200 rounded-xl">
                 <Sparkles size={24} className="text-slate-200 mx-auto mb-2" />
-                <p className="text-sm text-slate-400 mb-1">No custom skills yet</p>
+                <p className="text-sm text-slate-400 mb-1">No custom experts yet</p>
                 <p className="text-xs text-slate-300 mb-3">Create your own strategy or workflow</p>
                 <button onClick={() => { setEditingSkill(null); setShowEditor(true); }}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors">
-                  <Plus size={12} /> Create Skill
+                  <Plus size={12} /> Create Expert
                 </button>
               </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-3">
-                {customSkills.map(skill => (
-                  <SkillCard key={skill.id} skill={skill} isActive={skill.id === activeSkillId}
-                    onToggle={onToggle} onEdit={handleEdit} onDelete={setDeleteTarget} />
-                ))}
-                {/* Add button card */}
-                <button onClick={() => { setEditingSkill(null); setShowEditor(true); }}
-                  className="rounded-xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center py-6 text-slate-400 hover:text-indigo-500 hover:border-indigo-300 transition-colors">
-                  <Plus size={20} />
-                  <span className="text-xs font-medium mt-1">New Skill</span>
-                </button>
-              </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
 

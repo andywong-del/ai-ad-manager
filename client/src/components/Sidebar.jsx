@@ -12,14 +12,28 @@ const MetaIcon = () => (
 );
 
 // ── Meta Ads Account Picker (direct flow: click → business → account) ────────
+const RECENT_ACCOUNTS_KEY = 'aam_recent_accounts';
+
+const getRecentAccounts = () => {
+  try { return JSON.parse(localStorage.getItem(RECENT_ACCOUNTS_KEY) || '[]'); } catch { return []; }
+};
+
+const saveRecentAccount = (business, account) => {
+  const recent = getRecentAccounts().filter(r => r.account.id !== account.id);
+  recent.unshift({ business: { id: business.id, name: business.name }, account: { id: account.id, name: account.name, account_id: account.account_id } });
+  localStorage.setItem(RECENT_ACCOUNTS_KEY, JSON.stringify(recent.slice(0, 3)));
+};
+
 const SidebarAccountPicker = ({ selectedAccount, selectedBusiness, onSelect, token, onLogin }) => {
   const [open, setOpen] = useState(false);
   const [level, setLevel] = useState('business');
   const [activeBiz, setActiveBiz] = useState(null);
+  const [confirmSwitch, setConfirmSwitch] = useState(null); // { business, account }
   const ref = useRef(null);
   const { businesses, isLoading: bizLoading } = useBusinesses();
   const { adAccounts, isLoading: accLoading } = useAdAccounts(level === 'accounts' ? activeBiz?.id : null);
   const accounts = Array.isArray(adAccounts) ? adAccounts : [];
+  const recentAccounts = getRecentAccounts();
 
   useEffect(() => {
     const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
@@ -28,11 +42,7 @@ const SidebarAccountPicker = ({ selectedAccount, selectedBusiness, onSelect, tok
   }, []);
 
   const toggle = () => {
-    // If not logged in, trigger Facebook login instead of opening empty picker
-    if (!token && onLogin) {
-      onLogin();
-      return;
-    }
+    if (!token && onLogin) { onLogin(); return; }
     if (!open) {
       setLevel(selectedBusiness ? 'accounts' : 'business');
       setActiveBiz(selectedBusiness || null);
@@ -41,7 +51,27 @@ const SidebarAccountPicker = ({ selectedAccount, selectedBusiness, onSelect, tok
   };
 
   const handleBizClick = (biz) => { setActiveBiz(biz); setLevel('accounts'); };
-  const handleAccClick = (account) => { onSelect(activeBiz, account); setOpen(false); };
+
+  const handleAccClick = (account, biz) => {
+    const business = biz || activeBiz;
+    // If switching away from current account, show confirmation
+    if (selectedAccount && account.id !== selectedAccount.id) {
+      setConfirmSwitch({ business, account });
+      return;
+    }
+    saveRecentAccount(business, account);
+    onSelect(business, account);
+    setOpen(false);
+  };
+
+  const confirmAccountSwitch = () => {
+    if (!confirmSwitch) return;
+    saveRecentAccount(confirmSwitch.business, confirmSwitch.account);
+    onSelect(confirmSwitch.business, confirmSwitch.account);
+    setConfirmSwitch(null);
+    setOpen(false);
+  };
+
   const hasSelection = selectedBusiness && selectedAccount;
 
   return (
@@ -103,7 +133,7 @@ const SidebarAccountPicker = ({ selectedAccount, selectedBusiness, onSelect, tok
                   ) : accounts.length === 0 ? (
                     <div className="px-3 py-6 text-center text-xs text-slate-400">No accounts found</div>
                   ) : accounts.map((account) => (
-                    <button key={account.id} onClick={() => handleAccClick(account)}
+                    <button key={account.id} onClick={() => handleAccClick(account, activeBiz)}
                       className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors
                         ${account.id === selectedAccount?.id ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
                       <span className="w-6 h-6 rounded-md bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-600 shrink-0">
@@ -122,6 +152,35 @@ const SidebarAccountPicker = ({ selectedAccount, selectedBusiness, onSelect, tok
           </div>
         )}
       </div>
+
+      {/* Recent accounts quick-switch */}
+      {token && !open && recentAccounts.length > 1 && (
+        <div className="mt-1 space-y-0.5">
+          {recentAccounts.filter(r => r.account.id !== selectedAccount?.id).slice(0, 2).map(r => (
+            <button key={r.account.id} onClick={() => handleAccClick(r.account, r.business)}
+              className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors">
+              <span className="w-4 h-4 rounded bg-slate-100 flex items-center justify-center text-[8px] font-bold text-slate-500 shrink-0">{r.account.name?.[0]?.toUpperCase()}</span>
+              <span className="truncate">{r.account.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Confirmation dialog for account switching */}
+      {confirmSwitch && (
+        <div className="absolute inset-0 z-[80] bg-black/20 backdrop-blur-sm flex items-center justify-center" onClick={() => setConfirmSwitch(null)}>
+          <div className="bg-white rounded-xl shadow-xl w-56 mx-3" onClick={e => e.stopPropagation()}>
+            <div className="px-4 pt-4 pb-2">
+              <p className="text-xs font-bold text-slate-800 mb-1">Switch Account?</p>
+              <p className="text-[11px] text-slate-500">Switching to <strong>{confirmSwitch.account.name}</strong> will start a new chat.</p>
+            </div>
+            <div className="flex items-center justify-end gap-2 px-4 py-3">
+              <button onClick={() => setConfirmSwitch(null)} className="px-3 py-1.5 rounded-lg text-[11px] font-medium text-slate-400 hover:bg-slate-50">Cancel</button>
+              <button onClick={confirmAccountSwitch} className="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-blue-600 text-white hover:bg-blue-500 transition-colors">Switch</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Google Ads — coming soon */}
       <div className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12px] font-medium border border-slate-100 bg-slate-50/50 text-slate-400 cursor-default">
@@ -289,7 +348,7 @@ export const Sidebar = ({
               : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700 border border-transparent'}`}
         >
           <Sparkles size={14} className={activeView?.type === 'skills' ? 'text-indigo-500' : 'text-slate-400'} />
-          <span className="flex-1 text-left">Skills Library</span>
+          <span className="flex-1 text-left">Expertise Library</span>
           {activeSkillId && <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" title="Skill active" />}
           <ChevronRight size={12} className="text-slate-300" />
         </button>
