@@ -86,26 +86,44 @@ const getTypeDisplay = (aud) => {
   return { main: 'Custom Audience', detail: detailMap[sub] || null };
 };
 
-// Extract retention days and engagement type from audience rule
+// Extract retention days and engagement type from audience rule or localStorage summary
 const getAudienceRule = (aud) => {
   let retention = aud.retention_days || null;
   let engagement = null;
   try {
     const rule = typeof aud.rule === 'string' ? JSON.parse(aud.rule) : aud.rule;
-    if (!rule) return { retention, engagement };
-    // Rule can have inclusions array or be a flat object
-    const inclusions = rule.inclusions || (rule.event_sources ? [rule] : []);
-    for (const inc of inclusions) {
-      if (inc.retention_seconds && !retention) {
-        retention = Math.round(inc.retention_seconds / 86400);
-      }
-      // Extract event type for engagement audiences
-      const filters = inc.filters || inc.rules || [];
-      for (const f of (Array.isArray(filters) ? filters : [filters])) {
-        if (f.field === 'event' && f.value) engagement = engagement || f.value;
+    if (rule) {
+      const inclusions = rule.inclusions || (rule.event_sources ? [rule] : []);
+      for (const inc of inclusions) {
+        if (inc.retention_seconds && !retention) {
+          retention = Math.round(inc.retention_seconds / 86400);
+        }
+        const filters = inc.filters || inc.rules || [];
+        for (const f of (Array.isArray(filters) ? filters : [filters])) {
+          if (f.field === 'event' && f.value) engagement = engagement || f.value;
+        }
       }
     }
   } catch { /* rule parsing failed */ }
+  // Fallback: parse from localStorage summary bullets
+  if (!retention || !engagement) {
+    try {
+      const stored = JSON.parse(localStorage.getItem('audience_summaries') || '{}');
+      const summary = stored[aud.name];
+      if (summary?.bullets) {
+        for (const b of summary.bullets) {
+          if (!retention) {
+            const m = b.match(/(?:Retention|retention)[:\s]*(\d+)\s*d/i);
+            if (m) retention = Number(m[1]);
+          }
+          if (!engagement) {
+            const m = b.match(/(?:Include|Engagement)[:\s]*(.*?)(?:\s*\((\d+)d\))?$/i);
+            if (m && m[1]) engagement = m[1].trim();
+          }
+        }
+      }
+    } catch { /* localStorage read failed */ }
+  }
   return { retention, engagement };
 };
 
