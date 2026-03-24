@@ -464,8 +464,9 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
     if (videoSource === 'video_id') { setVideos([]); return; }
     if (videoSource === 'campaign') { setVideos([]); setVideosLoading(false); return; }
 
-    // FB Page: need a page selected first
+    // FB Page / IG account: need a selection first
     if (videoSource === 'fb_page' && !videoSourcePage) { setVideos([]); setVideosLoading(false); return; }
+    if (videoSource === 'ig_account' && !videoSourceIg) { setVideos([]); setVideosLoading(false); return; }
     setVideosLoading(true);
     setVideos([]);
     setSelectedVideoIds([]);
@@ -474,15 +475,28 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
     let endpoint;
     if (videoSource === 'fb_page') {
       endpoint = `/meta/pages/${videoSourcePage}/videos?adAccountId=${adAccountId}`;
+    } else if (videoSource === 'ig_account') {
+      endpoint = `/meta/instagram/${videoSourceIg}/media`;
     } else {
-      // Both 'ig_account' and default use ad account videos
       endpoint = `/meta/adaccounts/${adAccountId}/videos`;
     }
 
     api.get(endpoint).then(r => {
-      const data = r.data || [];
-      // Mark IG-sourced videos for all sources (not just ig_account)
-      setVideos(data.map(v => ({ ...v, is_ig: !!v.source_instagram_media_id })));
+      let data = r.data || [];
+      if (videoSource === 'ig_account') {
+        // Normalize IG media format to match video table expectations
+        data = data.map(m => ({
+          id: m.id,
+          title: m.caption ? m.caption.slice(0, 80) : 'Untitled',
+          picture: m.thumbnail_url || '',
+          source: m.media_url,
+          created_time: m.timestamp,
+          is_ig: true,
+        }));
+      } else {
+        data = data.map(v => ({ ...v, is_ig: !!v.source_instagram_media_id }));
+      }
+      setVideos(data);
       setVideosLoading(false);
     }).catch(err => { console.error('Video fetch error:', err); setVideosLoading(false); });
   }, [tab, videoSource, videoSourcePage, videoSourceIg, adAccountId]);
@@ -909,6 +923,21 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
                     )}
                   </div>
                 )}
+                {videoSource === 'ig_account' && (
+                  <div className="flex-1">
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">Instagram Account</label>
+                    {igAccountsLoading ? (
+                      <p className="text-xs text-slate-400 italic py-2">Loading...</p>
+                    ) : igAccounts.length === 0 ? (
+                      <p className="text-xs text-slate-400 italic py-2">No IG accounts found</p>
+                    ) : (
+                      <select value={videoSourceIg} onChange={e => setVideoSourceIg(e.target.value)} className={INPUT_CLS}>
+                        <option value="">Select an account</option>
+                        {igAccounts.map(a => <option key={a.id} value={a.id}>{a.username?.includes(' ') || !a.username ? `📄 ${a.username || a.id}` : `@${a.username}`}</option>)}
+                      </select>
+                    )}
+                  </div>
+                )}
                 {videoSource === 'campaign' && (
                   <div className="flex-1">
                     <label className="block text-xs font-semibold text-slate-600 mb-1">Campaign</label>
@@ -936,6 +965,9 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
               {videoSource === 'fb_page' && !videoSourcePage && (
                 <p className="text-xs text-slate-400 italic text-center py-4">Select a Facebook Page to see its videos</p>
               )}
+              {videoSource === 'ig_account' && !videoSourceIg && (
+                <p className="text-xs text-slate-400 italic text-center py-4">Select an Instagram account to see its videos</p>
+              )}
               {videoSource === 'campaign' && !selectedCampaignId && (
                 <p className="text-xs text-slate-400 italic text-center py-4">Select a campaign to see its video ads</p>
               )}
@@ -947,7 +979,7 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
                   <input value={videoIdInput} onChange={e => setVideoIdInput(e.target.value)} placeholder="Paste video IDs, comma separated" className={INPUT_CLS} />
                   <p className="text-[10px] text-slate-400 mt-1">Enter one or more video IDs separated by commas</p>
                 </div>
-              ) : (videoSource === 'fb_page' && !videoSourcePage) || (videoSource === 'campaign' && !selectedCampaignId) ? null : (
+              ) : (videoSource === 'fb_page' && !videoSourcePage) || (videoSource === 'ig_account' && !videoSourceIg) || (videoSource === 'campaign' && !selectedCampaignId) ? null : (
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1.5">
                     Select Videos <span className="text-slate-400 font-normal">({selectedVideoIds.length} selected)</span>
