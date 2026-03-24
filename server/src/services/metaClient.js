@@ -493,14 +493,19 @@ export const getAsyncReportResults = async (token, reportRunId) => {
 // ─── Audiences ───────────────────────────────────────────────────────
 
 export const getCustomAudiences = async (token, adAccountId) => {
-  const { data } = await metaApi.get(`/${adAccountId}/customaudiences`, {
-    params: {
-      access_token: token,
-      fields: 'id,name,subtype,description,delivery_status,operation_status,approximate_count_lower_bound,approximate_count_upper_bound,time_created,time_updated,is_value_based,rule,retention_days',
-      limit: 50
-    }
-  });
-  return data.data;
+  const baseFields = 'id,name,subtype,description,delivery_status,operation_status,approximate_count_lower_bound,approximate_count_upper_bound,time_created,time_updated,is_value_based';
+  try {
+    const { data } = await metaApi.get(`/${adAccountId}/customaudiences`, {
+      params: { access_token: token, fields: `${baseFields},rule,retention_days`, limit: 50 }
+    });
+    return data.data;
+  } catch {
+    // Fallback without rule/retention_days if Meta doesn't support them
+    const { data } = await metaApi.get(`/${adAccountId}/customaudiences`, {
+      params: { access_token: token, fields: baseFields, limit: 50 }
+    });
+    return data.data;
+  }
 };
 
 export const createCustomAudience = async (token, adAccountId, params) => {
