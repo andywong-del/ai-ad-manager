@@ -1181,23 +1181,41 @@ export const getPages = async (token) => {
   return data.data;
 };
 
-export const getPageVideos = async (token, pageId) => {
+export const getPageVideos = async (token, pageId, adAccountId) => {
   // First get the page access token (required for /{pageId}/videos)
   const pages = await getPages(token);
   const page = pages?.find(p => p.id === pageId);
   const pageToken = page?.access_token || token;
 
   try {
+    // Use page's video library (published videos on the page)
     const { data } = await metaApi.get(`/${pageId}/videos`, {
       params: {
         access_token: pageToken,
-        fields: 'id,title,description,source,picture,length,created_time,thumbnails',
-        limit: 100
+        fields: 'id,title,description,source,picture,length,created_time,updated_time,status',
+        limit: 200
       }
     });
-    return data.data || [];
+    const pageVideos = (data.data || []).filter(v => !v.status || v.status.video_status === 'ready');
+
+    // Also fetch ad account videos for completeness (catches videos used in ads)
+    if (adAccountId) {
+      try {
+        const adVids = await getAdVideos(token, adAccountId);
+        // Merge: add ad account videos not already in page videos
+        const pageVideoIds = new Set(pageVideos.map(v => v.id));
+        const extra = (adVids || []).filter(v => !pageVideoIds.has(v.id));
+        return [...pageVideos, ...extra];
+      } catch { /* ignore — page videos alone is fine */ }
+    }
+
+    return pageVideos;
   } catch (err) {
     console.error('getPageVideos error:', err.response?.data?.error?.message || err.message);
+    // Fallback to ad account videos if page videos fail
+    if (adAccountId) {
+      try { return await getAdVideos(token, adAccountId); } catch { /* */ }
+    }
     return [];
   }
 };

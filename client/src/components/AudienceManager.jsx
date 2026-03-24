@@ -424,7 +424,7 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
 
     let endpoint;
     if (videoSource === 'fb_page') {
-      endpoint = `/meta/pages/${videoSourcePage}/videos`;
+      endpoint = `/meta/pages/${videoSourcePage}/videos?adAccountId=${adAccountId}`;
     } else if (videoSource === 'ig_account') {
       endpoint = `/meta/instagram/${videoSourceIg}/media`;
     } else {
