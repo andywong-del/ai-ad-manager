@@ -174,9 +174,15 @@ const INPUT_CLS = 'w-full px-3 py-2 rounded-lg border border-slate-200 text-sm f
 
 // ── Include/Exclude Rule Component ──────────────────────────────────────────
 const WEBSITE_EVENTS = [
-  { value: 'all_visitors', label: 'All website visitors' },
-  { value: 'specific_pages', label: 'People who visited specific web pages' },
-  { value: 'time_spent', label: 'Visitors by time spent (top 25%)' },
+  { value: 'all_visitors', label: 'All website visitors', desc: 'Includes people who have visited any of your websites.' },
+  { value: 'specific_pages', label: 'People who visited specific web pages', desc: 'Includes people who have visited specific websites or web pages.' },
+  { value: 'time_spent', label: 'Visitors by time spent', desc: 'Include people in the top percentile of time spent on your website.' },
+];
+
+const TIME_SPENT_PERCENTILES = [
+  { value: '25', label: 'Top 25%' },
+  { value: '10', label: 'Top 10%' },
+  { value: '5', label: 'Top 5%' },
 ];
 
 const URL_CONDITIONS = [
@@ -185,34 +191,100 @@ const URL_CONDITIONS = [
   { value: 'equals', label: 'Equals' },
 ];
 
-const WebsiteRuleCard = ({ rule, onChange, onRemove, isOnly, type }) => (
-  <div className="border border-slate-200 rounded-lg p-3 space-y-2 bg-white relative">
-    {!isOnly && (
-      <button onClick={onRemove} className="absolute top-2 right-2 text-slate-300 hover:text-red-400 transition-colors"><X size={14} /></button>
-    )}
-    <div className="flex items-center gap-1.5 mb-1">
-      <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${type === 'include' ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-600'}`}>
-        {type === 'include' ? 'Include' : 'Exclude'}
-      </span>
-    </div>
-    <select value={rule.event} onChange={e => onChange({ ...rule, event: e.target.value })} className={INPUT_CLS}>
-      {WEBSITE_EVENTS.map(ev => <option key={ev.value} value={ev.value}>{ev.label}</option>)}
-    </select>
-    {rule.event === 'specific_pages' && (
-      <div className="flex gap-2">
-        <select value={rule.urlCondition || 'contains'} onChange={e => onChange({ ...rule, urlCondition: e.target.value })} className="px-2 py-1.5 rounded-lg border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-100 w-36 shrink-0">
-          {URL_CONDITIONS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-        </select>
-        <input value={rule.urlFilter || ''} onChange={e => onChange({ ...rule, urlFilter: e.target.value })} placeholder="e.g., /products or /checkout" className={INPUT_CLS} />
+const MAX_RETENTION_DAYS = 180;
+
+const WebsiteRuleCard = ({ rule, onChange, onRemove, isOnly, type, pixelEvents = [] }) => {
+  const retentionExceeded = rule.retentionDays > MAX_RETENTION_DAYS;
+
+  return (
+    <div className="border border-slate-200 rounded-lg p-3 space-y-2.5 bg-white relative">
+      {!isOnly && (
+        <button onClick={onRemove} className="absolute top-2 right-2 text-slate-300 hover:text-red-400 transition-colors"><X size={14} /></button>
+      )}
+      <div className="flex items-center gap-1.5 mb-1">
+        <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${type === 'include' ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-600'}`}>
+          {type === 'include' ? 'Include' : 'Exclude'}
+        </span>
       </div>
-    )}
-    <div className="flex items-center gap-2">
-      <label className="text-[10px] text-slate-500 shrink-0">In the past</label>
-      <input type="number" value={rule.retentionDays} onChange={e => onChange({ ...rule, retentionDays: Number(e.target.value) })} min={1} max={180} className="w-16 px-2 py-1.5 rounded-lg border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-100" />
-      <span className="text-[10px] text-slate-500">days</span>
+
+      {/* Radio-style event selector like Meta UI */}
+      <div className="border border-slate-200 rounded-lg overflow-hidden">
+        {WEBSITE_EVENTS.map((ev, i) => (
+          <button key={ev.value} onClick={() => onChange({ ...rule, event: ev.value })}
+            className={`w-full flex items-start gap-3 px-3 py-2.5 text-left transition-colors
+              ${rule.event === ev.value ? 'bg-blue-50' : 'hover:bg-slate-50'}
+              ${i > 0 ? 'border-t border-slate-100' : ''}`}>
+            <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5
+              ${rule.event === ev.value ? 'border-blue-600' : 'border-slate-300'}`}>
+              {rule.event === ev.value && <div className="w-2 h-2 rounded-full bg-blue-600" />}
+            </div>
+            <div>
+              <p className={`text-xs font-medium ${rule.event === ev.value ? 'text-blue-700' : 'text-slate-700'}`}>{ev.label}</p>
+              {ev.desc && <p className="text-[10px] text-slate-400 mt-0.5">{ev.desc}</p>}
+            </div>
+          </button>
+        ))}
+        {/* Custom pixel events section */}
+        {pixelEvents.length > 0 && (
+          <>
+            <div className="border-t border-slate-200 px-3 py-2 bg-slate-50">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">From your events</p>
+            </div>
+            {pixelEvents.map(ev => (
+              <button key={ev} onClick={() => onChange({ ...rule, event: `custom:${ev}` })}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 text-left border-t border-slate-100 transition-colors
+                  ${rule.event === `custom:${ev}` ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
+                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0
+                  ${rule.event === `custom:${ev}` ? 'border-blue-600' : 'border-slate-300'}`}>
+                  {rule.event === `custom:${ev}` && <div className="w-2 h-2 rounded-full bg-blue-600" />}
+                </div>
+                <p className={`text-xs font-medium ${rule.event === `custom:${ev}` ? 'text-blue-700' : 'text-slate-700'}`}>{ev}</p>
+              </button>
+            ))}
+          </>
+        )}
+      </div>
+
+      {/* Time spent percentile */}
+      {rule.event === 'time_spent' && (
+        <div>
+          <label className="block text-[10px] font-semibold text-slate-500 mb-1">Percentile</label>
+          <select value={rule.percentile || '25'} onChange={e => onChange({ ...rule, percentile: e.target.value })} className={INPUT_CLS}>
+            {TIME_SPENT_PERCENTILES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+          </select>
+        </div>
+      )}
+
+      {/* URL filter for specific pages */}
+      {rule.event === 'specific_pages' && (
+        <div className="flex gap-2">
+          <select value={rule.urlCondition || 'contains'} onChange={e => onChange({ ...rule, urlCondition: e.target.value })} className="px-2 py-1.5 rounded-lg border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-100 w-36 shrink-0">
+            {URL_CONDITIONS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+          </select>
+          <input value={rule.urlFilter || ''} onChange={e => onChange({ ...rule, urlFilter: e.target.value })} placeholder="e.g., /products or /checkout" className={INPUT_CLS} />
+        </div>
+      )}
+
+      {/* Retention days with validation */}
+      <div>
+        <div className="flex items-center gap-2">
+          <label className="text-[10px] text-slate-500 shrink-0">In the past</label>
+          <input type="number" value={rule.retentionDays}
+            onChange={e => onChange({ ...rule, retentionDays: Number(e.target.value) })}
+            min={1} max={180}
+            className={`w-16 px-2 py-1.5 rounded-lg border text-xs focus:outline-none focus:ring-2
+              ${retentionExceeded ? 'border-red-300 focus:ring-red-100 text-red-600' : 'border-slate-200 focus:ring-blue-100'}`} />
+          <span className="text-[10px] text-slate-500">days</span>
+        </div>
+        {retentionExceeded && (
+          <p className="text-[10px] text-red-500 font-medium mt-1 flex items-center gap-1">
+            <AlertTriangle size={10} /> Maximum retention is {MAX_RETENTION_DAYS} days for website audiences. Please reduce to proceed.
+          </p>
+        )}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const EngagementRuleCard = ({ rule, onChange, onRemove, isOnly, type, engagementOptions }) => (
   <div className="border border-slate-200 rounded-lg p-3 space-y-2 bg-white relative">
@@ -245,6 +317,7 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
   // Website — Include/Exclude rules
   const [pixels, setPixels] = useState([]);
   const [selectedPixelId, setSelectedPixelId] = useState('');
+  const [pixelEvents, setPixelEvents] = useState([]); // custom events from pixel
   const [websiteInclusions, setWebsiteInclusions] = useState([{ event: 'all_visitors', urlCondition: 'contains', urlFilter: '', retentionDays: 30 }]);
   const [websiteExclusions, setWebsiteExclusions] = useState([]);
 
@@ -318,6 +391,17 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
       }).catch(() => {});
     }
   }, [tab, adAccountId]);
+
+  // Fetch custom events when a pixel is selected
+  useEffect(() => {
+    if (tab !== 'website' || !selectedPixelId) { setPixelEvents([]); return; }
+    api.get(`/pixels/${selectedPixelId}/stats`).then(r => {
+      const stats = r.data || [];
+      // Extract unique event names from pixel stats
+      const events = [...new Set((Array.isArray(stats) ? stats : []).map(s => s.event).filter(Boolean))];
+      setPixelEvents(events);
+    }).catch(() => setPixelEvents([]));
+  }, [tab, selectedPixelId]);
 
   // Fetch videos when video source changes — use correct endpoint per source
   useEffect(() => {
@@ -418,14 +502,13 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
     const audName = name ? `"${name}"` : '';
     const descPart = description ? `, description: "${description}"` : '';
 
-    const webEventLabels = {
-      all_visitors: 'all website visitors',
-      specific_pages: 'visitors to specific web pages',
-      time_spent: 'visitors by time spent (top 25%)',
-    };
-
     const fmtWebRule = (rule) => {
-      let desc = webEventLabels[rule.event] || rule.event;
+      let desc;
+      if (rule.event === 'all_visitors') desc = 'all website visitors';
+      else if (rule.event === 'specific_pages') desc = 'visitors to specific web pages';
+      else if (rule.event === 'time_spent') desc = `visitors by time spent (top ${rule.percentile || 25}%)`;
+      else if (rule.event?.startsWith('custom:')) desc = `people who triggered "${rule.event.replace('custom:', '')}" event`;
+      else desc = rule.event;
       if (rule.urlFilter) {
         const cond = rule.urlCondition === 'not_contains' ? "doesn't contain" : rule.urlCondition === 'equals' ? 'equals' : 'contains';
         desc += ` (URL ${cond} "${rule.urlFilter}")`;
@@ -527,6 +610,8 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
     if (maxRet && retentionDays < 1) return 'Retention must be at least 1 day';
     if (tab === 'website' && !selectedPixelId) return 'Please select a pixel';
     if (tab === 'website' && websiteInclusions.length === 0) return 'Please add at least one inclusion rule';
+    if (tab === 'website' && [...websiteInclusions, ...websiteExclusions].some(r => r.retentionDays > 180)) return 'Website audience retention cannot exceed 180 days. Please reduce to proceed.';
+    if (tab === 'website' && [...websiteInclusions, ...websiteExclusions].some(r => r.retentionDays < 1)) return 'Retention must be at least 1 day';
     if (tab === 'video' && videoSource === 'fb_page' && !videoSourcePage) return 'Please select a Facebook Page';
     if (tab === 'video' && videoSource === 'ig_account' && !videoSourceIg) return 'Please select an Instagram account';
     if (tab === 'video' && videoSource === 'campaign' && !selectedCampaignId) return 'Please select a campaign';
@@ -629,7 +714,7 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
                 <label className="block text-xs font-semibold text-slate-600 mb-1.5">Include people who meet</label>
                 <div className="space-y-2">
                   {websiteInclusions.map((rule, i) => (
-                    <WebsiteRuleCard key={`inc-${i}`} rule={rule} type="include"
+                    <WebsiteRuleCard key={`inc-${i}`} rule={rule} type="include" pixelEvents={pixelEvents}
                       isOnly={websiteInclusions.length === 1 && websiteExclusions.length === 0}
                       onChange={updated => setWebsiteInclusions(prev => prev.map((r, j) => j === i ? updated : r))}
                       onRemove={() => setWebsiteInclusions(prev => prev.filter((_, j) => j !== i))} />
@@ -647,7 +732,7 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
                   <label className="block text-xs font-semibold text-slate-600 mb-1.5">Exclude people who meet</label>
                   <div className="space-y-2">
                     {websiteExclusions.map((rule, i) => (
-                      <WebsiteRuleCard key={`exc-${i}`} rule={rule} type="exclude"
+                      <WebsiteRuleCard key={`exc-${i}`} rule={rule} type="exclude" pixelEvents={pixelEvents}
                         isOnly={false}
                         onChange={updated => setWebsiteExclusions(prev => prev.map((r, j) => j === i ? updated : r))}
                         onRemove={() => setWebsiteExclusions(prev => prev.filter((_, j) => j !== i))} />
