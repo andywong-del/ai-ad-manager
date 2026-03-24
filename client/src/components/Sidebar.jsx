@@ -163,6 +163,8 @@ export const Sidebar = ({
   onRenameFolder,
   onReorderFolders,
   onOpenAudiences,
+  token,
+  onLogin,
 }) => {
   const [openFolders, setOpenFolders] = useState({});
   const [hoveredSession, setHoveredSession] = useState(null);
@@ -447,20 +449,27 @@ export const Sidebar = ({
 
       {/* User Profile */}
       <div className="px-3 pb-4 pt-2">
-        <div className="flex items-center gap-3 px-2">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shrink-0 shadow-sm">
-            <span className="text-white text-xs font-bold">A</span>
+        {token ? (
+          <div className="flex items-center gap-3 px-2">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shrink-0 shadow-sm">
+              <span className="text-white text-xs font-bold">A</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-slate-800 truncate">Andy Wong</p>
+              <p className="text-[11px] text-slate-400 truncate">andy.wong@presslogic.com</p>
+            </div>
+            {onLogout && (
+              <button onClick={onLogout} className="text-slate-400 hover:text-slate-600 transition-colors" title="Log out">
+                <LogOut size={16} />
+              </button>
+            )}
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-slate-800 truncate">Andy Wong</p>
-            <p className="text-[11px] text-slate-400 truncate">andy.wong@presslogic.com</p>
-          </div>
-          {onLogout && (
-            <button onClick={onLogout} className="text-slate-400 hover:text-slate-600 transition-colors" title="Log out">
-              <LogOut size={16} />
-            </button>
-          )}
-        </div>
+        ) : (
+          <button onClick={onLogin}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold bg-blue-600 text-white hover:bg-blue-500 transition-colors">
+            <LogOut size={14} className="rotate-180" /> Connect Facebook
+          </button>
+        )}
       </div>
     </aside>
   );

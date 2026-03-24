@@ -28,12 +28,7 @@ export default function App() {
   const [selectedBusiness, setSelectedBusiness] = useState(null);
   const [selectedAccount,  setSelectedAccount]  = useState(null);
 
-  // Step 1: Facebook login (skip in dev bypass mode)
-  if (!longLivedToken && !DEV_BYPASS) {
-    return <LoginPage onLogin={login} isLoading={isLoading} error={error} />;
-  }
-
-  // Step 2: Dashboard — user selects business/account from sidebar
+  // Always show Dashboard — soft wall prompts login when needed
   return (
     <ErrorBoundary>
       <Dashboard
@@ -44,6 +39,9 @@ export default function App() {
         onSwitchAccount={(account) => setSelectedAccount(account)}
         onSwitchBusiness={(business) => { setSelectedAccount(null); setSelectedBusiness(business || null); }}
         onLogout={() => { logout(); setSelectedBusiness(null); setSelectedAccount(null); }}
+        onLogin={login}
+        isLoginLoading={isLoading}
+        loginError={error}
       />
     </ErrorBoundary>
   );

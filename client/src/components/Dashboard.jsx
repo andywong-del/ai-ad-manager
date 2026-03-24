@@ -27,6 +27,32 @@ const SUGGESTED_ACTIONS = [
 ];
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
+// ── Connect Prompt (soft wall for unauthenticated users) ──────────────────────
+const ConnectPrompt = ({ onLogin, isLoading, error, onDismiss }) => (
+  <div className="fixed inset-0 z-[70] bg-black/30 backdrop-blur-sm flex items-center justify-center p-4" onClick={onDismiss}>
+    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
+      <div className="px-6 pt-6 pb-4 text-center">
+        <div className="w-14 h-14 rounded-2xl bg-blue-100 flex items-center justify-center mx-auto mb-4">
+          <svg viewBox="0 0 24 24" className="w-7 h-7 text-blue-600" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.879V14.89h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.989C18.343 21.129 22 16.99 22 12c0-5.523-4.477-10-10-10z"/></svg>
+        </div>
+        <h3 className="text-base font-bold text-slate-900 mb-1">Connect Your Ad Account</h3>
+        <p className="text-sm text-slate-500">Sign in with Facebook to unlock this feature — manage campaigns, audiences, and chat with your AI agent.</p>
+        {error && <p className="text-xs text-red-500 mt-2">{error}</p>}
+      </div>
+      <div className="px-6 pb-6 space-y-2">
+        <button onClick={onLogin} disabled={isLoading}
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold bg-blue-600 text-white hover:bg-blue-500 transition-colors disabled:opacity-50">
+          {isLoading ? 'Connecting...' : 'Continue with Facebook'}
+        </button>
+        <button onClick={onDismiss}
+          className="w-full px-4 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors">
+          Browse first
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
 export const Dashboard = ({
   token = null,
   adAccountId = null,
@@ -35,11 +61,22 @@ export const Dashboard = ({
   onSwitchAccount,
   onSwitchBusiness,
   onLogout,
+  onLogin,
+  isLoginLoading,
+  loginError,
 }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [chatLanguage, setChatLanguage] = useState(() => localStorage.getItem('aam_language') || 'en');
   const [activeView, setActiveView] = useState({ type: 'chat' });
   const [reportPanel, setReportPanel] = useState(null);
+  const [showConnectPrompt, setShowConnectPrompt] = useState(false);
+
+  // Guard: show connect prompt when user tries to use a feature without auth
+  const requireAuth = useCallback((action) => {
+    if (token) return true;
+    setShowConnectPrompt(true);
+    return false;
+  }, [token]);
 
   const {
     skills, activeSkill, activeSkillId, toggleSkill,
@@ -66,6 +103,7 @@ export const Dashboard = ({
   }, [onSwitchBusiness, onSwitchAccount]);
 
   const handleSend = useCallback((text, attachments, slashIds) => {
+    if (!requireAuth()) return;
     setActiveView({ type: 'chat' });
     // Inject skill context: slash commands take priority, then active skill
     let skillCtx = null;
@@ -100,12 +138,14 @@ export const Dashboard = ({
   }, [deleteSavedItem, activeView]);
 
   const handleNavigateFunnel = useCallback(() => {
+    if (!requireAuth()) return;
     setActiveView({ type: 'funnel' });
-  }, []);
+  }, [requireAuth]);
 
   const handleOpenAudiences = useCallback(() => {
+    if (!requireAuth()) return;
     setActiveView({ type: 'audiences' });
-  }, []);
+  }, [requireAuth]);
 
   const handleAudienceToChat = useCallback((prompt) => {
     setActiveView({ type: 'chat' });
@@ -170,6 +210,8 @@ export const Dashboard = ({
         onToggleSkill={toggleSkill}
         onOpenSkillsLibrary={() => setActiveView({ type: 'skills' })}
         onOpenAudiences={handleOpenAudiences}
+        token={token}
+        onLogin={onLogin}
       />
 
       {/* Main Content */}
@@ -256,6 +298,16 @@ export const Dashboard = ({
         <div className="fixed bottom-6 right-6 z-50 bg-emerald-500 text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-2 text-sm font-medium">
           {notification}
         </div>
+      )}
+
+      {/* Connect Prompt — soft wall for unauthenticated users */}
+      {showConnectPrompt && onLogin && (
+        <ConnectPrompt
+          onLogin={onLogin}
+          isLoading={isLoginLoading}
+          error={loginError}
+          onDismiss={() => setShowConnectPrompt(false)}
+        />
       )}
     </div>
   );
