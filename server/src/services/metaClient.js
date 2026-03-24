@@ -1191,7 +1191,6 @@ export const getConnectedInstagramAccounts = async (token, adAccountId) => {
   }
 
   // 2. Fetch IG business accounts linked to Pages (single API call)
-  //    Uses instagram_business_account field — the correct way to get IG professional accounts per Page
   try {
     const { data } = await metaApi.get('/me/accounts', {
       params: {
@@ -1208,7 +1207,24 @@ export const getConnectedInstagramAccounts = async (token, adAccountId) => {
       }
     }
   } catch (err) {
-    console.error('Page instagram_business_account fallback error:', err.response?.data?.error?.message || err.message);
+    console.error('Page instagram_business_account error:', err.response?.data?.error?.message || err.message);
+  }
+
+  // 3. Fetch business-owned IG accounts (covers accounts not linked to user's Pages)
+  try {
+    const adAccount = await getAdAccountDetails(token, adAccountId);
+    const businessId = adAccount?.business?.id;
+    if (businessId) {
+      const bizIgAccounts = await getBusinessOwnedIGAccounts(token, businessId);
+      for (const a of (bizIgAccounts || [])) {
+        if (!seenIds.has(a.id)) {
+          seenIds.add(a.id);
+          accounts.push({ id: a.id, username: a.username, profile_pic: a.profile_pic });
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Business owned IG accounts error:', err.response?.data?.error?.message || err.message);
   }
 
   return accounts;
