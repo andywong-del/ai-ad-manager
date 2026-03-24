@@ -1208,9 +1208,9 @@ export const claimAdAccount = async (token, businessId, adAccountId) => {
 };
 
 export const getConnectedInstagramAccounts = async (token, adAccountId) => {
-  const allResults = []; // collect { id, username, profile_pic, _needsResolve }
-  const addResult = (id, username, profilePic, needsResolve = false) =>
-    allResults.push({ id, username, profile_pic: profilePic, _needsResolve: needsResolve });
+  // Collect { id, username, profile_pic, _source, _pageToken }
+  const allResults = [];
+  const pageTokenMap = new Map(); // igId -> pageToken (for username resolution)
 
   // Run all sources in parallel
   const source1 = metaApi.get(`/${adAccountId}/connected_instagram_accounts`, {
@@ -1218,7 +1218,7 @@ export const getConnectedInstagramAccounts = async (token, adAccountId) => {
   }).then(({ data }) => {
     const found = data.data || [];
     console.log(`[IG Discovery] Source 1 - connected_instagram_accounts: ${found.length}`, found.map(a => a.username));
-    found.forEach(a => addResult(a.id, a.username, a.profile_picture_url));
+    found.forEach(a => allResults.push({ id: a.id, username: a.username, profile_pic: a.profile_picture_url, _source: 1 }));
   }).catch(err => console.error('[IG Discovery] Source 1 ERROR:', err.response?.data?.error?.message || err.message));
 
   const source2and4 = metaApi.get('/me/accounts', {
@@ -1226,9 +1226,14 @@ export const getConnectedInstagramAccounts = async (token, adAccountId) => {
   }).then(async ({ data }) => {
     const pages = data.data || [];
     // Source 2: IG business accounts linked to Pages
-    const igFromPages = pages.filter(p => p.instagram_business_account).map(p => p.instagram_business_account);
-    console.log(`[IG Discovery] Source 2 - Pages (${pages.length}): ${igFromPages.length} IG accounts`, igFromPages.map(a => a.username));
-    igFromPages.forEach(ig => addResult(ig.id, ig.username, ig.profile_picture_url));
+    for (const p of pages) {
+      if (p.instagram_business_account) {
+        const ig = p.instagram_business_account;
+        console.log(`[IG Discovery] Source 2 - Page "${p.name}": @${ig.username}`);
+        allResults.push({ id: ig.id, username: ig.username, profile_pic: ig.profile_picture_url, _source: 2 });
+        if (p.access_token) pageTokenMap.set(ig.id, p.access_token);
+      }
+    }
 
     // Source 4: page-backed + page instagram_accounts (parallel across pages)
     await Promise.allSettled(pages.map(async (page) => {
@@ -1239,9 +1244,10 @@ export const getConnectedInstagramAccounts = async (token, adAccountId) => {
           params: { access_token: pageToken, fields: 'id,username,name,profile_picture_url' }
         });
         for (const a of (igData.data || [])) {
-          const hasRealUsername = a.username && a.username !== a.id;
           console.log(`[IG Discovery] Source 4a - Page "${page.name}": id=${a.id}, username=${a.username || 'NONE'}`);
-          addResult(a.id, hasRealUsername ? a.username : page.name, a.profile_picture_url, !hasRealUsername);
+          // page_backed_instagram_accounts often returns page name as username — always mark for resolution
+          allResults.push({ id: a.id, username: a.username || page.name, profile_pic: a.profile_picture_url, _source: 4, _needsResolve: true });
+          pageTokenMap.set(a.id, pageToken);
         }
       } catch (_) { /* skip */ }
       // 4b: instagram_accounts on page
@@ -1250,10 +1256,9 @@ export const getConnectedInstagramAccounts = async (token, adAccountId) => {
           params: { access_token: pageToken, fields: 'id,username,profile_picture_url' }
         });
         for (const a of (igData.data || [])) {
-          if (a.username) {
-            console.log(`[IG Discovery] Source 4b - Page "${page.name}": ${a.username}`);
-            addResult(a.id, a.username, a.profile_picture_url);
-          }
+          console.log(`[IG Discovery] Source 4b - Page "${page.name}": id=${a.id}, username=${a.username || 'NONE'}`);
+          allResults.push({ id: a.id, username: a.username, profile_pic: a.profile_picture_url, _source: 4, _needsResolve: true });
+          pageTokenMap.set(a.id, pageToken);
         }
       } catch (_) { /* skip */ }
     }));
@@ -1261,43 +1266,47 @@ export const getConnectedInstagramAccounts = async (token, adAccountId) => {
 
   await Promise.allSettled([source1, source2and4]);
 
-  // Deduplicate by ID — prefer entries with real usernames (not needing resolution)
+  // Deduplicate by ID — prefer Source 1 > Source 2 > Source 4
   const seenIds = new Map(); // id -> index in accounts
   const accounts = [];
+  // Sort: source 1 first (most reliable usernames), then 2, then 4
+  allResults.sort((a, b) => (a._source || 99) - (b._source || 99));
   for (const a of allResults) {
     if (!a.id) continue;
     const existing = seenIds.get(a.id);
     if (existing === undefined) {
       seenIds.set(a.id, accounts.length);
       accounts.push(a);
-    } else if (accounts[existing]._needsResolve && !a._needsResolve) {
-      // Replace fallback entry with one that has a real username
-      accounts[existing] = a;
     }
   }
 
-  // Resolve usernames for accounts that still need it (page name fallbacks)
+  // Resolve usernames using page tokens for accounts that need it
   const toResolve = accounts.filter(a => a._needsResolve);
   if (toResolve.length > 0) {
     console.log(`[IG Discovery] Resolving usernames for ${toResolve.length} accounts...`);
     await Promise.allSettled(toResolve.map(async (acct) => {
-      try {
-        const { data } = await metaApi.get(`/${acct.id}`, {
-          params: { access_token: token, fields: 'id,username,profile_picture_url' }
-        });
-        if (data.username) {
-          console.log(`[IG Discovery] Resolved: ${acct.username} -> @${data.username}`);
-          acct.username = data.username;
-          if (data.profile_picture_url) acct.profile_pic = data.profile_picture_url;
+      // Try page token first (more likely to have instagram_basic access), then user token
+      const tokensToTry = [pageTokenMap.get(acct.id), token].filter(Boolean);
+      for (const tryToken of tokensToTry) {
+        try {
+          const { data } = await metaApi.get(`/${acct.id}`, {
+            params: { access_token: tryToken, fields: 'id,username,profile_picture_url' }
+          });
+          if (data.username) {
+            console.log(`[IG Discovery] Resolved: ${acct.username} -> @${data.username}`);
+            acct.username = data.username;
+            if (data.profile_picture_url) acct.profile_pic = data.profile_picture_url;
+            break; // success, stop trying
+          }
+        } catch (err) {
+          console.warn(`[IG Discovery] Could not resolve ${acct.id}: ${err.response?.data?.error?.message || err.message}`);
         }
-      } catch (err) {
-        console.warn(`[IG Discovery] Could not resolve ${acct.id}: ${err.response?.data?.error?.message || err.message}`);
       }
     }));
   }
 
-  // Clean up internal flag before returning
-  const result = accounts.map(({ _needsResolve, ...rest }) => rest);
+  // Clean up internal flags before returning
+  const result = accounts.map(({ _source, _needsResolve, ...rest }) => rest);
   console.log(`[IG Discovery] TOTAL: ${result.length} accounts`, result.map(a => a.username));
   return result;
 };
