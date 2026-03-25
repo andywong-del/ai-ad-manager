@@ -1367,7 +1367,34 @@ export const getIgMedia = async (token, igAccountId, { pageId, after } = {}) => 
       const videos = (data.data || []).filter(m => m.media_type === 'VIDEO');
       const nextCursor = data.paging?.cursors?.after || null;
       console.log(`[getIgMedia] Direct IG media: ${data.data?.length || 0} total, ${videos.length} videos`);
-      return { videos, nextCursor: data.paging?.next ? nextCursor : null };
+
+      // Fetch video insights (3-second views) in parallel for all videos
+      // Try ig_reels_aggregated_all_plays_count (reels) and video_views (older videos)
+      await Promise.allSettled(videos.map(async (v) => {
+        try {
+          const { data: insightData } = await metaApi.get(`/${v.id}/insights`, {
+            params: { access_token: igToken, metric: 'ig_reels_aggregated_all_plays_count,video_views' }
+          });
+          for (const m of (insightData.data || [])) {
+            const val = m.values?.[0]?.value;
+            if (val != null && val > 0) { v.three_second_views = val; break; }
+          }
+        } catch { /* insights not available for all videos */ }
+      }));
+
+      // Normalize IG video fields to match FB video format used by the UI
+      const normalized = videos.map(v => ({
+        ...v,
+        title: v.caption?.slice(0, 80) || 'Untitled',
+        picture: v.thumbnail_url,
+        created_time: v.timestamp,
+        updated_time: v.timestamp,
+        three_second_views: v.three_second_views || 0,
+        source_instagram_media_id: v.id,
+        is_ig: true,
+      }));
+
+      return { videos: normalized, nextCursor: data.paging?.next ? nextCursor : null };
     } catch (err) {
       console.log(`[getIgMedia] IG media endpoint failed (${err.response?.data?.error?.code || err.message}), trying page fallback...`);
     }
