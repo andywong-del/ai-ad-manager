@@ -374,7 +374,7 @@ export const deleteAdImage = async (token, adAccountId, imageHash) => {
 const _videoViewsCache = new Map(); // key → { map, ts }
 const VIEWS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-export const getVideoViewsMap = async (token, adAccountId, { datePreset = 'last_30d' } = {}) => {
+export const getVideoViewsMap = async (token, adAccountId, { datePreset = 'maximum' } = {}) => {
   const cacheKey = `${adAccountId}:${datePreset}`;
   const cached = _videoViewsCache.get(cacheKey);
   if (cached && Date.now() - cached.ts < VIEWS_CACHE_TTL) return cached.map;
@@ -531,7 +531,7 @@ export const getVideoViewsMap = async (token, adAccountId, { datePreset = 'last_
       fields: 'ad_id,video_play_actions',
       date_preset: datePreset,
       limit: 500
-    }, { maxPages: 5 });
+    }, { maxPages: 10 });
 
     // ── Step 5: Aggregate views per video family (deduplicated) ──
     const familyViews = {}; // family_key → total views
@@ -1745,6 +1745,97 @@ export const getIgMedia = async (token, igAccountId, { pageId, adAccountId, afte
   }
 
   return { videos: [], nextCursor: null };
+};
+
+// ─── Universal Video Aggregator ──────────────────────────────────────
+// Single function that merges Page videos + IG media + Ad videos into one
+// deduplicated list with fully aggregated 3-second views from ALL ad insights.
+
+export const getUniversalVideos = async (token, { adAccountId, pageId, igAccountId } = {}) => {
+  // Step 1: Build the global views map (date_preset=maximum) — shared by all sources
+  const viewsMap = adAccountId
+    ? await getVideoViewsMap(token, adAccountId, { datePreset: 'maximum' })
+    : {};
+
+  const cleanTitle = (t) => (t || '').replace(/^Auto_Cropped_AR_.*?(?:DCO_|V\d+_)/i, '').trim() || t || '';
+
+  // Step 2: Fetch all three sources in parallel
+  const [adVids, pageResult, igResult] = await Promise.all([
+    adAccountId
+      ? getAdVideos(token, adAccountId, { viewsMap }).catch(() => [])
+      : Promise.resolve([]),
+    pageId && adAccountId
+      ? getPageVideos(token, pageId, adAccountId).catch(() => ({ videos: [] }))
+      : Promise.resolve({ videos: [] }),
+    igAccountId
+      ? getIgMedia(token, igAccountId, { pageId, adAccountId }).catch(() => ({ videos: [] }))
+      : Promise.resolve({ videos: [] })
+  ]);
+
+  const pageVids = pageResult.videos || [];
+  const igVids = igResult.videos || [];
+
+  // Step 3: Deduplicate and merge into a single map keyed by normalized title+length
+  // This groups all variants (auto-cropped, IG crosspost, ad copy) into one entry
+  const familyMap = {}; // family_key → merged video entry
+
+  const addToFamily = (v, source) => {
+    const title = cleanTitle(v.title) || 'Untitled';
+    const length = Math.round((v.length || 0) * 10) / 10;
+    const fkey = `${title.toLowerCase()}|${Math.round(length)}`;
+    const views = v.three_second_views || 0;
+
+    if (!familyMap[fkey]) {
+      familyMap[fkey] = {
+        id: v.id,
+        title: title,
+        description: v.description,
+        source: v.source,
+        picture: v.picture || v.thumbnail_url,
+        length: v.length || length,
+        created_time: v.created_time,
+        updated_time: v.updated_time,
+        three_second_views: views,
+        source_instagram_media_id: v.source_instagram_media_id,
+        permalink: v.permalink,
+        is_ig: !!v.is_ig,
+        sources: [source],
+        _ids: new Set([v.id])
+      };
+    } else {
+      const entry = familyMap[fkey];
+      // Take the highest view count (already aggregated per-family by viewsMap)
+      if (views > entry.three_second_views) entry.three_second_views = views;
+      // Prefer page/IG metadata over ad metadata (better titles, thumbnails)
+      if ((source === 'page' || source === 'ig') && !entry.sources.includes(source)) {
+        if (v.picture || v.thumbnail_url) entry.picture = v.picture || v.thumbnail_url;
+        if (v.source) entry.source = v.source;
+        if (v.permalink) entry.permalink = v.permalink;
+        if (title !== 'Untitled') entry.title = title;
+      }
+      if (v.source_instagram_media_id) entry.source_instagram_media_id = v.source_instagram_media_id;
+      if (v.is_ig) entry.is_ig = true;
+      // Track latest updated_time
+      if (v.updated_time && (!entry.updated_time || v.updated_time > entry.updated_time)) {
+        entry.updated_time = v.updated_time;
+      }
+      if (!entry.sources.includes(source)) entry.sources.push(source);
+      entry._ids.add(v.id);
+    }
+  };
+
+  // Add in priority order: page first (best metadata), then IG, then ad
+  for (const v of pageVids) addToFamily(v, 'page');
+  for (const v of igVids) addToFamily(v, 'ig');
+  for (const v of adVids) addToFamily(v, 'ad');
+
+  // Step 4: Convert to array, clean up internal fields, sort by views desc
+  const videos = Object.values(familyMap)
+    .map(({ _ids, ...v }) => ({ ...v, variant_count: _ids.size, sources: v.sources }))
+    .sort((a, b) => (b.three_second_views || 0) - (a.three_second_views || 0));
+
+  console.log(`[getUniversalVideos] ${videos.length} unique videos (${pageVids.length} page + ${igVids.length} ig + ${adVids.length} ad before dedup)`);
+  return { videos };
 };
 
 export const getPageAds = async (token, pageId) => {

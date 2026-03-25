@@ -369,7 +369,7 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
   const [websiteExclusions, setWebsiteExclusions] = useState([]);
 
   // Video
-  const [videoSource, setVideoSource] = useState('fb_page');
+  const [videoSource, setVideoSource] = useState('all');
   const [videoSourcePage, setVideoSourcePage] = useState('');
   const [videoSourceIg, setVideoSourceIg] = useState('');
   const [videoIdInput, setVideoIdInput] = useState('');
@@ -524,6 +524,12 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
   // Build the video fetch endpoint
   const getVideoEndpoint = (after) => {
     const sep = (url) => url.includes('?') ? '&' : '?';
+    if (videoSource === 'all') {
+      const pageId = pages[0]?.id || '';
+      const igId = igAccounts[0]?.id || '';
+      const params = [`adAccountId=${adAccountId}`, pageId ? `pageId=${pageId}` : '', igId ? `igAccountId=${igId}` : ''].filter(Boolean).join('&');
+      return `/meta/videos/universal?${params}`;
+    }
     if (videoSource === 'fb_page') {
       const base = `/meta/pages/${videoSourcePage}/videos?adAccountId=${adAccountId}`;
       return after ? `${base}&after=${after}` : base;
@@ -561,7 +567,7 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
       setVideoNextCursor(cursor);
       setVideosLoading(false);
     }).catch(err => { console.error('Video fetch error:', err); setVideosLoading(false); });
-  }, [tab, videoSource, videoSourcePage, videoSourceIg, adAccountId]);
+  }, [tab, videoSource, videoSourcePage, videoSourceIg, adAccountId, pages.length, igAccounts.length]);
 
   // Load more videos when user paginates past current data
   const loadMoreVideos = () => {
@@ -979,6 +985,7 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
                 <div className="flex-1">
                   <label className="block text-xs font-semibold text-slate-600 mb-1">Video Sources</label>
                   <select value={videoSource} onChange={e => setVideoSource(e.target.value)} className={INPUT_CLS}>
+                    <option value="all">All Videos (Aggregated)</option>
                     <option value="fb_page">Facebook Page</option>
                     <option value="ig_account">Instagram professional account</option>
                     <option value="campaign">Campaign</option>

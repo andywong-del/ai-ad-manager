@@ -220,6 +220,19 @@ router.get('/adaccounts/:id/videos', async (req, res, next) => {
   }
 });
 
+// Universal video aggregator — merges Page + IG + Ad videos with full ad insight views
+router.get('/videos/universal', async (req, res, next) => {
+  try {
+    const { adAccountId, pageId, igAccountId } = req.query;
+    if (!adAccountId) return res.status(400).json({ error: 'adAccountId is required' });
+    const data = await metaClient.getUniversalVideos(req.token, { adAccountId, pageId, igAccountId });
+    res.json(data);
+  } catch (err) {
+    const metaErr = err.response?.data?.error;
+    res.status(err.response?.status || 500).json({ error: metaErr?.message || err.message, code: metaErr?.code });
+  }
+});
+
 // Pixels for an ad account
 router.get('/adaccounts/:id/pixels', async (req, res, next) => {
   try {
