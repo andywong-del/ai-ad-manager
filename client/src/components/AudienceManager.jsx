@@ -1037,6 +1037,27 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
                 )}
               </div>
 
+              {/* Engagement Type — select before choosing videos */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Engagement Type</label>
+                <select value={engagementType} onChange={e => setEngagementType(e.target.value)} className={INPUT_CLS}>
+                  <option value="">Choose an engagement type</option>
+                  <option value="video_watched_3s">People who have viewed at least 3 seconds of your video</option>
+                  <option value="video_watched_10s">People who have viewed at least 10 seconds of your video</option>
+                  <option value="video_watched_15s">People who either completed or viewed at least 15 seconds (ThruPlay)</option>
+                  <option value="video_watched_25pct">People who have viewed at least 25% of your video</option>
+                  <option value="video_watched_50pct">People who have viewed at least 50% of your video</option>
+                  <option value="video_watched_75pct">People who have viewed at least 75% of your video</option>
+                  <option value="video_watched_95pct">People who have viewed at least 95% of your video</option>
+                </select>
+              </div>
+
+              {/* Retention */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Retention (days)</label>
+                <input type="number" value={retentionDays} onChange={e => setRetentionDays(Number(e.target.value))} min={1} max={365} className={INPUT_CLS} />
+              </div>
+
               {/* Empty state prompts */}
               {videoSource === 'fb_page' && !videoSourcePage && (
                 <p className="text-xs text-slate-400 italic text-center py-4">Select a Facebook Page to see its videos</p>
@@ -1218,23 +1239,6 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
                 </div>
               )}
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Engagement Type</label>
-                <select value={engagementType} onChange={e => setEngagementType(e.target.value)} className={INPUT_CLS}>
-                  <option value="">Choose an engagement type</option>
-                  <option value="video_watched_3s">People who have viewed at least 3 seconds of your video</option>
-                  <option value="video_watched_10s">People who have viewed at least 10 seconds of your video</option>
-                  <option value="video_watched_15s">People who either completed or viewed at least 15 seconds (ThruPlay)</option>
-                  <option value="video_watched_25pct">People who have viewed at least 25% of your video</option>
-                  <option value="video_watched_50pct">People who have viewed at least 50% of your video</option>
-                  <option value="video_watched_75pct">People who have viewed at least 75% of your video</option>
-                  <option value="video_watched_95pct">People who have viewed at least 95% of your video</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Retention (days)</label>
-                <input type="number" value={retentionDays} onChange={e => setRetentionDays(Number(e.target.value))} min={1} max={365} className={INPUT_CLS} />
-              </div>
             </>
           )}
 
