@@ -1348,7 +1348,7 @@ export const getConnectedInstagramAccounts = async (token, adAccountId) => {
 
 export const getPages = async (token) => {
   const { data } = await metaApi.get('/me/accounts', {
-    params: { access_token: token, fields: 'id,name,engagement,fan_count,category,access_token' }
+    params: { access_token: token, fields: 'id,name,engagement,fan_count,category,access_token,instagram_business_account{id,name,username}' }
   });
   return data.data;
 };
@@ -1393,18 +1393,29 @@ export const getPageVideos = async (token, pageId, adAccountId, { after } = {}) 
 };
 
 export const getIgMedia = async (token, igAccountId, { pageId, after } = {}) => {
-  // Try direct IG media endpoint first (requires instagram_business_basic)
+  // Try direct IG media endpoint (requires instagram_basic permission)
+  // Use page token if available — page tokens carry instagram_basic scope
+  let igToken = token;
+  if (pageId) {
+    try {
+      const pages = await getPages(token);
+      const page = pages?.find(p => p.id === pageId);
+      if (page?.access_token) igToken = page.access_token;
+    } catch { /* use user token */ }
+  }
+
   if (!after) {
     try {
       const { data } = await metaApi.get(`/${igAccountId}/media`, {
         params: {
-          access_token: token,
-          fields: 'id,media_type,media_url,thumbnail_url,caption,timestamp',
+          access_token: igToken,
+          fields: 'id,media_type,media_url,thumbnail_url,caption,timestamp,permalink',
           limit: 50
         }
       });
       const videos = (data.data || []).filter(m => m.media_type === 'VIDEO');
       const nextCursor = data.paging?.cursors?.after || null;
+      console.log(`[getIgMedia] Direct IG media: ${data.data?.length || 0} total, ${videos.length} videos`);
       return { videos, nextCursor: data.paging?.next ? nextCursor : null };
     } catch (err) {
       console.log(`[getIgMedia] IG media endpoint failed (${err.response?.data?.error?.code || err.message}), trying page fallback...`);
