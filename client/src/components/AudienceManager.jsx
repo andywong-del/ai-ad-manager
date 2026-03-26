@@ -570,7 +570,7 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
     }).catch(err => { console.error('Video fetch error:', err); setVideosLoading(false); });
   }, [tab, videoSource, videoSourcePage, videoSourceIg, adAccountId, pages.length, igAccounts.length]);
 
-  // Load more videos when user paginates past current data
+  // Load more videos when user paginates past current data — advance page AFTER data arrives
   const loadMoreVideos = () => {
     if (!videoNextCursor || videoLoadingMore) return;
     setVideoLoadingMore(true);
@@ -580,6 +580,7 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
       const cursor = Array.isArray(res) ? null : (res.nextCursor || null);
       setVideos(prev => [...prev, ...normalizeVideos(raw, videoSource)]);
       setVideoNextCursor(cursor);
+      setVideoPage(p => p + 1); // advance page only after data is ready
       setVideoLoadingMore(false);
     }).catch(err => { console.error('Load more videos error:', err); setVideoLoadingMore(false); });
   };
@@ -1091,8 +1092,10 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
                     Select Videos <span className="text-slate-400 font-normal">({selectedVideoIds.length} selected)</span>
                   </label>
                   {videosLoading ? (
-                    <div className="flex items-center gap-2 py-6 justify-center text-xs text-slate-400">
-                      <RefreshCw size={14} className="animate-spin" /> Loading videos...
+                    <div className="flex flex-col items-center gap-2 py-8 justify-center text-xs text-slate-400">
+                      <RefreshCw size={16} className="animate-spin text-blue-400" />
+                      <span>Loading videos & fetching view metrics...</span>
+                      <span className="text-[10px] text-slate-300">This may take a moment for accounts with many videos</span>
                     </div>
                   ) : videos.length === 0 ? (
                     <p className="text-xs text-slate-400 italic py-4 text-center">No videos found</p>
@@ -1234,15 +1237,14 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
                         </span>
                         <button onClick={() => {
                           if (safePage >= totalPages - 1 && videoNextCursor) {
-                            // On last page with more data available — fetch next batch then advance
+                            // On last page with more data — fetch next batch (page advances in callback)
                             loadMoreVideos();
-                            setVideoPage(p => p + 1);
                           } else {
                             setVideoPage(p => Math.min(totalPages - 1, p + 1));
                           }
-                        }} disabled={safePage >= totalPages - 1 && !videoNextCursor}
-                          className={`px-2.5 py-1 rounded-md text-[11px] font-medium border ${safePage >= totalPages - 1 && !videoNextCursor ? 'border-slate-100 text-slate-300 cursor-not-allowed' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
-                          {videoLoadingMore ? '…' : 'Next ▶'}
+                        }} disabled={(safePage >= totalPages - 1 && !videoNextCursor) || videoLoadingMore}
+                          className={`px-2.5 py-1 rounded-md text-[11px] font-medium border ${(safePage >= totalPages - 1 && !videoNextCursor) || videoLoadingMore ? 'border-slate-100 text-slate-300 cursor-not-allowed' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                          {videoLoadingMore ? <><RefreshCw size={11} className="inline animate-spin mr-1" />Loading...</> : 'Next ▶'}
                         </button>
                       </div>
                     )}
