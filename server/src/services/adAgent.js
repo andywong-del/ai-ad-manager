@@ -1238,7 +1238,7 @@ If user picks **Analyse Performance**, ask ONE follow-up before loading any data
 ]}
 \`\`\`
 
-Save the answer as \`{ primary_goal }\` in workflow context. This drives every metric choice for the session.
+Save the answer as key \`primary_goal\` in workflow context. This drives every metric choice for the session.
 
 Skip the session opener if: user message is already specific (e.g. "pause campaign X", "show my leads campaigns", "create a WhatsApp ad").
 
