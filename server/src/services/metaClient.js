@@ -1578,14 +1578,38 @@ export const getPageVideos = async (token, pageId, adAccountId, { after } = {}) 
       } catch { /* IG crosspost detection failed, skip */ }
     }
 
+    // Build ad video lookup by rounded length for same-account matching
+    // Safe because we resolved the CORRECT ad account for this page's business
+    const adByLength = {}; // length_tenths → highest views
+    if (resolvedAdAccount) {
+      try {
+        const adVids = await getAdVideos(token, resolvedAdAccount, { viewsMap });
+        for (const av of (adVids || [])) {
+          const lenKey = Math.round((av.length || 0) * 10);
+          if (lenKey > 0 && (av.three_second_views || 0) > (adByLength[lenKey]?.views || 0)) {
+            adByLength[lenKey] = { views: av.three_second_views, updated_time: av.updated_time };
+          }
+        }
+      } catch { /* skip */ }
+    }
+
     const pageVideos = rawPageVideos.map(v => {
-      // Priority: ad-level 3s views (from correct ad account) → organic views
-      const adViews = viewsMap[v.id] || 0;
+      // Priority: 1) exact video_id match, 2) length match from same ad account, 3) organic views
+      let adViews = viewsMap[v.id] || 0;
+      let lastUsed = v.updated_time;
+      if (!adViews && v.length) {
+        const lenKey = Math.round((v.length || 0) * 10);
+        const match = adByLength[lenKey];
+        if (match?.views) { adViews = match.views; }
+        if (match?.updated_time && (!lastUsed || match.updated_time > lastUsed)) {
+          lastUsed = match.updated_time;
+        }
+      }
       const isCrosspost = !!igCrosspostMap[v.id] || !!v.source_instagram_media_id;
       return {
         ...v,
         three_second_views: adViews || v.views || 0,
-        updated_time: v.updated_time,
+        updated_time: lastUsed,
         is_ig: isCrosspost,
         sources: isCrosspost ? ['page', 'ig'] : ['page']
       };
@@ -1663,6 +1687,20 @@ export const getIgMedia = async (token, igAccountId, { pageId, adAccountId, afte
         }));
       }
 
+      // Build ad video length lookup for same-account matching
+      const adByLength = {};
+      if (resolvedAdAccount) {
+        try {
+          const adVids = await getAdVideos(token, resolvedAdAccount, { viewsMap });
+          for (const av of (adVids || [])) {
+            const lenKey = Math.round((av.length || 0) * 10);
+            if (lenKey > 0 && (av.three_second_views || 0) > (adByLength[lenKey]?.views || 0)) {
+              adByLength[lenKey] = { views: av.three_second_views, updated_time: av.updated_time };
+            }
+          }
+        } catch { /* skip */ }
+      }
+
       // Also fetch page videos to get ad-level views for crossposted content
       let pageVideoViews = {}; // crosspost matching by timestamp
       if (resolvedPageId) {
@@ -1674,15 +1712,20 @@ export const getIgMedia = async (token, igAccountId, { pageId, adAccountId, afte
             params: { access_token: pt, fields: 'id,title,description,source,picture,length,created_time,updated_time,views,source_instagram_media_id', limit: 50 }
           });
           for (const pv of (pvData.data || [])) {
-            // Ad-level views for this page video
-            const adViews = viewsMap[pv.id] || 0;
+            // Ad-level views: exact ID match → length match from same ad account → organic
+            let adViews = viewsMap[pv.id] || 0;
+            if (!adViews && pv.length) {
+              const lenKey = Math.round((pv.length || 0) * 10);
+              adViews = adByLength[lenKey]?.views || 0;
+            }
             if (pv.created_time) {
               pageVideoViews[pv.created_time.slice(0, 16)] = {
                 views: adViews || pv.views || 0,
                 title: pv.title,
                 picture: pv.picture,
                 length: pv.length,
-                id: pv.id
+                id: pv.id,
+                updated_time: adByLength[Math.round((pv.length || 0) * 10)]?.updated_time || pv.updated_time
               };
             }
           }
@@ -1720,12 +1763,19 @@ export const getIgMedia = async (token, igAccountId, { pageId, adAccountId, afte
           const igTimestamps = new Set(videos.map(v => v.timestamp?.slice(0, 16)));
           const extra = (pvData.data || [])
             .filter(pv => !igTimestamps.has(pv.created_time?.slice(0, 16)))
-            .map(pv => ({
-              ...pv,
-              three_second_views: viewsMap[pv.id] || pv.views || 0,
-              is_ig: false,
-              sources: ['page']
-            }));
+            .map(pv => {
+              let adViews = viewsMap[pv.id] || 0;
+              if (!adViews && pv.length) {
+                const lenKey = Math.round((pv.length || 0) * 10);
+                adViews = adByLength[lenKey]?.views || 0;
+              }
+              return {
+                ...pv,
+                three_second_views: adViews || pv.views || 0,
+                is_ig: false,
+                sources: ['page']
+              };
+            });
           if (extra.length) {
             const merged = [...normalized, ...extra];
             merged.sort((a, b) => (b.three_second_views || 0) - (a.three_second_views || 0));
