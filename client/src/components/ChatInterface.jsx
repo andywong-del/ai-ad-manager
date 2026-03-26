@@ -1270,7 +1270,7 @@ const ActionCard = ({ label, desc, prompt, onSend, disabled }) => (
     <p className="text-[14px] font-bold text-slate-900 leading-snug mt-3">{label}</p>
     <p className="text-[12px] text-slate-400 leading-relaxed mt-1.5 flex-1">{desc}</p>
     <div className="flex items-center gap-1 mt-3 text-[11px] font-semibold text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity">
-      Generate Report <ArrowUpRight size={11} />
+      Ask now <ArrowUpRight size={11} />
     </div>
   </button>
 );
