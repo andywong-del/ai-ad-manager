@@ -281,6 +281,149 @@ Ask: **"Type 'delete' to confirm, or should I swap the creative on linked ads fi
 
 **Step 4 VERIFY** -- Confirm deletion.
 
+### Creating a Carousel Ad
+
+**Step 1 READ** — Determine card count and upload images.
+
+Ask how many cards:
+
+```options
+{"title":"How many carousel cards?","options":[
+  {"id":"2","title":"2 cards"},
+  {"id":"3","title":"3 cards"},
+  {"id":"4","title":"4 cards"},
+  {"id":"custom","title":"Custom (5-10)"}
+]}
+```
+
+**Validation**: Minimum 2 cards, maximum 10. Reject if outside range.
+
+For each card, user uploads an image. Each upload calls:
+
+```
+POST /api/assets/images
+```
+
+After each upload, immediately confirm and collect card details:
+
+```metrics
+Card 1 uploaded ✓
+Hash: abc123
+Dimensions: 1080x1080
+```
+
+Then ask for that card's headline + URL:
+- Headline (max 40 chars)
+- Landing URL (each card can have an independent link)
+
+Repeat for every card. Track progress:
+
+```metrics
+Carousel Progress
+Cards uploaded: 3 of 4
+Card 1: ✓ "夏日新品" → example.com/summer
+Card 2: ✓ "限時優惠" → example.com/sale
+Card 3: ✓ "免運費" → example.com/shipping
+Card 4: pending upload
+```
+
+**All cards MUST be 1080x1080 (1:1)**. Warn immediately if dimensions don't match.
+
+**Step 2 CONFIRM** — Show full carousel structure with ordering.
+
+Once all cards are uploaded, display the complete carousel review:
+
+```steps
+Action: CREATE carousel creative
+Page: 111222333 ("My Store")
+Primary Text: "探索我哋嘅新系列"
+CTA: SHOP_NOW (applied to all cards)
+URL Tags: utm_source=fb&utm_campaign=carousel
+
+┌─────────────────────────────────────────────────┐
+│ Card 1: [abc123] "夏日新品"                       │
+│         → https://example.com/summer             │
+├─────────────────────────────────────────────────┤
+│ Card 2: [def456] "限時優惠"                       │
+│         → https://example.com/sale               │
+├─────────────────────────────────────────────────┤
+│ Card 3: [ghi789] "免運費"                         │
+│         → https://example.com/shipping           │
+├─────────────────────────────────────────────────┤
+│ Card 4: [jkl012] "新會員專享"                      │
+│         → https://example.com/member             │
+└─────────────────────────────────────────────────┘
+Total cards: 4
+```
+
+Then offer reordering:
+
+```options
+{"title":"Card order — any changes?","options":[
+  {"id":"confirm","title":"Order looks good ✓","description":"Proceed with current sequence"},
+  {"id":"swap","title":"Swap card positions","description":"Tell me which cards to swap (e.g. swap 1 and 3)"},
+  {"id":"remove","title":"Remove a card","description":"Drop one card from the carousel"},
+  {"id":"add","title":"Add another card","description":"Upload one more image (max 10)"}
+]}
+```
+
+If user requests a swap, reorder the `child_attachments` array and re-display the full list.
+
+**Validation checks before proceeding:**
+- ✅ Card count: 2-10 cards
+- ✅ All images: 1080x1080 (1:1)
+- ✅ All cards have headline + URL
+- ✅ CTA type is the same across all cards (carousel requires uniform CTA)
+- ✅ Primary text is set
+
+If any check fails, show which card has the issue and ask user to fix it.
+
+Ask: **"Should I proceed?"**
+
+**Step 3 EXECUTE** — Build the `object_story_spec` and create.
+
+```json
+{
+  "page_id": "PAGE_ID",
+  "link_data": {
+    "link": "https://example.com",
+    "message": "Primary text for carousel",
+    "child_attachments": [
+      { "image_hash": "abc123", "name": "夏日新品", "link": "https://example.com/summer" },
+      { "image_hash": "def456", "name": "限時優惠", "link": "https://example.com/sale" },
+      { "image_hash": "ghi789", "name": "免運費", "link": "https://example.com/shipping" },
+      { "image_hash": "jkl012", "name": "新會員專享", "link": "https://example.com/member" }
+    ],
+    "call_to_action": { "type": "SHOP_NOW" }
+  }
+}
+```
+
+```
+POST /api/creatives
+```
+
+**Step 4 VERIFY** — Confirm and preview.
+
+```
+GET /api/creatives/:new_id
+GET /api/creatives/:new_id/previews?ad_format=MOBILE_FEED_STANDARD
+```
+
+```metrics
+Carousel Creative Created ✓
+ID: 120200...
+Name: "Product Carousel v1"
+Cards: 4
+CTA: SHOP_NOW
+```
+
+```quickreplies
+["Preview on Instagram", "Create ad with this creative", "Add more cards", "Create another carousel"]
+```
+
+---
+
 ### Boost Existing Post Flow
 
 1. Call `GET /api/pages` to list pages.
@@ -297,6 +440,7 @@ Ask: **"Type 'delete' to confirm, or should I swap the creative on linked ads fi
 - **Deletions**: Warn about linked ads that will stop delivering. Suggest swapping the creative on ads first. Require explicit "delete" confirmation.
 - **Ad copy policy**: Never generate clickbait, misleading claims, or personal attributes ("Are you struggling with...") -- these violate Meta advertising policy.
 - **Image/video specs**: Validate dimensions match target placement before uploading. Warn if specs do not match.
+- **Carousel validation**: Minimum 2 cards, maximum 10. All images must be 1080x1080 (1:1). CTA type must be uniform across all cards. Every card must have a headline and URL. Always display full card list and offer reordering before creation.
 - **Bulk operations**: Max 10 creatives per batch with per-batch confirmation.
 
 ## Quick Reference
