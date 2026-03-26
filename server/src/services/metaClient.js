@@ -1585,6 +1585,22 @@ export const getIgMedia = async (token, igAccountId, { pageId, adAccountId, afte
       const nextCursor = data.paging?.cursors?.after || null;
       console.log(`[getIgMedia] Direct IG media: ${data.data?.length || 0} total, ${videos.length} videos`);
 
+      // Batch-fetch native IG media views via /{media_id}/insights?metric=views
+      // Per Meta docs: 'views' metric is active for FEED, REELS, STORY
+      const igViews = {}; // media_id → view count
+      for (let i = 0; i < videos.length; i += 25) {
+        const batch = videos.slice(i, i + 25);
+        await Promise.all(batch.map(async (v) => {
+          try {
+            const { data: insData } = await metaApi.get(`/${v.id}/insights`, {
+              params: { access_token: igToken, metric: 'views' }
+            });
+            const val = insData.data?.[0]?.values?.[0]?.value;
+            if (val != null) igViews[v.id] = parseInt(val, 10) || 0;
+          } catch { /* views not available for this media */ }
+        }));
+      }
+
       // Normalize IG video fields to match FB video format used by the UI
       const normalized = videos.map(v => ({
         ...v,
@@ -1592,7 +1608,7 @@ export const getIgMedia = async (token, igAccountId, { pageId, adAccountId, afte
         picture: v.thumbnail_url,
         created_time: v.timestamp,
         updated_time: v.timestamp,
-        three_second_views: 0, // IG media endpoint doesn't return views
+        three_second_views: igViews[v.id] || 0,
         source_instagram_media_id: v.id,
         is_ig: true,
       }));
