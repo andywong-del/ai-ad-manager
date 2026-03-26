@@ -1505,20 +1505,10 @@ export const getPages = async (token) => {
 };
 
 export const getPageVideos = async (token, pageId, adAccountId, { after } = {}) => {
-  // First get the page access token (required for /{pageId}/videos)
+  // Get the page access token (required for /{pageId}/videos)
   const pages = await getPages(token);
   const page = pages?.find(p => p.id === pageId);
   const pageToken = page?.access_token || token;
-
-  // Build ad insights views map first, then pass to getAdVideos to avoid redundant call
-  const viewsMapPromise = adAccountId ? getVideoViewsMap(token, adAccountId) : Promise.resolve({});
-  // getAdVideos reuses the same viewsMap (no duplicate getVideoViewsMap call)
-  const adVidsPromise = adAccountId
-    ? viewsMapPromise.then(vm => getAdVideos(token, adAccountId, { viewsMap: vm })).catch(() => [])
-    : Promise.resolve([]);
-
-  // Strip Meta auto-crop prefix from ad video titles
-  const cleanTitle = (t) => (t || '').replace(/^Auto_Cropped_AR_.*?(?:DCO_|V\d+_)/i, '').trim() || t || '';
 
   try {
     const params = {
@@ -1528,15 +1518,10 @@ export const getPageVideos = async (token, pageId, adAccountId, { after } = {}) 
     };
     if (after) params.after = after;
 
-    const [{ data }, viewsMap, adVids] = await Promise.all([
-      metaApi.get(`/${pageId}/videos`, { params }),
-      viewsMapPromise,
-      adVidsPromise
-    ]);
-
+    const { data } = await metaApi.get(`/${pageId}/videos`, { params });
     const rawPageVideos = (data.data || []).filter(v => !v.status || v.status.video_status === 'ready');
 
-    // Batch-fetch native video insights (blue_reels_play_count) for accurate 3s views
+    // Batch-fetch native video insights (blue_reels_play_count) for 3s-like view count
     const nativeViews = {}; // video_id → play count
     const videoIds = rawPageVideos.map(v => v.id);
     for (let i = 0; i < videoIds.length; i += 25) {
@@ -1554,41 +1539,18 @@ export const getPageVideos = async (token, pageId, adAccountId, { after } = {}) 
       } catch { /* video_insights not available for some videos, skip */ }
     }
 
-    const pageVideos = rawPageVideos.map(v => {
-      // Priority: 1) exact ad match by video ID, 2) native video_insights, 3) views field
-      const adViews = viewsMap[v.id] || 0;
-      const native = nativeViews[v.id];
-      const views = adViews || native || v.views || 0;
-      return {
-        ...v,
-        title: cleanTitle(v.title) || v.title,
-        three_second_views: views,
-        updated_time: v.updated_time
-      };
-    });
+    // Use native video insights only — no ad account cross-matching
+    const pageVideos = rawPageVideos.map(v => ({
+      ...v,
+      three_second_views: nativeViews[v.id] || v.views || 0,
+      updated_time: v.updated_time
+    }));
+
     const nextCursor = data.paging?.cursors?.after || null;
     const hasMore = !!data.paging?.next;
-
-    // Merge ad account videos not already in page list (dedup by exact ID only)
-    if (!after && adVids?.length) {
-      const pageVideoIds = new Set(pageVideos.map(v => v.id));
-      const extra = adVids
-        .filter(v => !pageVideoIds.has(v.id))
-        .map(v => ({ ...v, title: cleanTitle(v.title) }));
-      const merged = [...pageVideos, ...extra].sort((a, b) =>
-        (b.updated_time || b.created_time || '').localeCompare(a.updated_time || a.created_time || ''));
-      return { videos: merged, nextCursor: hasMore ? nextCursor : null };
-    }
-
     return { videos: pageVideos, nextCursor: hasMore ? nextCursor : null };
   } catch (err) {
     console.error('getPageVideos error:', err.response?.data?.error?.message || err.message);
-    if (!after && adAccountId) {
-      try {
-        const adVids = await getAdVideos(token, adAccountId);
-        return { videos: (adVids || []).map(v => ({ ...v, title: cleanTitle(v.title) })), nextCursor: null };
-      } catch { /* */ }
-    }
     return { videos: [], nextCursor: null };
   }
 };
@@ -1600,7 +1562,6 @@ const resolveViews = (viewsMap, videoId, length, organicViews = 0) => {
 };
 
 export const getIgMedia = async (token, igAccountId, { pageId, adAccountId, after } = {}) => {
-  // Try direct IG media endpoint (requires instagram_basic permission)
   // Use page token if available — page tokens carry instagram_basic scope
   let igToken = token;
   if (pageId) {
@@ -1611,21 +1572,15 @@ export const getIgMedia = async (token, igAccountId, { pageId, adAccountId, afte
     } catch { /* use user token */ }
   }
 
-  // Build ad insights views map in parallel (if ad account available)
-  const viewsMapPromise = adAccountId ? getVideoViewsMap(token, adAccountId) : Promise.resolve({});
-
   if (!after) {
     try {
-      const [{ data }, viewsMap] = await Promise.all([
-        metaApi.get(`/${igAccountId}/media`, {
-          params: {
-            access_token: igToken,
-            fields: 'id,media_type,media_url,thumbnail_url,caption,timestamp,permalink',
-            limit: 50
-          }
-        }),
-        viewsMapPromise
-      ]);
+      const { data } = await metaApi.get(`/${igAccountId}/media`, {
+        params: {
+          access_token: igToken,
+          fields: 'id,media_type,media_url,thumbnail_url,caption,timestamp,permalink',
+          limit: 50
+        }
+      });
       const videos = (data.data || []).filter(m => m.media_type === 'VIDEO');
       const nextCursor = data.paging?.cursors?.after || null;
       console.log(`[getIgMedia] Direct IG media: ${data.data?.length || 0} total, ${videos.length} videos`);
@@ -1637,13 +1592,12 @@ export const getIgMedia = async (token, igAccountId, { pageId, adAccountId, afte
         picture: v.thumbnail_url,
         created_time: v.timestamp,
         updated_time: v.timestamp,
-        three_second_views: resolveViews(viewsMap, v.id, v.length),
+        three_second_views: 0, // IG media endpoint doesn't return views
         source_instagram_media_id: v.id,
         is_ig: true,
       }));
 
-      // If we got some IG videos and there's a page, also fetch page videos and merge
-      // (many IG videos are crossposted and only appear under page videos)
+      // Merge crossposted page videos (they have views + duration)
       if (pageId) {
         try {
           const pagePages = await getPages(token);
@@ -1654,10 +1608,9 @@ export const getIgMedia = async (token, igAccountId, { pageId, adAccountId, afte
           });
           const pageVids = (pvData.data || []).map(pv => ({
             ...pv,
-            three_second_views: resolveViews(viewsMap, pv.id, pv.length, pv.views),
+            three_second_views: pv.views || 0,
             is_ig: !!pv.source_instagram_media_id
           }));
-          // Merge: page videos first (they have views + duration), dedupe by source_instagram_media_id
           const igIds = new Set(normalized.map(n => n.id));
           const extra = pageVids.filter(pv => !igIds.has(pv.id) && !igIds.has(pv.source_instagram_media_id));
           console.log(`[getIgMedia] Merged: ${normalized.length} IG + ${extra.length} page videos`);
@@ -1672,9 +1625,8 @@ export const getIgMedia = async (token, igAccountId, { pageId, adAccountId, afte
     }
   }
 
-  // Fallback: fetch videos from the linked FB Page (works without instagram_business_basic)
+  // Fallback: fetch videos from the linked FB Page
   if (pageId) {
-    const viewsMap = await viewsMapPromise;
     const pages = await getPages(token);
     const page = pages?.find(p => p.id === pageId);
     const pageToken = page?.access_token || token;
@@ -1688,7 +1640,7 @@ export const getIgMedia = async (token, igAccountId, { pageId, adAccountId, afte
       const { data } = await metaApi.get(`/${pageId}/videos`, { params });
       const videos = (data.data || []).map(v => ({
         ...v,
-        three_second_views: resolveViews(viewsMap, v.id, v.length, v.views),
+        three_second_views: v.views || 0,
         is_ig: !!v.source_instagram_media_id
       }));
       const nextCursor = data.paging?.cursors?.after || null;
