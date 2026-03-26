@@ -1682,9 +1682,10 @@ export const getIgMedia = async (token, igAccountId, { pageId, adAccountId, afte
         }),
         viewsMapPromise
       ]);
-      const videos = (data.data || []).filter(m => m.media_type === 'VIDEO');
+      const allMedia = data.data || [];
+      const videos = allMedia.filter(m => m.media_type === 'VIDEO' || m.media_type === 'REELS');
       const nextCursor = data.paging?.cursors?.after || null;
-      console.log(`[getIgMedia] Direct IG media: ${data.data?.length || 0} total, ${videos.length} videos`);
+      console.log(`[getIgMedia] Direct IG media: ${allMedia.length} total (types: ${[...new Set(allMedia.map(m => m.media_type))].join(',')}), ${videos.length} videos`);
 
       // Fetch page videos + ad views + native IG views ALL in parallel to avoid serial bottleneck
       const pageVideoViewsPromise = (async () => {
@@ -1792,17 +1793,18 @@ export const getIgMedia = async (token, igAccountId, { pageId, adAccountId, afte
       };
       if (after) params.after = after;
       const { data } = await metaApi.get(`/${resolvedPageId}/videos`, { params });
-      // Only return IG-crossposted videos — FB-only videos belong in the Page source
-      const videos = (data.data || [])
-        .filter(v => !!v.source_instagram_media_id)
-        .map(v => ({
-          ...v,
-          three_second_views: viewsMap[v.id] || v.views || 0,
-          is_ig: true,
-          sources: ['ig', 'page']
-        }));
+      // Prefer IG-crossposted videos, but if none found, return all page videos as fallback
+      const allPageVids = (data.data || []);
+      const crossposted = allPageVids.filter(v => !!v.source_instagram_media_id);
+      const useVids = crossposted.length > 0 ? crossposted : allPageVids;
+      const videos = useVids.map(v => ({
+        ...v,
+        three_second_views: viewsMap[v.id] || v.views || 0,
+        is_ig: !!v.source_instagram_media_id,
+        sources: v.source_instagram_media_id ? ['ig', 'page'] : ['page']
+      }));
       videos.sort((a, b) => (b.three_second_views || 0) - (a.three_second_views || 0));
-      console.log(`[getIgMedia] Page fallback: ${videos.length} IG-crossposted videos from page ${resolvedPageId}`);
+      console.log(`[getIgMedia] Page fallback: ${crossposted.length} crossposted + ${allPageVids.length} total from page ${resolvedPageId}`);
       return { videos, nextCursor: data.paging?.next ? nextCursor : null };
     } catch (err2) {
       console.log(`[getIgMedia] Page fallback failed: ${err2.response?.data?.error?.message || err2.message}`);
