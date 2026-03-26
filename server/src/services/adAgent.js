@@ -911,16 +911,23 @@ const adTools = [
   T('load_skill', 'Load a skill\'s detailed workflow guidance. Call this BEFORE executing complex flows like campaign creation, audience creation, report generation, etc. The skill contains step-by-step instructions, API formats, and best practices. Available skills: campaign-manager, targeting-audiences, creative-manager, insights-reporting, ad-manager, adset-manager, tracking-conversions, automation-rules, business-manager, lead-ads, product-catalogs.',
     async (_args, context) => {
       const { skill_name } = _args;
+      // Search across all 3 layer subfolders
+      for (const layer of ['analytical', 'strategic', 'operational']) {
+        try {
+          const filepath = path.join(SKILLS_DIR, layer, `${skill_name}.md`);
+          const content = await fs.readFile(filepath, 'utf-8');
+          const body = content.replace(/^---\n[\s\S]*?\n---\n?/, '').trim();
+          return { skill: skill_name, layer, content: body };
+        } catch { /* try next layer */ }
+      }
+      // Fallback: flat file in SKILLS_DIR
       try {
         const filepath = path.join(SKILLS_DIR, `${skill_name}.md`);
         const content = await fs.readFile(filepath, 'utf-8');
-        // Strip frontmatter
         const body = content.replace(/^---\n[\s\S]*?\n---\n?/, '').trim();
         return { skill: skill_name, content: body };
       } catch {
-        const files = await fs.readdir(SKILLS_DIR).catch(() => []);
-        const available = files.filter(f => f.endsWith('.md')).map(f => f.replace('.md', ''));
-        return { error: `Skill "${skill_name}" not found. Available: ${available.join(', ')}` };
+        return { error: `Skill "${skill_name}" not found. Available: campaign-manager, targeting-audiences, creative-manager, insights-reporting, ad-manager, adset-manager, tracking-conversions, automation-rules, business-manager, lead-ads, product-catalogs` };
       }
     },
     obj({ skill_name: str('Skill ID to load, e.g. "campaign-manager", "targeting-audiences", "creative-manager", "insights-reporting"') }, ['skill_name'])),

@@ -42,14 +42,27 @@ router.get('/', async (_req, res) => {
   try {
     const skills = [];
 
-    // Read default skills
+    // Read default skills (scan subfolders: analytical, strategic, operational)
     try {
-      const defaultFiles = await fs.readdir(DEFAULT_DIR);
-      for (const file of defaultFiles.filter(f => f.endsWith('.md'))) {
-        const content = await fs.readFile(path.join(DEFAULT_DIR, file), 'utf-8');
-        const skill = parseMd(content, file);
-        skill.isDefault = true;
-        skills.push(skill);
+      const entries = await fs.readdir(DEFAULT_DIR, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          const subDir = path.join(DEFAULT_DIR, entry.name);
+          const files = await fs.readdir(subDir);
+          for (const file of files.filter(f => f.endsWith('.md'))) {
+            const content = await fs.readFile(path.join(subDir, file), 'utf-8');
+            const skill = parseMd(content, file);
+            skill.isDefault = true;
+            skill.layer = entry.name;
+            skills.push(skill);
+          }
+        } else if (entry.name.endsWith('.md')) {
+          // Also support flat .md files in default/ for backwards compat
+          const content = await fs.readFile(path.join(DEFAULT_DIR, entry.name), 'utf-8');
+          const skill = parseMd(content, entry.name);
+          skill.isDefault = true;
+          skills.push(skill);
+        }
       }
     } catch {}
 
@@ -77,12 +90,20 @@ router.get('/:id', async (req, res) => {
     const { id } = req.params;
     const filename = `${id}.md`;
 
-    // Try default first, then custom
-    for (const dir of [DEFAULT_DIR, CUSTOM_DIR]) {
+    // Search default subfolders (analytical, strategic, operational), then custom
+    const searchDirs = [
+      path.join(DEFAULT_DIR, 'analytical'),
+      path.join(DEFAULT_DIR, 'strategic'),
+      path.join(DEFAULT_DIR, 'operational'),
+      DEFAULT_DIR, // flat fallback
+      CUSTOM_DIR,
+    ];
+    for (const dir of searchDirs) {
       try {
         const content = await fs.readFile(path.join(dir, filename), 'utf-8');
         const skill = parseMd(content, filename);
-        skill.isDefault = dir === DEFAULT_DIR;
+        skill.isDefault = dir !== CUSTOM_DIR;
+        skill.layer = dir.includes('analytical') ? 'analytical' : dir.includes('strategic') ? 'strategic' : dir.includes('operational') ? 'operational' : undefined;
         return res.json(skill);
       } catch {}
     }
