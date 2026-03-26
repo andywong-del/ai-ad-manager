@@ -221,6 +221,11 @@ router.post('/', async (req, res) => {
             if (part.functionCall) {
               sse(res, { type: 'tool_call', name: part.functionCall.name });
               console.log(`[chat] tool call: ${part.functionCall.name}`);
+              // Send workflow context updates to client
+              if (part.functionCall.name === 'update_workflow_context') {
+                const wfData = part.functionCall.args?.data;
+                if (wfData) sse(res, { type: 'context', data: wfData });
+              }
             }
           }
         }
