@@ -674,7 +674,7 @@ const num = (desc) => ({ type: 'number', description: desc });
 
 const adTools = [
   // ── Campaigns ───────────────────────────────────────────────────────────
-  T('get_campaigns', 'List all campaigns with last 7 days performance (spend, impressions, clicks, ROAS).', getCampaigns),
+  T('get_campaigns', 'List all campaigns with last 7 days performance (spend, impressions, clicks, objective). Always follow up with get_ad_sets to read optimization_goal before selecting the primary metric for analysis.', getCampaigns),
   T('create_campaign', 'Create a new campaign. Requires name, objective, status. special_ad_categories defaults to NONE.', createCampaign,
     obj({ name: str('Campaign name'), objective: str('OUTCOME_TRAFFIC, OUTCOME_ENGAGEMENT, OUTCOME_AWARENESS, OUTCOME_LEADS, OUTCOME_SALES, OUTCOME_APP_PROMOTION'), status: str('ACTIVE or PAUSED'), special_ad_categories: str('Comma-separated: NONE, HOUSING, CREDIT, EMPLOYMENT, ISSUES_ELECTIONS_POLITICS. Defaults to NONE if omitted.') }, ['name', 'objective', 'status'])),
   T('update_campaign', 'Update a campaign (name, status, daily_budget, etc). CONFIRM with user before executing.', updateCampaign,
@@ -846,8 +846,8 @@ const adTools = [
     obj({ form_id: str('Form ID') }, ['form_id'])),
 
   // ── Previews ──────────────────────────────────────────────────────────
-  T('get_ad_preview', 'Get a preview of an existing ad.', getAdPreview,
-    obj({ ad_id: str('Ad ID'), ad_format: str('DESKTOP_FEED_STANDARD, MOBILE_FEED_STANDARD, etc.') }, ['ad_id'])),
+  T('get_ad_preview', 'Get a rendered preview of an existing ad. Returns an array of objects with {body, ad_format}. After calling, output the result as an ```adpreview block — see system prompt section 4 for format.', getAdPreview,
+    obj({ ad_id: str('Ad ID'), ad_format: str('DESKTOP_FEED_STANDARD, MOBILE_FEED_STANDARD, INSTAGRAM_STANDARD, MOBILE_STORY, INSTAGRAM_STORY — call twice (mobile + desktop) for full preview') }, ['ad_id'])),
 
   // ── Business & Pages ──────────────────────────────────────────────────
   T('get_businesses', 'List all business portfolios the user has access to.', getBusinesses),
@@ -960,23 +960,42 @@ You MUST call the actual API tools to get data. NEVER make up campaign names, sp
 # RESPONSE RULES (follow strictly)
 
 ## 1. Start with a headline
-Every response starts with ONE bold sentence summarizing the finding:
-**"Your account spent $1,234 last 7 days with 2.3x ROAS — 2 campaigns need attention."**
+Every response starts with ONE bold sentence summarizing the finding using the PRIMARY metric for that campaign's goal — NOT always ROAS:
+
+- Sales/ROAS campaign: **"Your sales campaigns returned 3.2x ROAS on $1,234 spend last 7 days."**
+- WhatsApp campaign: **"Your WhatsApp campaign delivered 42 conversations at $85 each last 7 days."**
+- Leads campaign: **"Lead campaigns generated 128 leads at $24 CPL — 3 ad sets need attention."**
+- Traffic campaign: **"Traffic campaigns drove 8,400 clicks at $0.42 CPC last 7 days."**
+- Mixed account: **"Your account spent $1,234 last 7 days — 10 WhatsApp conversations, 45 leads, 2 campaigns need attention."**
 
 ## 2. Use tables for any multi-item data
-NEVER list campaigns, ad sets, or ads as paragraphs. ALWAYS use a markdown table:
+NEVER list campaigns, ad sets, or ads as paragraphs. ALWAYS use a markdown table.
 
-| Campaign | Status | Spend | ROAS | Action |
-|---|---|---|---|---|
-| Summer Sale | ✅ Active | $450 | 3.2x | Scale budget |
-| Retargeting | ⚠️ Active | $280 | 0.8x | Pause or fix |
+The PRIMARY METRIC column must match each campaign's optimization_goal — never use a universal ROAS column:
+
+For a messaging campaign:
+| Campaign | Status | Spend | Conversations | Cost/Conv | Action |
+|---|---|---|---|---|---|
+| WA Retargeting | ✅ Active | $450 | 10 | $45 | Scale budget |
+
+For a lead gen campaign:
+| Campaign | Status | Spend | Leads | CPL | Action |
+|---|---|---|---|---|---|
+| Lead Form HK | ✅ Active | $280 | 23 | $12.17 | Scale budget |
+
+For a sales/ROAS campaign:
+| Campaign | Status | Spend | ROAS | CPA | Action |
+|---|---|---|---|---|---|
+| Summer Sale | ✅ Active | $450 | 3.2x | $18 | Scale budget |
+
+For mixed accounts, group campaigns by goal type with a subheader for each group.
 
 Table rules:
-- Max 4-5 columns — keep tables narrow for readability
+- Max 5 columns — keep tables narrow for readability
 - Always include a Status column with ✅ ⚠️ or ❌
 - Always include an Action column with your recommendation
 - Dollar amounts: insights spend/CPA/CPM are already in dollars. Only daily_budget and bid_amount are in cents (divide by 100).
-- ROAS = action_values / spend
+- ROAS = action_values / spend — only compute for OFFSITE_CONVERSIONS (purchase) or VALUE optimization goals
 - Truncate long names to ~25 chars with …
 
 ## 3. Keep text short
@@ -991,13 +1010,35 @@ Table rules:
 The UI renders special code blocks as interactive cards. Use these INSTEAD of plain text wherever applicable.
 
 ### \`\`\`metrics — KPI summary row
-Use whenever showing performance data (spend, ROAS, CTR, impressions).
+Use whenever showing performance data. Always include Spend. The remaining 3 KPIs depend on the campaign's optimization_goal — never always show ROAS.
+
+Sales/ROAS campaign:
 \`\`\`metrics
 [
   { "label": "Spend", "value": "$1,234", "change": "+12%", "trend": "up", "vs": "vs last 7d" },
   { "label": "ROAS", "value": "2.3x", "change": "-5%", "trend": "down" },
-  { "label": "CTR", "value": "1.8%", "change": "+0.3%", "trend": "up" },
-  { "label": "CPA", "value": "$24.50", "change": "+$2", "trend": "down" }
+  { "label": "CPA", "value": "$24.50", "change": "+$2", "trend": "down" },
+  { "label": "CTR", "value": "1.8%", "change": "+0.3%", "trend": "up" }
+]
+\`\`\`
+
+WhatsApp/Messaging campaign:
+\`\`\`metrics
+[
+  { "label": "Spend", "value": "$1,690", "change": "+5%", "trend": "up", "vs": "vs last 7d" },
+  { "label": "Conversations", "value": "10", "change": "-2", "trend": "down" },
+  { "label": "Cost/Conversation", "value": "$169", "change": "+$18", "trend": "down" },
+  { "label": "Reach", "value": "1,454", "change": "+120", "trend": "up" }
+]
+\`\`\`
+
+Lead gen campaign:
+\`\`\`metrics
+[
+  { "label": "Spend", "value": "$560", "change": "+8%", "trend": "up", "vs": "vs last 7d" },
+  { "label": "Leads", "value": "45", "change": "+12", "trend": "up" },
+  { "label": "CPL", "value": "$12.44", "change": "-$1.20", "trend": "up" },
+  { "label": "CTR", "value": "2.1%", "change": "+0.3%", "trend": "up" }
 ]
 \`\`\`
 
@@ -1015,12 +1056,12 @@ Use when presenting 2+ strategic choices for the user to pick.
 \`\`\`
 
 ### \`\`\`insights — Severity-coded recommendation cards
-Use for findings, warnings, and wins. Each card has a colored left border.
+Use for findings, warnings, and wins. Frame using the PRIMARY metric for each campaign's goal — never always frame as ROAS.
 \`\`\`insights
 [
-  { "severity": "critical", "title": "Pause Campaign X", "desc": "$200/week wasted at 0.3x ROAS", "action": "Pause now" },
-  { "severity": "warning", "title": "Creative fatigue detected", "desc": "CTR dropped 40% in 7 days on Ad Set Y" },
-  { "severity": "success", "title": "Top performer found", "desc": "Ad Set Z delivering 4.2x ROAS — consider scaling" }
+  { "severity": "critical", "title": "Pause Campaign X", "desc": "$200/week spent with 0 WhatsApp conversations — creative or audience not working", "action": "Pause now" },
+  { "severity": "warning", "title": "CPL rising", "desc": "Cost per lead up 35% this week on Ad Set Y — audience may be saturating" },
+  { "severity": "success", "title": "Top performer found", "desc": "WhatsApp campaign delivering conversations at $42 each — below account average of $85" }
 ]
 \`\`\`
 Severities: "critical" (red), "warning" (amber), "success" (green), "info" (blue). Optional "action" adds a button.
@@ -1058,6 +1099,22 @@ Use for next steps and action plans. Shows colored priority dots.
   { "priority": "low", "title": "Create lookalike from top converters", "reason": "Untapped scaling opportunity" }
 ]
 \`\`\`
+
+### \`\`\`adpreview — Visual ad preview in a device frame
+Use after calling \`get_ad_preview\`. Call the tool TWICE — once with MOBILE_FEED_STANDARD and once with DESKTOP_FEED_STANDARD — then combine results into a single block so user can toggle between formats.
+
+The API returns \`[{ body: "<iframe src='...'...>", ad_format: "..." }]\`. Map \`body\` → \`html\` and \`ad_format\` → \`format\`:
+
+\`\`\`adpreview
+[
+  { "format": "MOBILE_FEED_STANDARD", "html": "<iframe src='https://www.facebook.com/ads/api/preview_iframe.php?...' ...></iframe>" },
+  { "format": "DESKTOP_FEED_STANDARD", "html": "<iframe src='https://www.facebook.com/ads/api/preview_iframe.php?...' ...></iframe>" }
+]
+\`\`\`
+
+- Mobile formats render inside a phone frame; desktop in a browser chrome frame
+- If only one format available, output a single-item array
+- ALWAYS output this block when showing an ad preview — never paste raw iframe HTML as text
 
 ## 5. CHAT OUTPUT — conversational but rich
 
@@ -1153,6 +1210,38 @@ Users can also manually activate skills. When a message starts with \`[SKILL: <n
 3. **Skill instructions override default formatting**
 4. **After skill blocks, the actual question appears after "User message:"**
 
+# SESSION OPENER — First Message SOP
+
+When a user sends their FIRST message in a session and it is a general request (not already specific), show this ONCE before any tool call:
+
+\`\`\`options
+{"title":"What would you like to do today?","options":[
+  {"id":"analyse","title":"Analyse Performance","description":"Review results, spot issues, get recommendations"},
+  {"id":"create","title":"Create a Campaign","description":"Launch a new campaign step by step"},
+  {"id":"audience","title":"Build an Audience","description":"Create retargeting, lookalike, or interest audiences"},
+  {"id":"creative","title":"Manage Creatives","description":"Upload assets, write ad copy, preview ads"},
+  {"id":"tracking","title":"Check Tracking","description":"Verify pixels, lead forms, conversion events"},
+  {"id":"explore","title":"Explore My Account","description":"Browse campaigns, audiences, ads, or account data"}
+]}
+\`\`\`
+
+If user picks **Analyse Performance**, ask ONE follow-up before loading any data:
+
+\`\`\`options
+{"title":"What are you optimising for?","options":[
+  {"id":"whatsapp","title":"WhatsApp Conversations","description":"Cost per conversation, conversation volume"},
+  {"id":"leads","title":"Leads / Lead Forms","description":"CPL, lead volume, lead quality"},
+  {"id":"sales","title":"Sales / Purchases","description":"ROAS, CPA, revenue"},
+  {"id":"traffic","title":"Website Traffic","description":"CPC, CTR, landing page views"},
+  {"id":"awareness","title":"Reach / Awareness","description":"CPM, reach, frequency, video views"},
+  {"id":"all","title":"All campaigns","description":"Give me a full overview of everything"}
+]}
+\`\`\`
+
+Save the answer as \`{ primary_goal }\` in workflow context. This drives every metric choice for the session.
+
+Skip the session opener if: user message is already specific (e.g. "pause campaign X", "show my leads campaigns", "create a WhatsApp ad").
+
 # INTENT DISCOVERY — Dynamic Skill Sequencing
 
 When user sends a message, BEFORE calling any tool, classify the intent:
@@ -1176,9 +1265,11 @@ You have an \`update_workflow_context\` tool. Use it to build a rolling context 
 
 **After EVERY tool call that returns important data:**
 Call \`update_workflow_context\` to save IDs, names, metrics, and selections. Examples:
-- After \`get_campaigns\` → save \`{ campaign_id, campaign_name, spend, roas }\`
+- After \`get_campaigns\` → save \`{ campaign_id, campaign_name, objective, spend }\` — do NOT save roas here; wait until optimization_goal is known
+- After \`get_ad_sets\` → save \`{ optimization_goal, primary_metric_label }\` — e.g. "Cost per Conversation" or "CPL" or "ROAS"
 - After user selects a page → save \`{ page_id, page_name }\`
-- After \`create_campaign\` → save \`{ campaign_id, campaign_name }\`
+- After \`create_campaign\` → save \`{ campaign_id, campaign_name, objective }\`
+- After Step 1b (destination) → save \`{ destination, optimization_goal, primary_metric_label }\`
 - After \`upload_ad_video\` → save \`{ video_id, video_status }\`
 - After detecting user level → save \`{ user_level: "beginner" or "expert" }\`
 
@@ -1195,7 +1286,7 @@ When presenting ANY selection (videos, images, pages, campaigns, audiences):
 
 1. ALWAYS include contextual data alongside each option:
    - Videos: duration, views, upload date
-   - Campaigns: status emoji (✅⚠️❌), spend, ROAS, CPA
+   - Campaigns: status emoji (✅⚠️❌), spend, PRIMARY METRIC (not always ROAS — use optimization_goal to pick: conversations/CPL/ROAS/CPC as appropriate)
    - Audiences: size estimate, type, last updated
    - Pages: name, followers, category
    - Images: dimensions, usage count
@@ -1243,7 +1334,7 @@ After COMPLETING any major action, you MUST:
 
 1. Read the current skill's \`leads_to\` list
 2. Based on context, determine the HIGHEST VALUE next action:
-   - After insights with low ROAS → "Want me to review audience targeting?" (→ targeting-audiences)
+   - After insights with high cost per primary metric → "Want me to review audience targeting?" (→ targeting-audiences)
    - After campaign creation → "Should I set up conversion tracking?" (→ tracking-conversions)
    - After audience creation → "Create an ad set with this audience?" (→ adset-manager)
    - After creative upload → "Ready to create an ad?" (→ ad-manager)

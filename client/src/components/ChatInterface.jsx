@@ -70,7 +70,7 @@ export const parseMarkdownTable = (text) => {
   let textBuf = [];
   let i = 0;
 
-  const RICH_BLOCKS = ['adlib', 'metrics', 'options', 'insights', 'score', 'copyvariations', 'steps', 'quickreplies', 'funnel', 'comparison', 'budget', 'trend'];
+  const RICH_BLOCKS = ['adlib', 'metrics', 'options', 'insights', 'score', 'copyvariations', 'steps', 'quickreplies', 'funnel', 'comparison', 'budget', 'trend', 'adpreview'];
 
   while (i < lines.length) {
     const trimmed = lines[i].trim();
@@ -740,6 +740,108 @@ const TrendCard = ({ data }) => {
   );
 };
 
+// ── Ad Preview Card ──────────────────────────────────────────────────────────
+// Data: [{ format, html }] or { format, html }
+// html is the raw <iframe src="..."> string returned by Meta's preview API
+const FORMAT_LABELS = {
+  MOBILE_FEED_STANDARD: 'Mobile Feed',
+  DESKTOP_FEED_STANDARD: 'Desktop Feed',
+  INSTAGRAM_STANDARD: 'Instagram Feed',
+  MOBILE_STORY: 'Mobile Story',
+  INSTAGRAM_STORY: 'IG Story',
+  INSTAGRAM_REELS: 'Reels',
+  RIGHT_COLUMN_STANDARD: 'Right Column',
+};
+
+const extractIframeSrc = (html) => {
+  if (!html) return null;
+  const m = html.match(/src=["']([^"']+)["']/);
+  return m ? m[1].replace(/&amp;/g, '&') : null;
+};
+
+const isMobileFormat = (fmt) =>
+  fmt && (fmt.includes('MOBILE') || fmt.includes('STORY') || fmt.includes('REELS') || fmt.includes('INSTAGRAM'));
+
+const isFullHeightFormat = (fmt) =>
+  fmt && (fmt.includes('STORY') || fmt.includes('REELS'));
+
+// Mobile feed: 480px. Stories/Reels: 568px (full 9:16 at 320px wide). Desktop: 300px.
+const getFrameHeight = (fmt) => {
+  if (isFullHeightFormat(fmt)) return 568;
+  if (isMobileFormat(fmt)) return 480;
+  return 300;
+};
+
+const AdPreviewBlock = ({ data }) => {
+  const previews = Array.isArray(data) ? data : (data ? [data] : []);
+  const [idx, setIdx] = useState(0);
+  if (!previews.length) return null;
+
+  const current = previews[idx] || previews[0];
+  const src = extractIframeSrc(current.html);
+  const mobile = isMobileFormat(current.format);
+  const frameHeight = getFrameHeight(current.format);
+  const label = FORMAT_LABELS[current.format] || current.format || 'Ad Preview';
+
+  return (
+    <MetaCard title="Ad Preview" subtitle={label} badge="Preview">
+      {previews.length > 1 && (
+        <div className="flex gap-1.5 px-4 pt-3 flex-wrap">
+          {previews.map((p, i) => (
+            <button key={i} onClick={() => setIdx(i)}
+              className={`px-3 py-1 text-[11px] font-medium rounded-full border transition-colors ${i === idx ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-500 border-slate-200 hover:border-blue-300 hover:text-blue-600'}`}>
+              {FORMAT_LABELS[p.format] || p.format}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="flex justify-center py-5 px-4 bg-slate-50">
+        {mobile ? (
+          <div className="relative w-[280px]">
+            {/* Phone shell */}
+            <div className="rounded-[32px] border-[6px] border-slate-800 bg-slate-900 shadow-2xl overflow-hidden">
+              <div className="flex justify-center pt-2 pb-1 bg-slate-900">
+                <div className="w-20 h-4 bg-slate-700 rounded-full" />
+              </div>
+              <div className="bg-white overflow-hidden" style={{ height: frameHeight }}>
+                {src ? (
+                  <iframe src={src} width="268" height={frameHeight} style={{ border: 'none', display: 'block' }} title="Ad preview" />
+                ) : (
+                  <div className="flex items-center justify-center h-full text-xs text-slate-400">Preview unavailable</div>
+                )}
+              </div>
+              <div className="h-5 bg-slate-900 flex items-center justify-center">
+                <div className="w-24 h-1 bg-slate-600 rounded-full" />
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="w-full max-w-[520px]">
+            {/* Browser shell */}
+            <div className="rounded-lg border border-slate-200 shadow-md overflow-hidden">
+              <div className="bg-slate-100 px-3 py-2 flex items-center gap-2 border-b border-slate-200">
+                <div className="flex gap-1.5 shrink-0">
+                  <div className="w-3 h-3 rounded-full bg-red-400" />
+                  <div className="w-3 h-3 rounded-full bg-amber-400" />
+                  <div className="w-3 h-3 rounded-full bg-green-400" />
+                </div>
+                <div className="flex-1 bg-white rounded text-[10px] text-slate-400 px-2 py-0.5 text-center truncate">facebook.com</div>
+              </div>
+              <div className="bg-white overflow-hidden">
+                {src ? (
+                  <iframe src={src} width="520" height={frameHeight} style={{ border: 'none', display: 'block', width: '100%' }} title="Ad preview" />
+                ) : (
+                  <div className="flex items-center justify-center h-40 text-xs text-slate-400">Preview unavailable</div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </MetaCard>
+  );
+};
+
 // ── Rich text renderer ───────────────────────────────────────────────────────
 const renderInline = (text) =>
   text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).map((part, i) => {
@@ -1002,6 +1104,7 @@ export const RichContent = ({ text, onSend }) => {
           case 'comparison': return <ComparisonCard key={i} data={seg.data} />;
           case 'budget': return <BudgetCard key={i} data={seg.data} />;
           case 'trend': return <TrendCard key={i} data={seg.data} />;
+          case 'adpreview': return <AdPreviewBlock key={i} data={seg.data} />;
           default: return <div key={i} className="whitespace-pre-wrap">{renderRichText(seg.content)}</div>;
         }
       })}
@@ -1115,6 +1218,7 @@ const MessageBubble = ({ message, isLatest, onSend, isTyping, onSaveItem, folder
                   case 'comparison': return <ComparisonCard key={i} data={seg.data} />;
                   case 'budget': return <BudgetCard key={i} data={seg.data} />;
                   case 'trend': return <TrendCard key={i} data={seg.data} />;
+          case 'adpreview': return <AdPreviewBlock key={i} data={seg.data} />;
                   default: return <div key={i} className="whitespace-pre-wrap">{renderRichText(seg.content)}</div>;
                 }
               })}

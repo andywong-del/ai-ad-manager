@@ -81,57 +81,117 @@ GET /api/insights/async/:reportRunId/results
 
 ## Analysis Workflow
 
-Follow this systematic flow for every report request. Gather data first, analyze second, present with structured blocks, then hand off to strategic skills.
+Follow this systematic flow for every report request. Detect goal first, gather data second, analyze third, present with structured blocks, then hand off to strategic skills.
 
-### Step 1 -- Gather ALL data (call tools in sequence)
+### Step 0 -- Detect Goal & Select Primary Metric (ALWAYS do this first)
 
-- **get_campaigns** -- all campaigns with status, budget, objective, and last 7d performance
-- **get_account_insights** with appropriate date_preset -- account-level metrics
-- **get_object_insights** for each active campaign ID -- per-campaign detailed performance
-- If needed: **get_ad_sets** and **get_object_insights** for ad set breakdowns
-- If needed: **get_ads** and **get_object_insights** for ad-level creative analysis
+Before fetching any data, determine what the campaign is actually optimising for. This drives every metric choice downstream.
 
-> **Data freshness warning:** Meta reporting has up to a 48-hour attribution window. Conversions from the last 48 hours may be incomplete. Always note this when presenting recent data.
+**0a. Call `get_campaigns`** to read `objective` for each campaign.
 
-### Step 2 -- Cross-analyze the data
+**0b. Call `get_ad_sets`** to read `optimization_goal` for each active ad set. This is the source of truth — `optimization_goal` overrides `objective` for metric selection.
 
-- Calculate ROAS = purchase_roas or (action_values / spend)
-- Calculate CPA = spend / conversions (or cost_per_action_type)
+**0c. Map to primary metric using this table:**
+
+| optimization_goal | Primary Metric | Primary Action Type | Label |
+|---|---|---|---|
+| `CONVERSATIONS` (WhatsApp / Messenger / IG DM) | Cost per Conversation | `onsite_conversion.messaging_conversation_started_7d` | Cost per Conversation |
+| `LEAD_GENERATION` | CPL | `lead` or `onsite_conversion.lead_grouped` | Cost per Lead |
+| `OFFSITE_CONVERSIONS` — purchase event | ROAS + CPA | `purchase` / `offsite_conversion.fb_pixel_purchase` | ROAS & Cost per Purchase |
+| `OFFSITE_CONVERSIONS` — lead event | CPL | `offsite_conversion.fb_pixel_lead` | Cost per Lead |
+| `OFFSITE_CONVERSIONS` — other event | CPA | match `custom_event_type` from promoted_object | Cost per Result |
+| `LINK_CLICKS` | CPC + CTR | `link_click` | Cost per Click |
+| `LANDING_PAGE_VIEWS` | Cost per LPV | `landing_page_view` | Cost per Landing Page View |
+| `REACH` | CPM + Reach | reach + impressions | CPM & Reach |
+| `THRUPLAY` | Cost per ThruPlay | `video_thruplay_watched_actions` | Cost per ThruPlay |
+| `VIDEO_VIEWS` | Cost per View | `video_view` | Cost per View |
+| `POST_ENGAGEMENT` | CPE | `post_engagement` | Cost per Engagement |
+| `APP_INSTALLS` | CPI | `mobile_app_install` | Cost per Install |
+| `VALUE` | ROAS | `purchase` + `action_values` | ROAS |
+
+**0d. For mixed accounts** (multiple campaigns with different goals), group by optimization_goal and apply the correct metric to each group. Never average ROAS across a Sales campaign and a WhatsApp campaign.
+
+**0e. ROAS rule:** Only compute ROAS when `optimization_goal` is `VALUE` or `OFFSITE_CONVERSIONS` with `custom_event_type = PURCHASE`. For all other goals, ROAS is meaningless — do not show it.
+
+**0f. Clarify intent if ambiguous:** If the user's request doesn't make it clear what they want to optimise (e.g. "how are my ads doing?" on a mixed account), ask ONE clarifying question before pulling data:
+> "Your account has campaigns with different goals — sales, WhatsApp conversations, and traffic. Which would you like to focus on, or should I cover all of them?"
+
+---
+
+### Step 1 -- Gather data (after goal is known)
+
+- **get_account_insights** with appropriate date_preset
+- **get_object_insights** for each active campaign — include fields relevant to detected goal:
+  - All goals: `spend,impressions,clicks,ctr,cpm,reach,frequency,actions,cost_per_action_type`
+  - Messaging/conversations: add `onsite_conversion.messaging_conversation_started_7d` to fields
+  - Sales/ROAS: add `action_values,purchase_roas`
+  - Video/awareness: add `video_p25_watched_actions,video_p75_watched_actions,video_p100_watched_actions,video_avg_time_watched_actions,video_thruplay_watched_actions`
+- **get_ad_sets** if optimization_goal is needed for any campaign (always needed on first analysis)
+
+> **Data freshness:** Meta has up to a 48-hour attribution window. Always note this when presenting recent data.
+
+---
+
+### Step 2 -- Cross-analyze using the correct metric
+
+**Parse `actions` and `cost_per_action_type` by the primary action type identified in Step 0.**
+
+- Extract primary result count: `actions.find(a => a.action_type === PRIMARY_ACTION_TYPE)?.value`
+- Extract primary cost: `cost_per_action_type.find(a => a.action_type === PRIMARY_ACTION_TYPE)?.value`
+- For ROAS only (OFFSITE_CONVERSIONS + PURCHASE / VALUE): `purchase_roas[0]?.value` or `action_values / spend`
 - Compare periods: last 7d vs previous 7d for trend detection
-- Identify winners (high ROAS, low CPA) and losers (low ROAS, high CPA, high frequency)
+- Identify winners and losers using the correct metric — not ROAS
 - Flag creative fatigue: frequency > 3 or declining CTR over time
 
-### Step 3 -- Present with structured blocks
+**Never use total `actions` count as "conversions" — always filter by the specific action_type for this campaign's goal.**
 
-Follow this exact visual flow:
+---
 
-**Bold headline** -- one sentence summary with key numbers.
+### Step 3 -- Present with goal-appropriate structured blocks
+
+**Bold headline** — one sentence with the PRIMARY metric, not always ROAS.
+
+Examples by goal:
+- Messaging: **"Your WhatsApp campaign delivered 42 conversations last 7 days at $85 per conversation."**
+- Leads: **"Lead campaigns generated 128 leads at $24 CPL — 3 ad sets need attention."**
+- Sales: **"Your sales campaigns returned 3.2x ROAS on $4,500 spend last 7 days."**
+- Traffic: **"Traffic campaigns drove 8,400 landing page views at $0.42 each."**
+- Awareness: **"Awareness campaign reached 245K unique users at $4.20 CPM."**
 
 ```metrics
-4 hero KPIs: Spend, ROAS, CTR, CPA (or context-appropriate metrics)
+Hero KPIs — always include Spend. Then based on goal:
+- Messaging: Conversations, Cost per Conversation, Reach, Frequency
+- Leads: Leads, CPL, CTR, Reach
+- Sales (ROAS): ROAS, CPA (purchase), Revenue, Conversions
+- Traffic: Landing Page Views, CPC, CTR, CPM
+- Awareness: Reach, CPM, Frequency, Impressions
+- Video: ThruPlays, Cost per ThruPlay, Video View Rate, Avg Watch Time
 ```
 
 ```trend
 Day-by-day performance chart -- ALWAYS include for any report covering 7+ days
+Use PRIMARY metric as the second series (not always ROAS)
 ```
 
-Markdown table -- campaign/ad set breakdown with all relevant columns.
+Markdown table -- campaign/ad set breakdown. Column 4 must be the PRIMARY METRIC for that campaign's goal, not a universal ROAS column. For mixed accounts, group by goal type.
 
 ```insights
-What the data means + what needs attention. Use severity: critical / warning / success.
+Findings using the correct metric benchmarks (see Strategic Handoff section below).
 ```
 
 ```score
-Audit scorecard when running health checks (structure, budget, creative, tracking).
+Audit scorecard when running health checks.
 ```
 
 ```steps
-Prioritized action plan: high / medium / low priority items.
+Prioritized action plan.
 ```
 
 ```quickreplies
-Contextual follow-up actions that lead to strategic skills.
+Contextual follow-up actions.
 ```
+
+---
 
 ### Step 4 -- Strategic Handoff (always end here)
 
@@ -144,70 +204,69 @@ After every analysis, identify which strategic skill the user should load next b
 ### 1. Weekly Performance Report
 
 **Tool call sequence:**
-1. get_campaigns -> get_account_insights (last_7d) -> get_object_insights for top campaigns -> get_account_insights (last_14d for comparison)
-2. Output: metrics -> trend (daily spend + ROAS) -> table -> comparison card -> insights -> steps -> quickreplies
+1. get_campaigns + get_ad_sets (Step 0: detect optimization_goal per campaign) -> get_account_insights (last_7d) -> get_object_insights for top campaigns (goal-appropriate fields) -> get_account_insights (last_14d for comparison)
+2. Output: metrics (PRIMARY metric per goal) -> trend (daily spend + PRIMARY metric) -> table (grouped by goal type) -> comparison card -> insights -> steps -> quickreplies
 
 **Strategic Handoff:**
-- If ROAS < 1.5x on any campaign -> recommend loading `campaign-manager` to adjust budgets or pause
+- Apply thresholds from the Strategic Handoff Summary table matching each campaign's optimization_goal
 - If CTR declining week-over-week -> recommend loading `creative-manager` for creative refresh
-- If CPA rising across all campaigns -> recommend loading `targeting-audiences` to review audience overlap
+- If primary metric cost rising > 20% WoW -> recommend loading `campaign-manager` to adjust budget or bid
 
 ```quickreplies
-["Drill into top campaign", "Optimize budgets in Campaign Manager", "Refresh creatives", "Review audience targeting"]
+["Drill into top campaign", "Optimise budgets", "Refresh creatives", "Review audience targeting"]
 ```
 
 ### 2. Monthly Performance Report
 
 **Tool call sequence:**
-1. get_campaigns -> get_account_insights (this_month) -> get_account_insights (last_month) -> get_object_insights for top campaigns (this_month)
-2. Output: metrics -> trend (daily spend + ROAS for the month) -> comparison card (this vs last month) -> table -> insights -> steps -> quickreplies
+1. get_campaigns + get_ad_sets (detect optimization_goal) -> get_account_insights (this_month) -> get_account_insights (last_month) -> get_object_insights for top campaigns (this_month, goal-appropriate fields)
+2. Output: metrics (PRIMARY metric) -> trend (daily spend + PRIMARY metric for the month) -> comparison card (this vs last month) -> table -> insights -> steps -> quickreplies
 
 **Strategic Handoff:**
-- If monthly ROAS trending down -> recommend loading `campaign-manager` for budget reallocation
+- If primary metric cost trending up month-over-month -> recommend loading `campaign-manager` for budget reallocation
 - If frequency > 3 across campaigns -> recommend loading `creative-manager` to rotate creatives
-- If conversion volume dropping despite stable spend -> recommend loading `tracking-conversions` to verify pixel health
+- If result volume dropping despite stable spend -> recommend loading `tracking-conversions` to verify pixel/lead form health
 
 ```quickreplies
-["Weekly breakdown", "Reallocate budgets", "Check pixel & tracking health", "Creative performance deep dive"]
+["Weekly breakdown", "Reallocate budgets", "Check tracking health", "Creative performance deep dive"]
 ```
 
 ### 3. Problems & Quick Wins
 
 **Tool call sequence:**
-1. get_campaigns -> get_object_insights for each active campaign (last_7d) -> get_ad_sets -> get_object_insights for low performers
-2. Look for: declining ROAS, rising CPA, high frequency, audience overlap, inactive campaigns still spending
+1. get_campaigns + get_ad_sets (detect optimization_goal per campaign) -> get_object_insights for each active campaign (last_7d, goal-appropriate fields) -> get_object_insights for low performers
+2. Look for: high cost per primary result, declining result volume, high frequency, audience overlap, inactive campaigns still spending
 
 **Strategic Handoff:**
-- Critical: ROAS < 1x -> recommend loading `campaign-manager` to pause or restructure immediately
-- Critical: If ROAS < 1x, also recommend loading `targeting-audiences` to check for audience overlap and targeting inefficiency before pausing campaigns.
+- Apply per-goal thresholds from Strategic Handoff Summary
 - Warning: frequency > 4 -> recommend loading `creative-manager` for urgent creative rotation
-- Warning: audience overlap detected -> recommend loading `targeting-audiences` to deduplicate audiences
-- Quick win: high ROAS but low budget -> recommend loading `campaign-manager` to scale budget
+- Warning: audience overlap detected -> recommend loading `targeting-audiences` to deduplicate
+- Quick win: low cost per result + low budget -> recommend loading `campaign-manager` to scale budget
 
 ```quickreplies
-["Fix top issue now", "Pause underperformers", "Scale winners via Campaign Manager", "Deduplicate audiences"]
+["Fix top issue now", "Pause underperformers", "Scale winners", "Deduplicate audiences"]
 ```
 
 ### 4. Creative Performance Analysis
 
 **Tool call sequence:**
-1. get_ads -> get_object_insights for each ad (last_7d) -> get_ad_creative for top/bottom ads
-2. Flag: frequency > 3, declining CTR, best vs worst performers
+1. get_ads -> get_object_insights for each ad (last_7d, include `actions,cost_per_action_type,frequency,ctr`) -> get_ad_creative for top/bottom ads
+2. Flag: frequency > 3, declining CTR, best vs worst performers by PRIMARY action type cost
 
 **Strategic Handoff:**
 - If top creatives identified -> recommend loading `creative-manager` to duplicate and iterate on winners
-- If all creatives fatigued (CTR < 1% and frequency > 3) -> recommend loading `creative-manager` for full creative refresh
+- If all creatives fatigued (CTR < 1% and frequency > 3) -> recommend loading `creative-manager` for full refresh
 - If video completion rates low -> recommend loading `creative-manager` to test shorter formats
 
 ```quickreplies
-["Generate new copy variations", "Duplicate top performers in Creative Manager", "Pause fatigued ads", "Test new creative format"]
+["Generate new copy variations", "Duplicate top performers", "Pause fatigued ads", "Test new creative format"]
 ```
 
-### 5. Budget Optimization Plan
+### 5. Budget Optimisation Plan
 
 **Tool call sequence:**
-1. get_campaigns -> get_object_insights for each campaign (last_7d) -> calculate ROAS per campaign
-2. Identify over/under-spending relative to ROAS
+1. get_campaigns + get_ad_sets (detect optimization_goal per campaign) -> get_object_insights for each campaign (last_7d, goal-appropriate fields) -> calculate PRIMARY metric cost per campaign
+2. Identify over/under-spending relative to PRIMARY metric performance — not ROAS universally
 
 **Strategic Handoff:**
 - Recommend loading `campaign-manager` to apply budget changes with specific dollar amounts
@@ -215,7 +274,7 @@ After every analysis, identify which strategic skill the user should load next b
 - If scaling opportunities found -> recommend loading `automation-rules` to set auto-scaling rules
 
 ```quickreplies
-["Apply budget changes in Campaign Manager", "Set auto-scaling rules", "Show ROAS projections", "Scale top campaigns"]
+["Apply budget changes", "Set auto-scaling rules", "Show performance projections", "Scale top campaigns"]
 ```
 
 ### 6. Full Account Health Audit
@@ -241,9 +300,9 @@ After every analysis, identify which strategic skill the user should load next b
 2. get_object_insights for top campaigns with daily breakdown (time_increment=1)
 
 **Strategic Handoff:**
-- If downward trend in ROAS over 7+ days -> recommend loading `campaign-manager` for intervention
+- If downward trend in primary metric over 7+ days -> recommend loading `campaign-manager` for intervention
 - If CPM rising steadily -> recommend loading `targeting-audiences` to expand or refresh audiences
-- If conversion rate declining -> recommend loading `tracking-conversions` to verify attribution setup
+- If result volume declining, spend stable -> recommend loading `tracking-conversions` to verify attribution/pixel/lead form
 
 ```quickreplies
 ["Compare to previous period", "Breakdown by campaign", "Adjust targeting strategy", "Verify conversion tracking"]
@@ -279,26 +338,140 @@ After every analysis, identify which strategic skill the user should load next b
 ["Create competitive creatives", "Test new ad formats", "Find underserved audiences", "Analyze more competitors"]
 ```
 
+### 10. A/B Test Results
+
+**Tool call sequence:**
+1. get_campaigns (identify split test campaigns — look for pairs with similar names or campaigns flagged as experiments) -> get_object_insights for each variant (same date range, goal-appropriate fields) -> compare primary metric per variant
+
+**Output:** comparison block (variant A vs B) -> metrics (PRIMARY metric for each variant, spend per variant) -> insights (winner or inconclusive) -> steps
+
+**Signals:**
+- Clear winner: one variant's cost per primary result is > 20% better on equivalent spend (> $50 per variant minimum)
+- No clear winner: < 20% difference — more data needed
+- Note: Meta doesn't provide statistical p-values — use spend parity and volume as proxies for confidence
+
+**Strategic Handoff:**
+- Winner identified -> recommend loading `creative-manager` to scale winner and pause loser
+- No winner yet -> recommend loading `campaign-manager` to extend test or increase budget
+
+```quickreplies
+["Scale winning variant", "Extend the test", "Pause losing variant", "Create new test"]
+```
+
+### 11. Budget Pacing Check
+
+**Tool call sequence:**
+1. get_campaigns (get daily_budget per active campaign) -> get_object_insights (today, spend field) -> get_object_insights (this_month, spend field)
+
+**Output:**
+
+```metrics
+Per active campaign:
+- Today's Spend vs Daily Budget
+- Pacing % (today's spend / (daily_budget × hours_elapsed/24))
+- MTD Spend
+- Projected Month-End Spend (MTD / days_elapsed × days_in_month)
+```
+
+**Pacing thresholds:**
+- < 70% of expected spend by midday: Underpacing — check audience size, bid, or creative
+- > 120% of daily budget: Overpacing — risk of budget blowout
+- 90-110%: On pace
+
+**Strategic Handoff:**
+- Underpacing campaigns -> recommend loading `campaign-manager` to diagnose delivery issues (audience too narrow, bid too low, learning phase stalled)
+- Overpacing / projected overspend -> recommend loading `campaign-manager` to add spend cap or reduce daily budget
+
+```quickreplies
+["Fix underpacing campaign", "Add spend cap", "Rebalance daily budgets", "Set auto-pause rules"]
+```
+
+### 12. Compare Campaigns / Periods
+
+**Tool call sequence:**
+- **Comparing campaigns:** get_object_insights for each campaign with the same date_preset + goal-appropriate fields
+- **Comparing periods:** get_object_insights with two separate time_range calls (e.g. last 7d vs previous 7d)
+
+**Output:** comparison block (side-by-side) -> table (spend, primary metric value, primary metric cost, CTR, CPM per campaign/period) -> insights (what improved, what declined, root cause) -> steps
+
+**Key rules:**
+- Only compare campaigns with the same `optimization_goal` — never cross-compare ROAS vs CPL
+- For period comparison: flag which changes (budget, audience, creative, bid) happened between periods
+- Always show absolute change AND % change
+
+**Strategic Handoff:**
+- One campaign outperforms on primary metric -> recommend loading `campaign-manager` to reallocate budget toward winner
+- Period comparison shows decline -> apply thresholds from Strategic Handoff Summary for that goal
+
+```quickreplies
+["Reallocate budget to winner", "Drill into better campaign", "Check what changed between periods", "Scale top performer"]
+```
+
 ---
 
 ## Strategic Handoff Summary
+
+Apply thresholds based on the campaign's `optimization_goal`, not universally.
+
+### Messaging / WhatsApp / Messenger Campaigns (optimization_goal = CONVERSATIONS)
+
+| Finding | Severity | Recommended Skill |
+|---------|----------|-------------------|
+| Cost per conversation rising > 20% WoW | Warning | `campaign-manager` -- review bid strategy |
+| Cost per conversation > 3x account average | Critical | `targeting-audiences` -- audience too broad or wrong segment |
+| Conversations < 5 in 7 days | Warning | `creative-manager` -- test new message creative |
+| Frequency > 3 | Warning | `creative-manager` -- rotate creatives |
+| High cost, low conversation rate | Critical | `creative-manager` -- CTA or message copy issue |
+
+### Lead Generation Campaigns (optimization_goal = LEAD_GENERATION)
+
+| Finding | Severity | Recommended Skill |
+|---------|----------|-------------------|
+| CPL rising > 20% WoW | Warning | `campaign-manager` -- budget or bid adjustment |
+| CPL > 3x account historical average | Critical | `targeting-audiences` -- audience review |
+| Lead volume dropping, spend stable | Warning | `tracking-conversions` -- verify lead form or pixel |
+| Frequency > 3 | Warning | `creative-manager` -- rotate creatives |
+| CTR declining WoW | Warning | `creative-manager` -- creative refresh |
+
+### Sales / Purchase Campaigns (optimization_goal = OFFSITE_CONVERSIONS or VALUE)
 
 | Finding | Severity | Recommended Skill |
 |---------|----------|-------------------|
 | ROAS < 1x | Critical | `campaign-manager` -- pause or restructure |
 | ROAS < 1.5x | Warning | `campaign-manager` -- budget reallocation |
-| CTR declining over time | Warning | `creative-manager` -- creative refresh |
-| Frequency > 3 | Warning | `creative-manager` -- rotate creatives |
-| Frequency > 5 | Critical | `creative-manager` -- urgent new creatives |
-| CPA rising across campaigns | Warning | `targeting-audiences` -- audience review |
+| CPA (purchase) rising > 20% WoW | Warning | `targeting-audiences` -- audience overlap or fatigue |
+| Conversions dropping, spend stable | Warning | `tracking-conversions` -- verify pixel + attribution |
+| High ROAS, low budget | Opportunity | `campaign-manager` -- scale budget |
+| ROAS < 1x with audience issues | Critical | `targeting-audiences` -- review overlap before pausing |
+
+### Traffic Campaigns (optimization_goal = LINK_CLICKS or LANDING_PAGE_VIEWS)
+
+| Finding | Severity | Recommended Skill |
+|---------|----------|-------------------|
+| CPC rising > 20% WoW | Warning | `creative-manager` -- ad relevance declining |
+| CTR < 0.5% | Warning | `creative-manager` -- creative not compelling |
+| Landing page view rate < 60% of clicks | Warning | `tracking-conversions` -- check pixel + page speed |
+| Frequency > 4 | Critical | `creative-manager` -- urgent new creative |
+
+### Awareness / Reach Campaigns (optimization_goal = REACH or THRUPLAY)
+
+| Finding | Severity | Recommended Skill |
+|---------|----------|-------------------|
+| CPM rising > 30% WoW | Warning | `targeting-audiences` -- audience too narrow |
+| Frequency > 5 | Critical | `creative-manager` -- audience saturated, new creative needed |
+| Video completion rate < 20% | Warning | `creative-manager` -- hook is not working |
+| ThruPlay rate < 15% | Warning | `creative-manager` -- video too long or weak opening |
+
+### Universal (apply to all campaign types)
+
+| Finding | Severity | Recommended Skill |
+|---------|----------|-------------------|
+| CTR declining week-over-week | Warning | `creative-manager` -- creative refresh |
 | Audience overlap > 30% | Warning | `targeting-audiences` -- consolidate |
 | Pixel firing errors | Critical | `tracking-conversions` -- fix pixel setup |
-| Conversions dropping, spend stable | Warning | `tracking-conversions` -- verify attribution |
-| High ROAS, low budget | Opportunity | `campaign-manager` -- scale budget |
 | Budget unevenly distributed | Warning | `campaign-manager` -- rebalance |
+| Placement CPA variance > 50% | Warning | `adset-manager` -- placement optimisation |
 | No automation rules | Info | `automation-rules` -- set up guardrails |
-| ROAS < 1x with audience issues | Critical | `targeting-audiences` -- review audience overlap and refine targeting before pausing |
-| Placement CPA variance > 50% | Warning | `adset-manager` -- placement optimization |
 
 ---
 
@@ -365,6 +538,9 @@ Specify via `action_attribution_windows`:
 
 ### Trend Chart Block Format
 
+The trend block second series must match the campaign's primary metric — not always ROAS.
+
+Sales campaign example:
 ```trend
 {"title":"Daily Spend & ROAS (Last 7 Days)","yLabel":"$","series":[
   {"name":"Spend","data":[
@@ -374,6 +550,20 @@ Specify via `action_attribution_windows`:
   {"name":"ROAS","data":[
     {"date":"Mar 18","value":"2.8"},{"date":"Mar 19","value":"3.1"},{"date":"Mar 20","value":"2.2"},
     {"date":"Mar 21","value":"3.5"},{"date":"Mar 22","value":"2.9"},{"date":"Mar 23","value":"3.0"},{"date":"Mar 24","value":"3.3"}
+  ]}
+]}
+```
+
+WhatsApp campaign example:
+```trend
+{"title":"Daily Spend & Conversations (Last 7 Days)","yLabel":"$","series":[
+  {"name":"Spend","data":[
+    {"date":"Mar 18","value":"240"},{"date":"Mar 19","value":"260"},{"date":"Mar 20","value":"190"},
+    {"date":"Mar 21","value":"280"},{"date":"Mar 22","value":"220"},{"date":"Mar 23","value":"250"},{"date":"Mar 24","value":"270"}
+  ]},
+  {"name":"Conversations","data":[
+    {"date":"Mar 18","value":"3"},{"date":"Mar 19","value":"2"},{"date":"Mar 20","value":"1"},
+    {"date":"Mar 21","value":"2"},{"date":"Mar 22","value":"1"},{"date":"Mar 23","value":"2"},{"date":"Mar 24","value":"1"}
   ]}
 ]}
 ```
@@ -397,7 +587,7 @@ Specify via `action_attribution_windows`:
 - NEVER say "I'll analyze" or "Let me look" -- just call the tools and present results
 - If a tool returns an error, explain it briefly and continue with available data
 - Always convert API amounts from cents to dollars (divide by 100)
-- Always calculate derived metrics (ROAS, CTR, CPA) -- don't just show raw numbers
+- Always calculate derived metrics appropriate to the goal (CTR always; ROAS only for purchase campaigns; CPL for lead campaigns; cost per conversation for messaging campaigns) — don't just show raw numbers
 - For comparison reports, calculate % change and use trend indicators (up/down)
 - Include SPECIFIC dollar amounts in recommendations ("shift $50/day from Campaign X to Campaign Y")
 - ALWAYS include a `trend` block for any report spanning 7+ days
@@ -409,10 +599,11 @@ Specify via `action_attribution_windows`:
 
 ### Contextual Quick Replies Rules
 
-Quick replies MUST be contextual based on findings:
-- Low ROAS found -> "Pause low performers" or "Reallocate budget"
+Quick replies MUST be contextual based on findings AND the campaign's primary goal:
+- High cost per primary result (conversation/lead/purchase) -> "Review audience targeting" or "Reallocate budget"
 - Creative fatigue detected -> "Refresh creatives" or "Generate new copy"
 - Budget uneven -> "Apply budget rebalance"
-- High performers found -> "Scale top campaigns" or "Duplicate winners"
+- Low cost per primary result + low budget -> "Scale top campaigns" or "Duplicate winners"
 - Always include at least one "drill deeper" option
 - Always include one "take action" option that leads to a strategic skill
+- NEVER include "Improve ROAS" as a quickreply for messaging or lead gen campaigns

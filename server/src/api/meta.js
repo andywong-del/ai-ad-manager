@@ -251,24 +251,7 @@ router.post('/trigger-permissions', async (req, res) => {
   const { adAccountId, igAccountId, pageId } = req.body;
   const results = {};
 
-  // 1. read_insights — GET /{page_id}/insights (requires page token + read_insights permission)
-  // Per Meta docs: read_insights covers Page/app/domain insights, NOT ad account insights
-  if (pageId) {
-    try {
-      // Get page token first (page insights require page access token)
-      const pages = await metaClient.getPages(req.token);
-      const page = pages?.find(p => p.id === pageId);
-      const pageToken = page?.access_token || req.token;
-      const { data } = await metaClient.metaApi.get(`/${pageId}/insights`, {
-        params: { access_token: pageToken, metric: 'page_views_total', period: 'day', date_preset: 'last_7d' }
-      });
-      results.read_insights = { ok: true, metrics: data.data?.length ?? 0 };
-    } catch (err) {
-      results.read_insights = { ok: false, error: err.response?.data?.error?.message || err.message };
-    }
-  }
-
-  // 2a. instagram_basic — GET /{ig_user_id}?fields=id,username,media_count
+  // 1. instagram_basic — GET /{ig_user_id}?fields=id,username,media_count
   // Per Meta docs: requires instagram_basic + pages_read_engagement
   if (igAccountId) {
     try {

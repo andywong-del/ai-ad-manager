@@ -18,17 +18,38 @@ router.get('/', async (req, res, next) => {
     const raw = await metaClient.getInsights(token, adAccountId, datePreset);
 
     const spend = parseFloat(raw.spend || 0);
-    const revenue = raw.action_values?.find(a => a.action_type === 'purchase')?.value || 0;
-    const conversions = raw.actions?.find(a => a.action_type === 'purchase')?.value || 0;
+
+    // Build a keyed map of all actions and action_values so the agent can pick
+    // the correct metric based on each campaign's optimization_goal.
+    // Never hardcode purchase — the agent decides what's relevant.
+    const actionsMap = {};
+    (raw.actions || []).forEach(a => { actionsMap[a.action_type] = parseFloat(a.value || 0); });
+
+    const actionValuesMap = {};
+    (raw.action_values || []).forEach(a => { actionValuesMap[a.action_type] = parseFloat(a.value || 0); });
+
+    const costPerActionMap = {};
+    (raw.cost_per_action_type || []).forEach(a => { costPerActionMap[a.action_type] = parseFloat(a.value || 0); });
 
     res.json({
       totalSpend: spend,
-      totalRevenue: parseFloat(revenue),
-      roas: spend > 0 ? parseFloat(revenue) / spend : 0,
-      conversions: parseInt(conversions),
       impressions: parseInt(raw.impressions || 0),
       clicks: parseInt(raw.clicks || 0),
-      ctr: parseFloat(raw.ctr || 0)
+      ctr: parseFloat(raw.ctr || 0),
+      reach: parseInt(raw.reach || 0),
+      frequency: parseFloat(raw.frequency || 0),
+      // Full action maps — agent selects correct type based on optimization_goal
+      actionsMap,
+      actionValuesMap,
+      costPerActionMap,
+      // Convenience fields for common goals (agent still validates these are relevant)
+      purchases: actionsMap['purchase'] || 0,
+      purchaseRevenue: actionValuesMap['purchase'] || 0,
+      purchaseRoas: spend > 0 && actionValuesMap['purchase'] ? (actionValuesMap['purchase'] / spend) : null,
+      leads: actionsMap['lead'] || actionsMap['onsite_conversion.lead_grouped'] || 0,
+      messagingConversations: actionsMap['onsite_conversion.messaging_conversation_started_7d'] || 0,
+      linkClicks: actionsMap['link_click'] || 0,
+      landingPageViews: actionsMap['landing_page_view'] || 0,
     });
   } catch (err) {
     next(err);

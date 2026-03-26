@@ -1,10 +1,10 @@
 ---
-name: targeting-audiences
+
+## name: targeting-audiences
 description: Plan audience targeting strategies — custom audiences, lookalikes, saved audiences, and interest targeting with interactive source selection
 layer: strategic
 depends_on: [insights-reporting]
 leads_to: [ad-manager, campaign-manager]
----
 
 # Targeting & Audiences
 
@@ -215,26 +215,48 @@ Body:
 
 Interactive audience planning flow. ALWAYS use ```options cards for every choice. NEVER list options as plain text bullets. Max 1-2 sentences between cards. Option titles MUST be human-readable names — NEVER raw IDs.
 
+**Progress:** Show step progress at the start of each step: `Step 2 of 4 — Engagement type`. Audience flows are shorter (3-5 steps) so users know they're close.
+
 **Golden Rules:**
 
 1. ALWAYS call API tools first to get real data (pages, videos, IG accounts) before presenting options — NEVER ask users to provide IDs manually
 2. Gather info efficiently — use smart defaults (retention=30d website, 365d engagement). Auto-generate names if not provided.
 3. When user provides enough info upfront, skip to confirmation.
 4. `special_ad_categories` is a CAMPAIGN-level field. NEVER ask about it when creating audiences.
+5. ALWAYS offer the exclusion step before final confirmation — it's a key quality-of-life feature that prevents wasted spend.
 
 ### Entry Point — Audience Type Selection
 
-Show immediately when user mentions audience, retargeting, custom audience, or lookalike:
+Show immediately when user mentions audience, retargeting, custom audience, or lookalike. Split into two cards — first ask the goal, then show relevant types:
 
 ```options
-{"title":"What type of audience do you want to create?","options":[
-  {"id":"WEBSITE","title":"Website Visitors","description":"Retarget people who visited your site via Meta Pixel"},
+{"title":"What's the purpose of this audience?","options":[
+  {"id":"RETARGET","title":"Retarget warm audiences","description":"Re-engage people who already know your brand"},
+  {"id":"PROSPECT","title":"Find new customers","description":"Reach people similar to your best customers"},
+  {"id":"SAVE","title":"Save a targeting preset","description":"Reusable interest/demographic targeting for future campaigns"}
+]}
+```
+
+**If RETARGET:**
+
+```options
+{"title":"Who do you want to retarget?","options":[
+  {"id":"WEBSITE","title":"Website Visitors","description":"People who visited your site via Meta Pixel"},
   {"id":"VIDEO","title":"Video Viewers","description":"People who watched your Facebook or Instagram videos"},
-  {"id":"CUSTOM","title":"Customer List","description":"Upload your own customer data (emails, phones)"},
   {"id":"INSTAGRAM","title":"Instagram Engagers","description":"People who interacted with your Instagram profile"},
   {"id":"PAGE","title":"Facebook Page Engagers","description":"People who interacted with your Facebook Page"},
-  {"id":"LOOKALIKE","title":"Lookalike Audience","description":"Find new people similar to your best customers"},
-  {"id":"SAVED","title":"Saved Audience","description":"Reusable interest/demographic targeting preset"}
+  {"id":"LEAD_AD","title":"Lead Form Engagers","description":"People who opened or submitted your lead form"},
+  {"id":"WHATSAPP","title":"WhatsApp Contacts","description":"People who messaged your WhatsApp Business account"},
+  {"id":"CUSTOMER_LIST","title":"Customer List","description":"Upload your own customer data (emails, phones)"}
+]}
+```
+
+**If PROSPECT:**
+
+```options
+{"title":"What should the new audience be based on?","options":[
+  {"id":"LOOKALIKE","title":"Lookalike Audience","description":"Find people similar to your existing customers or followers"},
+  {"id":"INTEREST","title":"Interest & Behavior Targeting","description":"Target by interests, behaviors, and demographics (Saved Audience)"}
 ]}
 ```
 
@@ -294,30 +316,42 @@ Confirm summary with ```steps, then call `create_custom_audience` with: name, de
 
 ### VIDEO Audience (Engagement)
 
-Video sources: Facebook Page videos, Instagram videos, Campaign video ads, or direct Video IDs.
+Video sources: Facebook Page videos, Instagram videos.
 
-**Step 1 — Choose video source:** Call `get_pages` AND `get_connected_instagram_accounts` in parallel. Present ALL sources:
+**Step 1 — Choose video source:** Call `get_pages` AND `get_connected_instagram_accounts` in parallel. Present ALL sources. Allow multi-select to combine FB + IG videos in a single audience:
 
 ```options
-{"title":"Choose video source","options":[
-  {"id":"fb:PAGE_ID_1","title":"TopGlow Medical","description":"Facebook Page"},
-  {"id":"fb:PAGE_ID_2","title":"My Brand HK","description":"Facebook Page"},
-  {"id":"ig:IG_ID_1","title":"@businessfocus.io","description":"Instagram"},
-  {"id":"ig:IG_ID_2","title":"@topglow.hk","description":"Instagram"}
+{"title":"Choose video source (you can combine FB + IG)","options":[
+  {"id":"fb:PAGE_ID_1","title":"TopGlow Medical","description":"Facebook Page · tap to select"},
+  {"id":"fb:PAGE_ID_2","title":"My Brand HK","description":"Facebook Page · tap to select"},
+  {"id":"ig:IG_ID_1","title":"@businessfocus.io","description":"Instagram · tap to select"},
+  {"id":"ig:IG_ID_2","title":"@topglow.hk","description":"Instagram · tap to select"},
+  {"id":"ALL","title":"All sources above","description":"Include all FB pages and IG accounts"}
 ]}
 ```
 
 **Step 2 — Show videos:** Based on source type:
-- Facebook Page: call `get_page_videos` with page_id
-- Instagram: call `get_ig_media` with ig_account_id (and page_id if available from the IG account's pageId field)
 
-Present with VIDEO TITLE (or caption) as the title:
+- Facebook Page: call `get_page_videos` with page_id
+- Instagram: call `get_ig_media` with ig_account_id
+
+If more than 8 videos are returned, offer a filter first:
 
 ```options
-{"title":"Select videos","options":[
-  {"id":"all","title":"All Videos","description":"Any video on this page"},
-  {"id":"VIDEO_ID_1","title":"Summer Collection Promo","description":"Jan 15 - 12.5K views"},
-  {"id":"VIDEO_ID_2","title":"Behind the Scenes","description":"Feb 3 - 8.2K views"}
+{"title":"Which videos to include?","options":[
+  {"id":"all","title":"All Videos","description":"Any video ever posted — broadest audience"},
+  {"id":"top","title":"Top Performers Only","description":"Pick specific high-view videos — more targeted"},
+  {"id":"recent","title":"Recent Videos (last 90 days)","description":"Only videos from the last 3 months"}
+]}
+```
+
+If user picks Top Performers or Recent — show the filtered list (sort by views descending, cap at 12):
+
+```options
+{"title":"Select videos (12 shown · sorted by views)","options":[
+  {"id":"all","title":"All Videos","description":"Include everything on this account"},
+  {"id":"VIDEO_ID_1","title":"Summer Collection Promo","description":"Jan 15 · 12.5K views · 1:02"},
+  {"id":"VIDEO_ID_2","title":"Behind the Scenes","description":"Feb 3 · 8.2K views · 0:45"}
 ]}
 ```
 
@@ -362,19 +396,23 @@ For Facebook Page videos, use `"type":"page"`. For Instagram videos, use `"type"
 
 **Engagement event values:**
 
-| Selection | Event Value |
-|-----------|-------------|
-| 3 seconds | `video_watched` |
-| 10 seconds | `video_watched` |
-| ThruPlay / 15s | `video_completed` |
-| 25% | `video_watched_25_percent` |
-| 50% | `video_watched_50_percent` |
-| 75% | `video_watched_75_percent` |
-| 95% | `video_watched_95_percent` |
+
+| Selection      | Event Value                |
+| -------------- | -------------------------- |
+| 3 seconds      | `video_watched`            |
+| 10 seconds     | `video_watched`            |
+| ThruPlay / 15s | `video_completed`          |
+| 25%            | `video_watched_25_percent` |
+| 50%            | `video_watched_50_percent` |
+| 75%            | `video_watched_75_percent` |
+| 95%            | `video_watched_95_percent` |
+
 
 ---
 
 ### CUSTOM Audience (Customer List)
+
+> **Important UX note:** Users cannot SHA-256 hash their data inside a chat window. This flow creates the audience shell — the user must upload hashed data via the Meta Business Suite Audiences tool or a CRM integration. Explain this clearly upfront.
 
 **Step 1 — Data type:**
 
@@ -382,7 +420,7 @@ For Facebook Page videos, use `"type":"page"`. For Instagram videos, use `"type"
 {"title":"What customer data do you have?","options":[
   {"id":"EMAIL","title":"Email Addresses","description":"Upload a list of customer emails"},
   {"id":"PHONE","title":"Phone Numbers","description":"Upload a list of phone numbers"},
-  {"id":"MIXED","title":"Multiple Fields","description":"Emails + phones + names for better match rates"}
+  {"id":"MIXED","title":"Emails + Phones + Names","description":"More fields = higher match rate (recommended)"}
 ]}
 ```
 
@@ -390,13 +428,111 @@ For Facebook Page videos, use `"type":"page"`. For Instagram videos, use `"type"
 
 ```options
 {"title":"Where did this data come from?","options":[
-  {"id":"USER_PROVIDED_ONLY","title":"Collected Directly","description":"Data you collected from your customers (CRM, signups)"},
-  {"id":"PARTNER_PROVIDED_ONLY","title":"From Partners","description":"Data provided by business partners"},
-  {"id":"BOTH","title":"Mixed Sources","description":"Combination of direct and partner data"}
+  {"id":"USER_PROVIDED_ONLY","title":"Collected from my customers","description":"Data from your CRM, signups, or purchases"},
+  {"id":"PARTNER_PROVIDED_ONLY","title":"From business partners","description":"Data provided by a third-party partner"},
+  {"id":"BOTH","title":"Mixed sources","description":"Combination of direct and partner data"}
 ]}
 ```
 
-Create with name, description, subtype="CUSTOM", then use `add_users_to_audience` to upload hashed data. Normalize before hashing: lowercase emails, remove spaces, use E.164 phone format.
+**Step 3 — Create the audience shell**, then explain the upload process:
+
+Create with name, description, subtype="CUSTOM", customer_file_source.
+
+Then show:
+
+```insights
+[
+  {"severity":"info","title":"Next step: Upload your customer list","desc":"I've created the audience. To add your customers, you need to upload a hashed CSV file. Here's how:","action":"View upload instructions"}
+]
+```
+
+Follow with clear instructions:
+
+> **To upload your customer list:**
+>
+> 1. Prepare a CSV with columns: email, phone (E.164 format: +85298765432), first_name, last_name
+> 2. Meta requires SHA-256 hashed values. Use a tool like [Meta's audience upload template](https://www.facebook.com/business/help/2343514732740832) or your CRM's export feature
+> 3. Go to **Meta Business Suite → Audiences → [Audience Name] → Add people**
+> 4. Upload your hashed CSV there
+>
+> Alternatively, if you can share pre-hashed data (SHA-256 of lowercase email / E.164 phone), I can upload it directly via the API.
+
+---
+
+### LEAD AD Audience (Lead Form Engagers)
+
+Retarget people who interacted with your Facebook/Instagram lead forms — people who opened but didn't submit are a high-intent warm audience.
+
+**Step 1 — Select Page:** Call `get_pages` and present.
+
+**Step 2 — Engagement type:**
+
+```options
+{"title":"What lead form interaction?","options":[
+  {"id":"lead_opened","title":"Opened the Lead Form","description":"Anyone who opened your form — including those who didn't submit"},
+  {"id":"lead_submitted","title":"Submitted the Lead Form","description":"People who completed and submitted the form"},
+  {"id":"lead_not_submitted","title":"Opened but Didn't Submit","description":"High-intent people who started but didn't finish — great for retargeting"}
+]}
+```
+
+Auto-default retention=90 days (max for lead ad audiences). Confirm and create with:
+
+- event_sources: `[{"id": "PAGE_ID", "type": "page"}]`
+- filter event: `lead_generation_opened` / `leadgen_submitted` / use both with exclusion for "opened but not submitted"
+
+---
+
+### WHATSAPP Contacts Audience
+
+Retarget people who interacted with your WhatsApp Business account — people who messaged you are high-intent warm audiences.
+
+**Step 1 — Select Page (with WhatsApp Business connected):** Call `get_pages` and present. The WhatsApp Business account must be linked to a Facebook Page.
+
+**Step 2 — Interaction type:**
+
+```options
+{"title":"What WhatsApp interaction?","options":[
+  {"id":"ALL","title":"All Interactions","description":"Anyone who sent or received messages with your WhatsApp Business — broadest"},
+  {"id":"SENT_MESSAGE","title":"Sent You a Message","description":"People who messaged your business first — highest intent"},
+  {"id":"OPENED_CONVERSATION","title":"Opened a Conversation","description":"People who opened a WhatsApp thread with your business"}
+]}
+```
+
+Auto-default retention=365 days. Confirm and create.
+
+**API parameters:**
+
+Use `subtype: "ENGAGEMENT"` with event_source type `whatsapp_business_account`. The `id` is the WhatsApp Business Account (WABA) ID linked to the selected Page.
+
+**Rule JSON format:**
+
+```json
+{
+  "inclusions": {
+    "operator": "or",
+    "rules": [{
+      "event_sources": [{"id": "WABA_ID", "type": "whatsapp_business_account"}],
+      "retention_seconds": SECONDS,
+      "filter": {
+        "operator": "and",
+        "filters": [
+          {"field": "event", "operator": "eq", "value": "EVENT_VALUE"}
+        ]
+      }
+    }]
+  }
+}
+```
+
+**Event values:**
+
+
+| Event               | Value                          |
+| ------------------- | ------------------------------ |
+| All interactions    | `WABA_MESSAGE`                 |
+| Sent a message      | `WABA_MESSAGE`                 |
+| Opened conversation | `WABA_CONVERSATION_STARTED_7D` |
+
 
 ---
 
@@ -418,8 +554,9 @@ Create with name, description, subtype="CUSTOM", then use `add_users_to_audience
   {"id":"all","title":"All Engagement","description":"Anyone who interacted with your profile or content"},
   {"id":"visit","title":"Profile Visitors","description":"People who visited your profile"},
   {"id":"post","title":"Post/Ad Engagement","description":"Reactions, comments, shares, saves"},
-  {"id":"message","title":"Sent a Message","description":"People who DM'd your account"},
-  {"id":"saved","title":"Saved a Post","description":"People who saved your posts or ads"}
+  {"id":"message","title":"Sent a DM","description":"People who sent a direct message to your account"},
+  {"id":"saved","title":"Saved a Post","description":"People who saved your posts or ads"},
+  {"id":"whatsapp","title":"Clicked WhatsApp Button","description":"People who tapped your WhatsApp contact button"}
 ]}
 ```
 
@@ -456,13 +593,16 @@ Auto-default retention=365. Confirm and create.
 
 **Event values:**
 
-| Event | Value |
-|-------|-------|
-| All engagement | `ig_business_profile_all` |
-| Visited profile | `ig_business_profile_visit` |
-| Sent message | `ig_user_messaged` |
-| Saved post/ad | `ig_user_saved_media` |
-| Engaged with post/ad | `ig_user_interacted_ad_or_organic` |
+
+| Event                   | Value                              |
+| ----------------------- | ---------------------------------- |
+| All engagement          | `ig_business_profile_all`          |
+| Visited profile         | `ig_business_profile_visit`        |
+| Sent message            | `ig_user_messaged`                 |
+| Saved post/ad           | `ig_user_saved_media`              |
+| Engaged with post/ad    | `ig_user_interacted_ad_or_organic` |
+| Clicked WhatsApp button | `ig_whatsapp_button_click`         |
+
 
 ---
 
@@ -484,8 +624,9 @@ Auto-default retention=365. Confirm and create.
   {"id":"engaged","title":"Any Engagement","description":"Reactions, shares, comments, link clicks on posts/ads"},
   {"id":"liked","title":"Page Likes/Follows","description":"People who currently like or follow your Page"},
   {"id":"visited","title":"Page Visitors","description":"Anyone who visited your Page"},
-  {"id":"cta","title":"CTA Button Clicks","description":"People who clicked Call, Message, etc."},
-  {"id":"messaged","title":"Sent a Message","description":"People who messaged your Page"}
+  {"id":"cta","title":"CTA Button Clicks","description":"People who clicked Call, Message, WhatsApp, etc."},
+  {"id":"messaged","title":"Sent a Message","description":"People who messaged your Page via Messenger"},
+  {"id":"whatsapp","title":"Clicked WhatsApp Button","description":"People who tapped the WhatsApp button on your Page"}
 ]}
 ```
 
@@ -513,13 +654,16 @@ Auto-default retention=365. Confirm and create.
 
 **Event values:**
 
-| Event | Value |
-|-------|-------|
-| Any engagement | `page_engaged` |
-| Likes/follows | `page_liked` |
-| CTA clicks | `page_cta_clicked` |
-| Messages | `page_messaged` |
-| Page visits | `page_visited` |
+
+| Event                 | Value                          |
+| --------------------- | ------------------------------ |
+| Any engagement        | `page_engaged`                 |
+| Likes/follows         | `page_liked`                   |
+| CTA clicks            | `page_cta_clicked`             |
+| Messages              | `page_messaged`                |
+| Page visits           | `page_visited`                 |
+| WhatsApp button click | `page_whatsapp_button_clicked` |
+
 
 ---
 
@@ -535,7 +679,22 @@ Auto-default retention=365. Confirm and create.
 ]}
 ```
 
-**Step 2 — Target country:** Ask user for the country.
+**Step 2 — Target country:**
+
+```options
+{"title":"Which country should the lookalike target?","options":[
+  {"id":"HK","title":"Hong Kong","description":"HK"},
+  {"id":"TW","title":"Taiwan","description":"TW"},
+  {"id":"SG","title":"Singapore","description":"SG"},
+  {"id":"MY","title":"Malaysia","description":"MY"},
+  {"id":"US","title":"United States","description":"US"},
+  {"id":"GB","title":"United Kingdom","description":"GB"},
+  {"id":"AU","title":"Australia","description":"AU"},
+  {"id":"OTHER","title":"Other country","description":"Type the country name or code"}
+]}
+```
+
+> **Minimum source size:** The source audience must have at least 100 people for Meta to generate a lookalike. Warn if the selected source audience shows a small estimated size.
 
 **Step 3 — Lookalike size:**
 
@@ -556,42 +715,78 @@ Confirm and call `create_lookalike_audience`. Ratio is decimal: 1% = 0.01.
 
 ### SAVED Audience (Interest/Behavior Targeting)
 
-**Step 1 — Demographics:**
+**Step 1 — What are you promoting?** Ask for the product/service/industry first — this informs interest search.
+
+> "What product or service is this audience for? (e.g. skincare brand, fitness studio, B2B SaaS)"
+
+**Step 2 — Location:**
+
+```options
+{"title":"Target location","options":[
+  {"id":"HK","title":"Hong Kong","description":""},
+  {"id":"TW","title":"Taiwan","description":""},
+  {"id":"SG","title":"Singapore","description":""},
+  {"id":"MY","title":"Malaysia","description":""},
+  {"id":"US","title":"United States","description":""},
+  {"id":"GB","title":"United Kingdom","description":""},
+  {"id":"OTHER","title":"Other / Multiple countries","description":"Specify country code(s)"}
+]}
+```
+
+**Step 3 — Demographics:**
 
 ```options
 {"title":"Target gender","options":[
-  {"id":"0","title":"All Genders","description":"No gender restriction"},
-  {"id":"1","title":"Male","description":"Male only"},
-  {"id":"2","title":"Female","description":"Female only"}
+  {"id":"0","title":"All Genders","description":"No restriction"},
+  {"id":"1","title":"Male only","description":""},
+  {"id":"2","title":"Female only","description":""}
 ]}
 ```
 
-Ask for target country and age range.
+Ask for age range (min/max). Default 18-65.
 
-**Step 2 — Interest discovery:** Ask for their niche/industry, call `targeting_search` with keywords, present results:
+**Step 4 — Interest discovery:** Call `targeting_search` with 2-3 keywords from Step 1. Present results with **estimated audience size in the target country** (from `get_reach_estimate` after each addition — not the global Meta size):
 
 ```options
 {"title":"Select interests to target","options":[
-  {"id":"6003139266461","title":"Fitness and wellness","description":"Interest · 450M people"},
-  {"id":"6003384248805","title":"Yoga","description":"Interest · 200M people"},
-  {"id":"6003659278981","title":"Running","description":"Interest · 300M people"}
+  {"id":"6003139266461","title":"Fitness and wellness","description":"Interest — add to see reach estimate"},
+  {"id":"6003384248805","title":"Yoga","description":"Interest — add to see reach estimate"},
+  {"id":"6003659278981","title":"Running","description":"Interest — add to see reach estimate"}
 ]}
 ```
 
-Use `targeting_browse` to explore available targeting categories if needed.
-
-**Step 3 — Validate and estimate:** Call `get_reach_estimate` and show:
+**Step 5 — Validate and estimate:** Call `get_reach_estimate` with the full targeting spec and show size **in the target country**:
 
 ```metrics
 {"metrics":[
-  {"label":"Estimated Audience Size","value":"2.5M - 5.0M"},
-  {"label":"Location","value":"United States"},
+  {"label":"Estimated Audience in Hong Kong","value":"180K - 420K"},
   {"label":"Age","value":"25-45"},
-  {"label":"Interests","value":"Fitness, Yoga, Running"}
+  {"label":"Interests","value":"Fitness, Yoga, Running"},
+  {"label":"Gender","value":"All"}
 ]}
 ```
 
+If audience < 50K — warn: "Narrow audience — may limit delivery and raise CPM. Consider broadening age or adding more interests."
+If audience > 10M in a small market — warn: "Very broad for this market — consider narrowing to improve relevance."
+
 Confirm and call `create_saved_audience`.
+
+---
+
+### Exclusion Step (offer for ALL audience types)
+
+After the main audience is defined and before confirmation, always offer exclusions:
+
+```options
+{"title":"Do you want to exclude anyone from this audience?","options":[
+  {"id":"NONE","title":"No exclusions","description":"Show ads to the full audience"},
+  {"id":"EXISTING_CUSTOMERS","title":"Exclude existing customers","description":"Exclude your customer list audience to avoid wasting budget"},
+  {"id":"RECENT_CONVERTERS","title":"Exclude recent converters","description":"Exclude people who already purchased or submitted a lead in the last 30 days"},
+  {"id":"CUSTOM","title":"Exclude a specific audience","description":"Choose any existing custom audience to exclude"}
+]}
+```
+
+If user picks an exclusion, call `get_custom_audiences` to let them select the exclusion audience, then add it to the rule JSON under `exclusions`.
 
 ---
 
@@ -602,29 +797,31 @@ After creating ANY audience, show:
 ```metrics
 {"metrics":[
   {"label":"Audience Name","value":"[Name]"},
-  {"label":"Type","value":"[Type]"},
-  {"label":"Audience ID","value":"[ID]"},
-  {"label":"Estimated Size","value":"[Size]"},
-  {"label":"Retention","value":"[Days] days"}
+  {"label":"Type","value":"[Type e.g. Website Visitors · 30 days]"},
+  {"label":"Estimated Size","value":"[Size or 'Populating — check back in 24-48 hours']"},
+  {"label":"Retention Window","value":"[X] days"},
+  {"label":"Exclusions","value":"[Exclusion audience name or 'None']"}
 ]}
 ```
 
-Then: "Your audience is ready! You can view and manage it in the Audiences module."
+> Note: New audiences show as "Populating" for 24-48 hours while Meta matches data. Estimated size appears once population is complete.
+
+Then: "Your audience is ready to use in ad sets."
 
 ```quickreplies
-["[audiences] View in Audiences", "Create ad set with this audience", "Create lookalike from this", "Analyze audience performance"]
+["Create ad set with this audience", "Create lookalike from this", "Build another audience", "Analyse audience performance"]
 ```
 
 **Keep users in our UI:** After creating an audience, do NOT send users to Meta Ads Manager or Business Suite. Direct them to the **Audiences module** in our app. Do NOT link to business.facebook.com or any external Meta URL.
 
 ## Analytical Handoff
 
-After creating audiences, recommend loading `insights-reporting` to analyze audience performance. Key questions to answer:
+After creating audiences, recommend loading `insights-reporting` to analyze audience performance. Key questions to answer (framed by the account's primary goal):
 
-- Which audience segments have the lowest CPA?
-- Which custom audiences are delivering the best ROAS?
-- Are lookalike audiences outperforming interest-based targeting?
-- Which retention windows produce the most conversions?
+- Which audience segments have the lowest cost per primary result (conversation / lead / purchase)?
+- Are lookalike audiences outperforming interest-based targeting on the primary metric?
+- Which retention windows produce the most conversions or conversations?
+- Is there audience overlap causing budget waste across ad sets?
 
 When user selects "Analyze audience performance" from quickreplies, load `insights-reporting` with the audience context.
 
@@ -632,46 +829,52 @@ When user selects "Analyze audience performance" from quickreplies, load `insigh
 
 After audience strategy is planned, execution proceeds through:
 
-- **`ad-manager`** — create ad sets using the planned audience targeting
-- **`campaign-manager`** — build a full campaign using the audience in Step 6
+- `**ad-manager`** — create ad sets using the planned audience targeting
+- `**campaign-manager**` — build a full campaign using the audience in Step 6
 
 ## Quick Reference
 
 ### Audience Subtypes
 
-| Subtype | Description |
-|---------|-------------|
-| `CUSTOM` | General custom audience (default) |
-| `WEBSITE` | Website visitors via Meta Pixel |
-| `APP` | App activity audience |
-| `VIDEO` | Users who engaged with video content |
+
+| Subtype     | Description                                         |
+| ----------- | --------------------------------------------------- |
+| `CUSTOM`    | General custom audience (default)                   |
+| `WEBSITE`   | Website visitors via Meta Pixel                     |
+| `APP`       | App activity audience                               |
+| `VIDEO`     | Users who engaged with video content                |
 | `LOOKALIKE` | Lookalike audience (created via lookalike endpoint) |
+
 
 ### Retention Limits
 
-| Audience Type | Max Retention | Default |
-|---------------|---------------|---------|
-| Website | 180 days | 30 days |
-| Lead Ad | 90 days | 30 days |
-| Offline | 180 days | 30 days |
-| Mobile App | 180 days | 30 days |
-| Video | 365 days | 365 days |
-| Instagram | 365 days | 365 days |
-| Facebook Page | 365 days | 365 days |
-| Facebook Event | 365 days | 365 days |
-| Shopping | 365 days | 365 days |
-| Catalogue | 365 days | 365 days |
-| AR | 365 days | 365 days |
+
+| Audience Type  | Max Retention | Default  |
+| -------------- | ------------- | -------- |
+| Website        | 180 days      | 30 days  |
+| Lead Ad        | 90 days       | 30 days  |
+| Offline        | 180 days      | 30 days  |
+| Mobile App     | 180 days      | 30 days  |
+| Video          | 365 days      | 365 days |
+| Instagram      | 365 days      | 365 days |
+| Facebook Page  | 365 days      | 365 days |
+| Facebook Event | 365 days      | 365 days |
+| Shopping       | 365 days      | 365 days |
+| Catalogue      | 365 days      | 365 days |
+| AR             | 365 days      | 365 days |
+
 
 ### Lookalike Ratio Guide
 
-| Ratio | Size | Best For |
-|-------|------|----------|
-| 1% (0.01) | Smallest | Conversions, high-value actions |
-| 2-3% (0.02-0.03) | Small-Medium | Balanced quality and reach |
-| 5% (0.05) | Medium | Traffic, engagement |
-| 10% (0.10) | Large | Broad awareness |
-| 20% (0.20) | Maximum | Maximum reach campaigns |
+
+| Ratio            | Size         | Best For                        |
+| ---------------- | ------------ | ------------------------------- |
+| 1% (0.01)        | Smallest     | Conversions, high-value actions |
+| 2-3% (0.02-0.03) | Small-Medium | Balanced quality and reach      |
+| 5% (0.05)        | Medium       | Traffic, engagement             |
+| 10% (0.10)       | Large        | Broad awareness                 |
+| 20% (0.20)       | Maximum      | Maximum reach campaigns         |
+
 
 `type` can be `"similarity"` (optimize for closeness) or `"reach"` (optimize for size).
 
@@ -726,3 +929,4 @@ After audience strategy is planned, execution proceeds through:
 - Hash each field individually with SHA-256 before sending.
 - Normalize before hashing: lowercase emails, remove spaces, use E.164 phone format.
 - Supported fields: `EMAIL`, `PHONE`, `FN` (first name), `LN` (last name), `ZIP`, `CT` (city), `ST` (state), `COUNTRY`, `DOBY` (birth year), `DOBM` (birth month), `DOBD` (birth day), `GEN` (gender), `MADID` (mobile advertiser ID).
+

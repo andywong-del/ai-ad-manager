@@ -1,9 +1,9 @@
 ---
-name: business-manager
-description: Navigate Facebook Business Manager -- view businesses, ad accounts, pages, pixels, and team members with account health analysis
-layer: analytical
+
+## name: business-manager  
+description: Navigate Facebook Business Manager -- view businesses, ad accounts, pages, pixels, and team members with account health analysis  
+layer: analytical  
 leads_to: [campaign-manager, tracking-conversions, targeting-audiences, creative-manager]
----
 
 # Business Manager
 
@@ -11,35 +11,41 @@ leads_to: [campaign-manager, tracking-conversions, targeting-audiences, creative
 
 ### Ad Accounts
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/meta/adaccounts` | List all ad accounts |
-| GET | `/api/meta/adaccounts/:id/details` | Get ad account details |
-| GET | `/api/meta/adaccounts/:id/activities` | Get account activity log |
-| GET | `/api/meta/adaccounts/:id/users` | List users with access |
-| GET | `/api/meta/adaccounts/:id/minimum-budgets` | Get minimum budget thresholds |
-| GET | `/api/meta/adaccounts/:id/instagram-accounts` | List connected Instagram accounts |
+
+| Method | Endpoint                                      | Description                       |
+| ------ | --------------------------------------------- | --------------------------------- |
+| GET    | `/api/meta/adaccounts`                        | List all ad accounts              |
+| GET    | `/api/meta/adaccounts/:id/details`            | Get ad account details            |
+| GET    | `/api/meta/adaccounts/:id/activities`         | Get account activity log          |
+| GET    | `/api/meta/adaccounts/:id/users`              | List users with access            |
+| GET    | `/api/meta/adaccounts/:id/minimum-budgets`    | Get minimum budget thresholds     |
+| GET    | `/api/meta/adaccounts/:id/instagram-accounts` | List connected Instagram accounts |
+
 
 ### Businesses
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/meta/businesses` | List all businesses |
-| GET | `/api/meta/businesses/:id/details` | Get business details |
-| GET | `/api/meta/businesses/:id/adaccounts` | List ad accounts under a business |
-| GET | `/api/meta/businesses/:id/users` | List team members |
-| GET | `/api/meta/businesses/:id/system-users` | List system users |
-| GET | `/api/meta/businesses/:id/owned-pages` | List owned Pages |
-| GET | `/api/meta/businesses/:id/owned-pixels` | List owned pixels |
-| GET | `/api/meta/businesses/:id/owned-catalogs` | List owned catalogs |
-| GET | `/api/meta/businesses/:id/owned-instagram` | List owned Instagram accounts |
-| GET | `/api/meta/businesses/:id/client-adaccounts` | List client ad accounts |
-| POST | `/api/meta/businesses/:id/claim-adaccount` | Claim an ad account |
+
+| Method | Endpoint                                     | Description                       |
+| ------ | -------------------------------------------- | --------------------------------- |
+| GET    | `/api/meta/businesses`                       | List all businesses               |
+| GET    | `/api/meta/businesses/:id/details`           | Get business details              |
+| GET    | `/api/meta/businesses/:id/adaccounts`        | List ad accounts under a business |
+| GET    | `/api/meta/businesses/:id/users`             | List team members                 |
+| GET    | `/api/meta/businesses/:id/system-users`      | List system users                 |
+| GET    | `/api/meta/businesses/:id/owned-pages`       | List owned Pages                  |
+| GET    | `/api/meta/businesses/:id/owned-pixels`      | List owned pixels                 |
+| GET    | `/api/meta/businesses/:id/owned-catalogs`    | List owned catalogs               |
+| GET    | `/api/meta/businesses/:id/owned-instagram`   | List owned Instagram accounts     |
+| GET    | `/api/meta/businesses/:id/client-adaccounts` | List client ad accounts           |
+| POST   | `/api/meta/businesses/:id/claim-adaccount`   | Claim an ad account               |
+
 
 #### Claim an Ad Account
+
 `POST /api/meta/businesses/:id/claim-adaccount`
 
 Body:
+
 ```json
 {
   "adaccount_id": "act_123456789"
@@ -48,10 +54,12 @@ Body:
 
 ### Pages
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/meta/pages` | List Facebook Pages the user manages |
-| GET | `/api/meta/pages/:id/ads` | List ads associated with a specific Page |
+
+| Method | Endpoint                  | Description                              |
+| ------ | ------------------------- | ---------------------------------------- |
+| GET    | `/api/meta/pages`         | List Facebook Pages the user manages     |
+| GET    | `/api/meta/pages/:id/ads` | List ads associated with a specific Page |
+
 
 The pages endpoint returns `id`, `name`, `engagement`, `fan_count`, and `category` for each page.
 
@@ -60,6 +68,7 @@ The pages endpoint returns `id`, `name`, `engagement`, `fan_count`, and `categor
 `POST /api/meta/batch`
 
 Body:
+
 ```json
 {
   "batch": [
@@ -76,6 +85,7 @@ Use the batch endpoint to combine multiple Graph API calls into a single HTTP re
 `GET /api/meta/ad-library?search_terms=...&ad_reached_countries=...`
 
 Search the public Facebook Ad Library for active ads. Required parameters:
+
 - `search_terms` -- keyword or advertiser name
 - `ad_reached_countries` -- comma-separated country codes (e.g., `US`, `GB`)
 
@@ -84,6 +94,7 @@ Search the public Facebook Ad Library for active ads. Required parameters:
 `POST /api/meta/reach-frequency`
 
 Body:
+
 ```json
 {
   "adAccountId": "act_123456789",
@@ -184,20 +195,22 @@ Flag: users with admin access who shouldn't have it, system users without recent
 
 After analyzing account health, recommend the appropriate strategic skill based on findings.
 
-| Finding | Severity | Recommended Skill | Action |
-|---------|----------|-------------------|--------|
-| Account DISABLED or UNSETTLED | Critical | None (manual fix) | Direct user to Meta Business Settings to resolve payment/policy |
-| Account PENDING_RISK_REVIEW | Critical | None (wait) | Inform user to wait for Meta review; no action possible |
-| Pixel not firing or missing | Critical | `tracking-conversions` | Fix pixel setup, verify events |
-| Pixel firing but no conversions | Warning | `tracking-conversions` | Debug event mapping and attribution |
-| Business not verified | Warning | None (manual fix) | Direct user to Business Verification in Meta settings |
-| No active campaigns | Info | `campaign-manager` | Create or reactivate campaigns |
-| Campaigns active but no spend | Warning | `campaign-manager` | Check budgets, scheduling, audience size |
-| High spend, low ROAS | Warning | `campaign-manager` | Budget reallocation, pause underperformers |
-| No Instagram account connected | Info | None (manual fix) | Connect IG in Business Settings for IG placements |
-| Audience overlap across ad sets | Warning | `targeting-audiences` | Consolidate or exclude overlapping audiences |
-| Creative diversity low | Warning | `creative-manager` | Test new formats and copy variations |
-| No automation rules set | Info | `automation-rules` | Set up budget and performance guardrails |
+
+| Finding                         | Severity | Recommended Skill      | Action                                                          |
+| ------------------------------- | -------- | ---------------------- | --------------------------------------------------------------- |
+| Account DISABLED or UNSETTLED   | Critical | None (manual fix)      | Direct user to Meta Business Settings to resolve payment/policy |
+| Account PENDING_RISK_REVIEW     | Critical | None (wait)            | Inform user to wait for Meta review; no action possible         |
+| Pixel not firing or missing     | Critical | `tracking-conversions` | Fix pixel setup, verify events                                  |
+| Pixel firing but no conversions | Warning  | `tracking-conversions` | Debug event mapping and attribution                             |
+| Business not verified           | Warning  | None (manual fix)      | Direct user to Business Verification in Meta settings           |
+| No active campaigns             | Info     | `campaign-manager`     | Create or reactivate campaigns                                  |
+| Campaigns active but no spend   | Warning  | `campaign-manager`     | Check budgets, scheduling, audience size                        |
+| High spend, low ROAS            | Warning  | `campaign-manager`     | Budget reallocation, pause underperformers                      |
+| No Instagram account connected  | Info     | None (manual fix)      | Connect IG in Business Settings for IG placements               |
+| Audience overlap across ad sets | Warning  | `targeting-audiences`  | Consolidate or exclude overlapping audiences                    |
+| Creative diversity low          | Warning  | `creative-manager`     | Test new formats and copy variations                            |
+| No automation rules set         | Info     | `automation-rules`     | Set up budget and performance guardrails                        |
+
 
 **Example handoff language:**
 
@@ -256,39 +269,45 @@ Each batch response includes `code` (HTTP status), `headers`, and `body` (JSON s
 
 ### Account Statuses
 
-| Code | Status | Can Run Ads? | Action Required |
-|------|--------|--------------|-----------------|
-| 1 | ACTIVE | Yes | None |
-| 2 | DISABLED | No | Appeal in Meta Business Settings |
-| 3 | UNSETTLED | No | Update payment method |
-| 7 | PENDING_RISK_REVIEW | No | Wait for Meta review |
-| 8 | PENDING_SETTLEMENT | No | Wait for settlement |
-| 9 | IN_GRACE_PERIOD | Limited | Resolve billing issues promptly |
-| 100 | PENDING_CLOSURE | No | Contact Meta support |
-| 101 | CLOSED | No | Cannot be reopened |
-| 201 | ANY_ACTIVE | Filter | Used for filtering only |
-| 202 | ANY_CLOSED | Filter | Used for filtering only |
+
+| Code | Status              | Can Run Ads? | Action Required                  |
+| ---- | ------------------- | ------------ | -------------------------------- |
+| 1    | ACTIVE              | Yes          | None                             |
+| 2    | DISABLED            | No           | Appeal in Meta Business Settings |
+| 3    | UNSETTLED           | No           | Update payment method            |
+| 7    | PENDING_RISK_REVIEW | No           | Wait for Meta review             |
+| 8    | PENDING_SETTLEMENT  | No           | Wait for settlement              |
+| 9    | IN_GRACE_PERIOD     | Limited      | Resolve billing issues promptly  |
+| 100  | PENDING_CLOSURE     | No           | Contact Meta support             |
+| 101  | CLOSED              | No           | Cannot be reopened               |
+| 201  | ANY_ACTIVE          | Filter       | Used for filtering only          |
+| 202  | ANY_CLOSED          | Filter       | Used for filtering only          |
+
 
 ### Business Verification Statuses
 
-| Status | Description | Impact |
-|--------|-------------|--------|
-| `not_verified` | Has not started verification | Limited features, lower API limits |
-| `pending` | Documents submitted, under review | Waiting -- no action needed |
-| `verified` | Business is verified | Full access to Custom Audiences, higher API limits |
+
+| Status         | Description                       | Impact                                             |
+| -------------- | --------------------------------- | -------------------------------------------------- |
+| `not_verified` | Has not started verification      | Limited features, lower API limits                 |
+| `pending`      | Documents submitted, under review | Waiting -- no action needed                        |
+| `verified`     | Business is verified              | Full access to Custom Audiences, higher API limits |
+
 
 ### Disable Reasons
 
-| Code | Reason |
-|------|--------|
-| 0 | NONE |
-| 1 | ADS_INTEGRITY_POLICY |
-| 2 | ADS_IP_REVIEW |
-| 3 | RISK_PAYMENT |
-| 4 | GRAY_ACCOUNT_SHUT_DOWN |
-| 5 | ADS_AFC_REVIEW |
-| 6 | BUSINESS_INTEGRITY_RAR |
-| 7 | PERMANENT_CLOSE |
+
+| Code | Reason                 |
+| ---- | ---------------------- |
+| 0    | NONE                   |
+| 1    | ADS_INTEGRITY_POLICY   |
+| 2    | ADS_IP_REVIEW          |
+| 3    | RISK_PAYMENT           |
+| 4    | GRAY_ACCOUNT_SHUT_DOWN |
+| 5    | ADS_AFC_REVIEW         |
+| 6    | BUSINESS_INTEGRITY_RAR |
+| 7    | PERMANENT_CLOSE        |
+
 
 ---
 
@@ -301,3 +320,4 @@ Each batch response includes `code` (HTTP status), `headers`, and `body` (JSON s
 - If no ad account selected, say: "Select an ad account from the sidebar to get started."
 - Always present account health findings with severity levels so users know what to fix first
 - End every analysis with quickreplies that lead to the appropriate strategic skill
+

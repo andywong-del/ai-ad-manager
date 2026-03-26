@@ -93,7 +93,9 @@ Returns all ads belonging to the campaign (across all ad sets).
 
 ## Strategy Workflow
 
-Full 11-step guided flow for creating a campaign from scratch. NEVER call a create tool until you have ALL required information. Do NOT attempt to create and fix errors one by one. Walk through each step using option cards. Keep each step to ONE options/metrics block + max 1 sentence of context. No paragraphs between steps.
+Full guided flow (Steps 1–11) for creating a campaign from scratch. NEVER call a create tool until you have ALL required information. Walk through each step using option cards. Keep each step to ONE options/metrics block + max 1 sentence of context. No paragraphs between steps.
+
+**Progress:** Always show step progress at the top of each step as plain text: `Step 2 of 11 — Page`. This tells the user where they are in the flow.
 
 ### Step 1 — Objective
 
@@ -101,14 +103,64 @@ Show immediately with no preamble:
 
 ```options
 {"title":"What's your campaign goal?","options":[
-  {"id":"SALES","title":"Sales","description":"Drive purchases on your website or app"},
-  {"id":"LEADS","title":"Leads","description":"Collect leads via forms or Messenger"},
+  {"id":"SALES","title":"Sales","description":"Drive purchases, WhatsApp conversations, or website conversions"},
+  {"id":"LEADS","title":"Leads","description":"Collect leads via forms, Messenger, or WhatsApp"},
   {"id":"TRAFFIC","title":"Traffic","description":"Send people to your website or app"},
   {"id":"AWARENESS","title":"Awareness","description":"Reach people likely to remember your ads"},
-  {"id":"ENGAGEMENT","title":"Engagement","description":"More likes, comments, shares, or event responses"},
+  {"id":"ENGAGEMENT","title":"Engagement","description":"More likes, comments, shares, or video views"},
   {"id":"APP_PROMOTION","title":"App Promotion","description":"Get more app installs or in-app actions"}
 ]}
 ```
+
+### Step 1b — Conversion Location (Destination)
+
+**This step is mandatory.** The destination determines `optimization_goal`, the correct CTA, and which tracking to set up. Show immediately after Step 1 — no preamble.
+
+Options vary by objective:
+
+**If Sales or Leads:**
+```options
+{"title":"Where do you want to get results?","options":[
+  {"id":"WEBSITE","title":"Website","description":"Drive conversions on your website — requires Meta Pixel"},
+  {"id":"WHATSAPP","title":"WhatsApp","description":"Start WhatsApp conversations — optimization_goal: CONVERSATIONS"},
+  {"id":"MESSENGER","title":"Messenger","description":"Start Messenger conversations — optimization_goal: CONVERSATIONS"},
+  {"id":"INSTAGRAM_DM","title":"Instagram DM","description":"Start Instagram DM conversations — optimization_goal: CONVERSATIONS"},
+  {"id":"LEAD_FORM","title":"Instant Lead Form","description":"Collect leads inside Facebook/Instagram — no website needed"},
+  {"id":"CALLS","title":"Phone Calls","description":"Drive calls directly from the ad"}
+]}
+```
+
+**If Traffic:**
+```options
+{"title":"Where should traffic go?","options":[
+  {"id":"WEBSITE","title":"Website / Landing Page","description":"Send clicks to a URL — optimization_goal: LINK_CLICKS or LANDING_PAGE_VIEWS"},
+  {"id":"WHATSAPP","title":"WhatsApp","description":"Click-to-WhatsApp — optimization_goal: CONVERSATIONS"},
+  {"id":"APP","title":"App","description":"Send traffic to your mobile app"}
+]}
+```
+
+**If Awareness or Engagement:** skip this step — destination is always the ad placement itself.
+
+**If App Promotion:** skip this step — destination is always the app store.
+
+**Save the destination** — it drives all downstream decisions:
+
+| Destination | optimization_goal | Primary Metric | CTA Options |
+|---|---|---|---|
+| Website (purchase) | `OFFSITE_CONVERSIONS` | ROAS / CPA | SHOP_NOW, BUY_NOW, GET_OFFER |
+| Website (lead) | `OFFSITE_CONVERSIONS` | CPL | SIGN_UP, LEARN_MORE, CONTACT_US |
+| WhatsApp | `CONVERSATIONS` | Cost per Conversation | SEND_WHATSAPP_MESSAGE, WHATSAPP_MESSAGE |
+| Messenger | `CONVERSATIONS` | Cost per Conversation | SEND_MESSAGE |
+| Instagram DM | `CONVERSATIONS` | Cost per Conversation | SEND_MESSAGE |
+| Lead Form | `LEAD_GENERATION` | CPL | SIGN_UP, APPLY_NOW, LEARN_MORE |
+| Phone Calls | `CALL` | Cost per Call | CALL_NOW |
+| Website (traffic) | `LINK_CLICKS` or `LANDING_PAGE_VIEWS` | CPC / Cost per LPV | LEARN_MORE, SHOP_NOW |
+
+**If destination = WhatsApp**, immediately ask before proceeding:
+
+> "What's your business WhatsApp number? (E.164 format, e.g. +85298765432)"
+
+Save as `whatsapp_phone_number` — required in Step 11 for the ad creative spec. Validate: must start with `+` followed by country code and number, no spaces or dashes.
 
 ### Step 2 — Page
 
@@ -128,9 +180,12 @@ Call `get_pages` and present as options (use page NAME as title, NEVER raw IDs):
   {"id":"IMAGE","title":"Single Image","description":"One static image — best for simple, clear messaging"},
   {"id":"VIDEO","title":"Single Video","description":"Video ad — best for storytelling and engagement"},
   {"id":"CAROUSEL","title":"Carousel","description":"2-10 scrollable cards — best for showcasing multiple products"},
+  {"id":"COLLECTION","title":"Collection","description":"Cover image/video + product grid — best for e-commerce browsing"},
   {"id":"EXISTING_POST","title":"Boost Existing Post","description":"Promote a post already on your Page"}
 ]}
 ```
+
+> Note: For WhatsApp/Messenger destination, IMAGE and VIDEO formats are recommended. Carousel works but is less common for conversation campaigns.
 
 ### Step 4 — Creative Upload & Spec Validation
 
@@ -142,7 +197,7 @@ Based on the chosen format, show the required specs BEFORE asking for the asset:
 > - **Stories/Reels**: 1080x1920 (9:16) — full-screen vertical
 > - Max 30MB. JPG or PNG. Min 600x600.
 
-After user uploads, call `upload_ad_image`. Show the image hash.
+After user uploads, call `upload_ad_image`. Show the image **name** (not the raw hash — hash is for internal use only).
 
 **For Video:**
 > You can upload a video in two ways:
@@ -173,26 +228,64 @@ User picks a post — use the post ID as `object_story_id` (format: "pageId_post
 
 ### Step 5 — Ad Copy & CTA
 
-Generate 3 ad copy variations using ```copyvariations block. Match tone to the creative:
-- Fashion: aspirational/lifestyle
-- Tech: feature-driven
-- Food: sensory
-- B2B: professional
+**Language detection first:** If the user's messages or business name suggest a non-English market (HK → Traditional Chinese/Cantonese, TW → Traditional Chinese, CN → Simplified Chinese, MY/SG → English or Malay, JP → Japanese), generate copy in that language by default. Ask if unsure: "Should the ad copy be in English or [local language]?"
+
+Generate 3 ad copy variations using ```copyvariations block. Match tone to industry AND destination:
+
+| Industry | Tone |
+|---|---|
+| Fashion / Beauty / Lifestyle | Aspirational, sensory, emotion-driven |
+| F&B / Food | Sensory, cravings-focused, urgency |
+| Healthcare / Medical / Wellness | Trust-building, reassuring, benefit-focused |
+| Tech / SaaS | Feature-driven, problem-solving, efficiency |
+| Finance / Insurance / Real Estate | Authority, security, ROI-focused |
+| Education / Courses | Transformation, outcome-focused, curiosity |
+| B2B / Professional Services | Professional, results-oriented, credibility |
+| Retail / E-commerce | Offer-led, urgency, social proof |
+
+For WhatsApp/Messenger destination, copy should invite conversation — end with a soft CTA that encourages a reply (e.g. "Send us a message to find out more", "Chat with us today").
 
 Each variation must include: primary text (under 125 chars), headline (under 40 chars), and CTA.
 
-Then present CTA selection:
+Then present CTA selection — show only CTAs relevant to the destination chosen in Step 1b:
 
+**For Website (Sales/Purchase):**
 ```options
 {"title":"Choose your call-to-action","options":[
   {"id":"SHOP_NOW","title":"Shop Now","description":"Best for e-commerce and product sales"},
-  {"id":"LEARN_MORE","title":"Learn More","description":"Best for traffic and content"},
-  {"id":"SIGN_UP","title":"Sign Up","description":"Best for lead generation and newsletters"},
-  {"id":"BOOK_TRAVEL","title":"Book Now","description":"Best for travel and hospitality"},
-  {"id":"CONTACT_US","title":"Contact Us","description":"Best for services and B2B"},
-  {"id":"DOWNLOAD","title":"Download","description":"Best for apps and digital content"},
+  {"id":"BUY_NOW","title":"Buy Now","description":"Direct purchase intent"},
   {"id":"GET_OFFER","title":"Get Offer","description":"Best for promotions and discounts"},
-  {"id":"APPLY_NOW","title":"Apply Now","description":"Best for jobs and finance"}
+  {"id":"LEARN_MORE","title":"Learn More","description":"Softer entry, best for higher-ticket items"}
+]}
+```
+
+**For WhatsApp / Messenger / Instagram DM:**
+```options
+{"title":"Choose your call-to-action","options":[
+  {"id":"SEND_WHATSAPP_MESSAGE","title":"Send WhatsApp Message","description":"Opens WhatsApp chat with your business"},
+  {"id":"WHATSAPP_MESSAGE","title":"WhatsApp Us","description":"Alternative WhatsApp CTA"},
+  {"id":"SEND_MESSAGE","title":"Send Message","description":"For Messenger or Instagram DM destination"},
+  {"id":"CONTACT_US","title":"Contact Us","description":"Generic contact CTA"}
+]}
+```
+
+**For Lead Form / Lead Gen:**
+```options
+{"title":"Choose your call-to-action","options":[
+  {"id":"SIGN_UP","title":"Sign Up","description":"Best for newsletters and registrations"},
+  {"id":"APPLY_NOW","title":"Apply Now","description":"Best for jobs, finance, courses"},
+  {"id":"GET_QUOTE","title":"Get Quote","description":"Best for services"},
+  {"id":"LEARN_MORE","title":"Learn More","description":"Lower friction entry"}
+]}
+```
+
+**For Traffic:**
+```options
+{"title":"Choose your call-to-action","options":[
+  {"id":"LEARN_MORE","title":"Learn More","description":"Best for content and awareness-to-traffic"},
+  {"id":"SHOP_NOW","title":"Shop Now","description":"Best for product browsing"},
+  {"id":"BOOK_TRAVEL","title":"Book Now","description":"Best for travel and hospitality"},
+  {"id":"DOWNLOAD","title":"Download","description":"Best for apps and digital content"}
 ]}
 ```
 
@@ -212,18 +305,29 @@ Present targeting approach:
 ]}
 ```
 
-If Interest-Based: ask for target country, age range, and gender. Call `targeting_search` with their keywords and present results as options.
+**If BROAD:** Use `{"geo_locations":{"countries":["XX"]},"age_min":18,"age_max":65,"targeting_optimization":"none"}`. Ask for country only (1 question). Meta's algorithm handles the rest.
+
+**If INTEREST-BASED:** Ask for target country, age range, and gender. Then ask: "What's the product/service? I'll find relevant interests." Call `targeting_search` with 2-3 keywords and present results as options. Show audience size **in the target country** (use `get_reach_estimate` after selecting interests — not the global Meta audience size).
+
+**If CUSTOM AUDIENCE:** Call `get_custom_audiences` and present existing audiences. If none exist, suggest loading the targeting-audiences skill to create one first.
+
+**If LOOKALIKE:** Call `get_custom_audiences` to show source audience options, then ask for target country.
+
+**If SAVED AUDIENCE:** Call `get_saved_audiences` and present options.
 
 After targeting is set, call `get_reach_estimate` and show:
 
 ```metrics
 {"metrics":[
-  {"label":"Estimated Reach","value":"1.2M - 3.5M","trend":"daily"},
-  {"label":"Target Country","value":"United States"},
+  {"label":"Estimated Reach in [Country]","value":"1.2M - 3.5M"},
+  {"label":"Target Country","value":"Hong Kong"},
   {"label":"Age Range","value":"25-45"},
   {"label":"Interests","value":"3 selected"}
 ]}
 ```
+
+If reach < 50,000 — warn: "Audience is narrow. Consider broadening age range or adding more interests."
+If reach > 50,000,000 — warn: "Audience is very broad. Consider adding interests or narrowing demographics."
 
 ### Step 7 — Placements
 
@@ -240,24 +344,30 @@ If user selects any Instagram placement, call `get_connected_instagram_accounts`
 
 ### Step 8 — Budget & Schedule
 
-Present budget options based on objective. Recommended starting budgets by objective:
+**Currency detection:** Call `get_ad_account_details` to read the account currency. Show all budget amounts in the account's actual currency (HKD, SGD, USD, GBP, etc.) — never hardcode USD.
 
-| Objective | Recommended Starting Budget | Why |
+Present budget options based on objective and destination. These are USD equivalents — multiply by local currency rate if account currency differs:
+
+| Destination / Goal | Recommended Starting Budget | Why |
 |---|---|---|
-| Sales / Leads | $20-30/day | Needs enough data for conversion optimization |
-| Traffic | $10-20/day | Lower cost per result, less data needed |
-| Awareness | $10-15/day | Optimizes for reach, efficient at lower budgets |
+| WhatsApp / Messenger conversations | $15-25/day | Conversation campaigns need sufficient reach to generate enough chats |
+| Website purchase (ROAS) | $20-30/day | Needs conversion events for algorithm to optimise |
+| Lead Form / Lead gen | $15-25/day | Needs lead events for optimisation |
+| Website traffic | $10-20/day | Lower cost per result, less data needed |
+| Awareness / Reach | $10-15/day | Efficient at lower budgets |
 | Engagement | $10-15/day | Low cost per engagement |
-| App Promotion | $20-30/day | Needs data for install optimization |
+| App Promotion | $20-30/day | Needs install data |
 
 ```options
-{"title":"Daily budget","options":[
-  {"id":"10","title":"$10/day","description":"Conservative — good for testing"},
-  {"id":"20","title":"$20/day","description":"Recommended starting budget"},
-  {"id":"50","title":"$50/day","description":"Aggressive — faster learning"},
+{"title":"Daily budget (in [ACCOUNT_CURRENCY])","options":[
+  {"id":"CONSERVATIVE","title":"[LOCAL_EQUIV of $10]/day","description":"Conservative — good for testing, limited delivery"},
+  {"id":"RECOMMENDED","title":"[LOCAL_EQUIV of $20]/day","description":"Recommended starting budget for this goal"},
+  {"id":"AGGRESSIVE","title":"[LOCAL_EQUIV of $50]/day","description":"Aggressive — faster learning phase"},
   {"id":"CUSTOM","title":"Custom Amount","description":"Set your own daily budget"}
 ]}
 ```
+
+> Replace `[LOCAL_EQUIV]` with the actual amount in the account currency. E.g. for HKD: HK$80/day, HK$160/day, HK$390/day.
 
 Then schedule:
 
@@ -272,7 +382,9 @@ If scheduled, ask for start date and end date. Call `get_minimum_budgets` to val
 
 ### Step 9 — Pixel & Tracking
 
-For SALES, LEADS, or TRAFFIC objectives: call `get_pixels` and present available pixels:
+**Skip this step entirely for WhatsApp, Messenger, Instagram DM, and Phone Call destinations** — pixel tracking is not used for conversation-based campaigns. Go directly to Step 10.
+
+For Website, Lead Form, and Traffic destinations: call `get_pixels` and present available pixels:
 
 ```options
 {"title":"Select your tracking pixel","options":[
@@ -300,13 +412,14 @@ Show ALL settings as a summary:
 ```steps
 {"title":"Campaign Review — Ready to Launch","steps":[
   {"label":"Campaign","description":"[Name] · [Objective] · PAUSED","priority":"high"},
+  {"label":"Destination","description":"[Destination e.g. WhatsApp / Website / Lead Form]","priority":"high"},
   {"label":"Page","description":"[Page Name]","priority":"high"},
-  {"label":"Creative","description":"[Format] · [Image/Video hash] · [Headline]","priority":"high"},
-  {"label":"Ad Copy","description":"[Primary text preview] · CTA: [CTA type]","priority":"high"},
-  {"label":"Audience","description":"[Country] · [Age range] · [Gender] · [Interests]","priority":"high"},
+  {"label":"Creative","description":"[Format] · [Asset name — NOT raw hash] · [Headline]","priority":"high"},
+  {"label":"Ad Copy","description":"[First 60 chars of primary text…] · CTA: [CTA label]","priority":"high"},
+  {"label":"Audience","description":"[Country] · Ages [min]-[max] · [Gender] · [Targeting type + summary]","priority":"high"},
   {"label":"Placements","description":"[Placement choice]","priority":"medium"},
-  {"label":"Budget","description":"$[amount]/day · [Schedule]","priority":"high"},
-  {"label":"Tracking","description":"[Pixel name] · [UTM tags]","priority":"medium"}
+  {"label":"Budget","description":"[AMOUNT + CURRENCY]/day · [Schedule]","priority":"high"},
+  {"label":"Tracking","description":"[Pixel name or 'Not required for this destination'] · [UTM status]","priority":"medium"}
 ]}
 ```
 
@@ -316,10 +429,26 @@ Then ask: **"Should I create this campaign?"**
 
 After user confirms, create ALL entities in sequence:
 
-1. `create_campaign`: name, objective, status=PAUSED, special_ad_categories=NONE
-2. `create_ad_set`: campaign_id, name, daily_budget (IN CENTS — multiply dollars x 100), billing_event=IMPRESSIONS, optimization_goal, bid_strategy=LOWEST_COST_WITHOUT_CAP, targeting (JSON with geo_locations, age_min, age_max, genders, targeting_optimization="none"), status=PAUSED
-3. `create_ad_creative`: name, object_story_spec (JSON with page_id + link_data for image/carousel OR video_data for video)
+1. `create_campaign`: name, objective (map from Step 1: SALES→OUTCOME_SALES, LEADS→OUTCOME_LEADS, TRAFFIC→OUTCOME_TRAFFIC, AWARENESS→OUTCOME_AWARENESS, ENGAGEMENT→OUTCOME_ENGAGEMENT, APP_PROMOTION→OUTCOME_APP_PROMOTION), status=PAUSED, special_ad_categories=NONE
+
+2. `create_ad_set`: campaign_id, name, daily_budget (IN CENTS — multiply dollars × 100), billing_event=IMPRESSIONS, bid_strategy=LOWEST_COST_WITHOUT_CAP, status=PAUSED, targeting (JSON with geo_locations, age_min, age_max, genders, targeting_optimization="none"), PLUS these fields based on destination:
+
+   | Destination | optimization_goal | promoted_object |
+   |---|---|---|
+   | Website (purchase) | `OFFSITE_CONVERSIONS` | `{"pixel_id":"ID","custom_event_type":"PURCHASE"}` |
+   | Website (lead) | `OFFSITE_CONVERSIONS` | `{"pixel_id":"ID","custom_event_type":"LEAD"}` |
+   | WhatsApp | `CONVERSATIONS` | omit |
+   | Messenger | `CONVERSATIONS` | omit |
+   | Instagram DM | `CONVERSATIONS` | omit |
+   | Lead Form | `LEAD_GENERATION` | omit |
+   | Traffic (clicks) | `LINK_CLICKS` | omit |
+   | Traffic (LPV) | `LANDING_PAGE_VIEWS` | omit |
+   | App | `APP_INSTALLS` | `{"application_id":"APP_ID","object_store_url":"URL"}` |
+
+3. `create_ad_creative`: name, object_story_spec (JSON with page_id + link_data for image/carousel OR video_data for video). For WhatsApp destination, include `link_data.call_to_action.type="SEND_WHATSAPP_MESSAGE"` and `link_data.call_to_action.value.whatsapp_phone_number="NUMBER"`.
+
 4. `create_ad`: adset_id, name, creative_id, status=PAUSED
+
 5. `preflight_check`: run pre-launch checklist on the campaign
 
 Present preflight results as a checklist:
@@ -327,7 +456,16 @@ Present preflight results as a checklist:
 - Fail: "No ads found" — Fix: Create at least one ad with a creative
 - Warn: "Budget below recommended minimum"
 
-If any FAIL items, do NOT activate — help the user fix them first. If all pass: call `get_ad_preview` to show the ad preview, then show summary:
+If any FAIL items, do NOT activate — help the user fix them first. If all pass: call `get_ad_preview` **twice** — once with `ad_format=MOBILE_FEED_STANDARD` and once with `ad_format=DESKTOP_FEED_STANDARD` — then output both as an `adpreview` block:
+
+```adpreview
+[
+  { "format": "MOBILE_FEED_STANDARD", "html": "[body from first get_ad_preview call]" },
+  { "format": "DESKTOP_FEED_STANDARD", "html": "[body from second get_ad_preview call]" }
+]
+```
+
+Then show summary:
 
 ```metrics
 {"metrics":[

@@ -400,7 +400,7 @@ export const DashboardPage = ({ adAccountId, onNavigateToChat }) => {
       setInsights(insRes.data);
       setCampaigns(Array.isArray(campRes.data) ? campRes.data : []);
 
-      // Fire-and-forget: trigger read_insights, instagram_basic, instagram_manage_insights
+      // Fire-and-forget: trigger instagram_basic, instagram_manage_insights
       // so they register in FB App Review dashboard
       api.get(`/meta/adaccounts/${adAccountId}/instagram-accounts`).then(igRes => {
         const igId = igRes.data?.[0]?.id;
