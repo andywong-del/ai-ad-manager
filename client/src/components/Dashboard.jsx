@@ -19,21 +19,6 @@ const ACCOUNT_ACTIONS = [
     prompt: 'Show me how my ads are performing.' },
 ];
 
-// Actions available without auth — general knowledge questions
-const GENERAL_ACTIONS = [
-  { icon: 'Zap',           label: 'Plan a Campaign Strategy',       desc: 'Get expert advice on objectives, targeting, and budget for your next campaign.',
-    prompt: 'Help me plan a Facebook ad campaign strategy. What objective should I pick, how should I structure targeting, and what budget should I start with?' },
-  { icon: 'BarChart3',     label: 'What Makes Great Ad Creative?',  desc: 'Learn best practices for images, video, and copy that convert.',
-    prompt: 'What makes great Facebook ad creative? Give me best practices for images, video, and ad copy that actually convert.' },
-  { icon: 'Target',        label: 'Audience Targeting Guide',       desc: 'Understand custom, lookalike, and interest-based audiences.',
-    prompt: 'Explain the different types of Facebook ad audiences — custom, lookalike, saved — and when to use each one.' },
-  { icon: 'DollarSign',    label: 'Budget & Bidding Explained',     desc: 'CBO vs ABO, bidding strategies, and how to allocate spend.',
-    prompt: 'Explain Facebook ad budgets and bidding. What is CBO vs ABO? Which bidding strategy should I use and how much should I spend?' },
-  { icon: 'AlertTriangle', label: 'Common Ad Mistakes',             desc: 'Top pitfalls that waste budget and how to avoid them.',
-    prompt: 'What are the most common Facebook ad mistakes that waste budget? How do I avoid them?' },
-  { icon: 'Search',        label: 'Ad Formats & Placements',        desc: 'Carousel, video, stories — which format works best for your goal.',
-    prompt: 'What are the different Facebook ad formats and placements? Which format works best for conversions vs awareness?' },
-];
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 
@@ -129,8 +114,7 @@ export const Dashboard = ({
     ? savedItems.find(i => i.id === activeView.itemId)
     : null;
 
-  // Show account-specific actions when connected, general knowledge actions otherwise
-  const suggestedActions = token && adAccountId ? ACCOUNT_ACTIONS : GENERAL_ACTIONS;
+  const suggestedActions = ACCOUNT_ACTIONS;
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
