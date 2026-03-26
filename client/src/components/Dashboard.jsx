@@ -11,18 +11,12 @@ import { AudienceManager } from './AudienceManager.jsx';
 
 // Actions that require a connected ad account
 const ACCOUNT_ACTIONS = [
-  { icon: 'Zap',           label: 'Create Campaign',                desc: 'Launch a new ad campaign step by step — objective, audience, creative, budget.',
-    prompt: `I want to create a new ad campaign. Guide me step by step with option cards for each choice.` },
-  { icon: 'BarChart3',     label: 'Weekly Performance Report',      desc: 'Spend, ROAS, CTR, CPA across all campaigns — with trends vs last week.',
-    prompt: 'Show my weekly performance report for the last 7 days with all campaigns, spend, ROAS, CTR, CPA. Compare to previous week.' },
-  { icon: 'AlertTriangle', label: 'Problems & Quick Wins',          desc: 'Find issues, wasted spend, and actionable fixes you can apply today.',
-    prompt: 'Find problems and quick wins in my ad account. Flag low ROAS campaigns, wasted spend, and give me fixes.' },
-  { icon: 'Search',        label: 'Creative Performance Analysis',  desc: 'Which ads are winning, which show fatigue — with copy recommendations.',
-    prompt: 'Analyze my ad creative performance. Show CTR, CPA, frequency for all ads. Flag fatigue and suggest new copy.' },
-  { icon: 'DollarSign',    label: 'Budget Optimization Plan',       desc: 'Where to shift spend for maximum ROAS — with specific reallocation amounts.',
-    prompt: 'Create a budget optimization plan. Show spend vs ROAS per campaign and recommend specific budget reallocations.' },
-  { icon: 'Target',        label: 'Audience & Targeting Review',    desc: 'Audience sizes, overlap issues, and expansion opportunities.',
-    prompt: 'Review my audiences and targeting. Show sizes, find overlap, suggest new audiences to test.' },
+  { icon: 'Zap',      label: 'Create Campaign',        desc: 'Launch a new ad in minutes — objective, destination, creative, audience, budget.',
+    prompt: 'I want to create a new campaign.' },
+  { icon: 'Users',    label: 'Build Audience',          desc: 'Create custom audiences from website visitors, video viewers, WhatsApp contacts, or customer lists.',
+    prompt: 'I want to build a new audience.' },
+  { icon: 'BarChart3', label: 'Performance Analysis',   desc: 'Analyse spend, results, and cost per outcome — conversations, leads, ROAS, or traffic.',
+    prompt: 'Show me how my ads are performing.' },
 ];
 
 // Actions available without auth — general knowledge questions
