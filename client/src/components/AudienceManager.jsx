@@ -510,7 +510,7 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
   const normalizeVideos = (raw, source) => {
     if (source === 'ig_account') {
       return raw.map(m => ({
-        id: m.id,
+        ...m,
         title: m.title || (m.description ? m.description.slice(0, 80) : (m.caption ? m.caption.slice(0, 80) : 'Untitled')),
         picture: m.picture || m.thumbnail_url || '',
         source: m.source || m.media_url,

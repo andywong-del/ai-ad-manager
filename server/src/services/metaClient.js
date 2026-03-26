@@ -1546,6 +1546,12 @@ export const getPageVideos = async (token, pageId, adAccountId, { after } = {}) 
     ? getVideoViewsMap(token, resolvedAdAccount, { datePreset: 'maximum' })
     : Promise.resolve({});
 
+  // Trigger read_insights by calling GET /{page_id}/insights (requires page token + read_insights permission)
+  metaApi.get(`/${pageId}/insights`, {
+    params: { access_token: pageToken, metric: 'page_views_total', period: 'day', date_preset: 'last_7d' }
+  }).then(() => console.log(`[getPageVideos] read_insights triggered for page ${pageId}`))
+    .catch(e => console.log(`[getPageVideos] read_insights trigger failed:`, e.response?.data?.error?.message || e.message));
+
   try {
     const params = {
       access_token: pageToken,
@@ -1656,6 +1662,17 @@ export const getIgMedia = async (token, igAccountId, { pageId, adAccountId, afte
     ? getVideoViewsMap(token, resolvedAdAccount, { datePreset: 'maximum' })
     : Promise.resolve({});
 
+  // Trigger read_insights by calling GET /{page_id}/insights (requires page token + read_insights permission)
+  if (resolvedPageId) {
+    const pages = await getPages(token).catch(() => []);
+    const pg = pages?.find(p => p.id === resolvedPageId);
+    const pt = pg?.access_token || token;
+    metaApi.get(`/${resolvedPageId}/insights`, {
+      params: { access_token: pt, metric: 'page_views_total', period: 'day', date_preset: 'last_7d' }
+    }).then(() => console.log(`[getIgMedia] read_insights triggered for page ${resolvedPageId}`))
+      .catch(e => console.log(`[getIgMedia] read_insights trigger failed:`, e.response?.data?.error?.message || e.message));
+  }
+
   if (!after) {
     try {
       const [{ data }, viewsMap] = await Promise.all([
@@ -1683,7 +1700,18 @@ export const getIgMedia = async (token, igAccountId, { pageId, adAccountId, afte
             });
             const val = insData.data?.[0]?.values?.[0]?.value;
             if (val != null) igViews[v.id] = parseInt(val, 10) || 0;
-          } catch { /* skip */ }
+          } catch (e) {
+            // Fallback: try deprecated video_views for older media
+            try {
+              const { data: insData } = await metaApi.get(`/${v.id}/insights`, {
+                params: { access_token: igToken, metric: 'video_views' }
+              });
+              const val = insData.data?.[0]?.values?.[0]?.value;
+              if (val != null) igViews[v.id] = parseInt(val, 10) || 0;
+            } catch {
+              console.log(`[getIgMedia] insights fetch failed for ${v.id}:`, e.response?.data?.error?.message || e.message);
+            }
+          }
         }));
       }
 
