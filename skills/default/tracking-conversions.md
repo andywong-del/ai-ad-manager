@@ -150,3 +150,63 @@ When sending the same event from both the browser pixel and the Conversions API,
   "custom_data": { "currency": "USD", "value": 49.99 }
 }
 ```
+
+## Pixel Setup Workflow
+
+When the user asks about pixels, tracking, events, or CAPI, run this guided flow automatically:
+
+### Step 1: Check existing setup
+Call `get_pixels` FIRST. Show results as a table:
+
+| Pixel | ID | Status |
+
+If no pixels exist, offer to create one immediately.
+
+### Step 2: Create pixel (if needed)
+Call `create_pixel` and show the pixel ID. Provide the base code snippet:
+
+```html
+<!-- Meta Pixel Code -->
+<script>
+!function(f,b,e,v,n,t,s){...}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');
+fbq('init', 'PIXEL_ID');
+fbq('track', 'PageView');
+</script>
+```
+
+### Step 3: Offer event setup via options card
+Show an options card with common events:
+- A: "Track Purchases" (e-commerce)
+- B: "Track Leads" (lead gen)
+- C: "Track Page Views only" (awareness)
+- D: "Custom event"
+
+### Step 4: Send test event
+Use `send_conversion_event` with test_event_code. Example:
+
+```json
+{
+  "data": [{
+    "event_name": "Purchase",
+    "event_time": 1711000000,
+    "action_source": "website",
+    "user_data": { "em": ["hashed_email"] },
+    "custom_data": { "currency": "USD", "value": 99.99 }
+  }],
+  "test_event_code": "TEST12345"
+}
+```
+
+### Step 5: Verify and next steps
+Standard events: PageView, ViewContent, AddToCart, InitiateCheckout, Purchase, Lead, CompleteRegistration, Subscribe, Contact, Search
+
+After sending test event, tell user: "Check Events Manager > Test Events to verify the event fired."
+
+### Step 6: Create custom conversion (optional)
+If user tracks purchases or leads, offer to create a custom conversion. Call `create_custom_conversion` to define value-based rules (e.g., "High-value purchase > $100").
+
+### Step 7: Always end with next actions
+
+```quickreplies
+["Send another test event", "Create custom conversion", "Create website audience from pixel", "Set up campaign with this pixel"]
+```

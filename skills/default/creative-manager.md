@@ -301,3 +301,167 @@ Videos must finish processing before they can be used in creatives. Attempting t
 | `RIGHT_COLUMN_STANDARD` | Facebook right column |
 | `AUDIENCE_NETWORK_INSTREAM_VIDEO` | Audience Network in-stream video |
 | `MARKETPLACE_MOBILE` | Facebook Marketplace on mobile |
+
+## Creative Workflow Guidance
+
+### Image Upload Specs by Placement
+
+Before uploading, always confirm the required specs for the target placement:
+
+| Placement | Dimensions | Aspect Ratio | Notes |
+|---|---|---|---|
+| Feed (FB/IG) | 1080x1080 | 1:1 | Best for engagement |
+| Stories/Reels | 1080x1920 | 9:16 | Full-screen vertical |
+| Right Column | 1200x628 | 1.91:1 | Landscape |
+| Carousel | 1080x1080 per card | 1:1 | 2-10 cards |
+| Marketplace | 1200x628 | 1.91:1 | Landscape |
+
+- Max file size: 30MB
+- Formats: JPG, PNG
+- Minimum resolution: 600x600
+
+After upload, always confirm: "Image uploaded successfully -- hash: [HASH]"
+
+### Video Upload Specs by Placement
+
+| Placement | Dimensions | Aspect Ratio | Max Duration |
+|---|---|---|---|
+| Feed | 1080x1080 or 1080x1350 | 1:1 or 4:5 | 240 minutes |
+| Stories | 1080x1920 | 9:16 | 60 seconds |
+| Reels | 1080x1920 | 9:16 | 90 seconds |
+| In-Stream | 1280x720+ | 16:9 | 5-15s recommended |
+| Carousel (video) | 1080x1080 | 1:1 | 240 minutes per card |
+
+- Max file size: 4GB
+- Formats: MP4, MOV, AVI, FLV, MKV, WebM (MP4 with H.264 recommended)
+- Minimum duration: 1 second
+- Audio: AAC, 128kbps+ recommended
+- Thumbnails: auto-generated, or provide a custom thumbnail via image upload
+
+### Upload Methods
+
+**Method 1 -- Direct file attachment (MP4/MOV):**
+User drags and drops or attaches a video file. The file is automatically uploaded and the message will contain `[Uploaded video: filename, video_id: ID]`. Use the video_id directly.
+
+**Method 2 -- URL (YouTube, hosted, direct link):**
+Call `upload_ad_video` with `file_url` parameter. Meta can ingest YouTube URLs, Vimeo, direct MP4 links, and most hosted video URLs. YouTube links must be **public** and not age-restricted or Meta will reject them.
+
+After any upload, always show the hash or ID so the user can reference it in creatives.
+
+### Video Processing Polling Workflow
+
+Videos process asynchronously after upload. Follow this sequence:
+
+1. Upload the video via `upload_ad_video`
+2. Immediately call `get_ad_video_status` with the returned video_id
+3. If status is NOT "ready", inform the user: "Your video is being processed by Meta. This usually takes 1-5 minutes depending on file size."
+4. On the next user message, check `get_ad_video_status` again. Repeat until status = "ready"
+5. Only then proceed to use the video_id in the ad creative's `video_data`
+
+Never attempt to create a creative with a video that is still processing -- it will fail.
+
+### object_story_spec Formats
+
+**Image ad:**
+
+```json
+{
+  "page_id": "PAGE_ID",
+  "link_data": {
+    "image_hash": "IMAGE_HASH",
+    "link": "https://example.com",
+    "message": "Primary text here",
+    "name": "Headline here",
+    "description": "Description here",
+    "call_to_action": {
+      "type": "SHOP_NOW",
+      "value": { "link": "https://example.com" }
+    }
+  }
+}
+```
+
+**Carousel ad:**
+
+```json
+{
+  "page_id": "PAGE_ID",
+  "link_data": {
+    "link": "https://example.com",
+    "child_attachments": [
+      { "image_hash": "HASH1", "name": "Headline 1", "link": "https://example.com/1" },
+      { "image_hash": "HASH2", "name": "Headline 2", "link": "https://example.com/2" }
+    ],
+    "message": "Primary text for carousel"
+  }
+}
+```
+
+**Video ad:**
+
+```json
+{
+  "page_id": "PAGE_ID",
+  "video_data": {
+    "video_id": "VIDEO_ID",
+    "message": "Primary text",
+    "title": "Headline",
+    "description": "Description",
+    "call_to_action": {
+      "type": "SHOP_NOW",
+      "value": { "link": "https://example.com" }
+    },
+    "image_hash": "THUMBNAIL_HASH_OPTIONAL"
+  }
+}
+```
+
+### Ad Copy Character Limits
+
+| Field | Recommended | Maximum | Notes |
+|---|---|---|---|
+| Primary text | 125 chars | 2200 chars | Truncated after ~3 lines on mobile |
+| Headline | 40 chars | 255 chars | Punchy, benefit-driven |
+| Description | 30 chars | 255 chars | Shown below headline on some placements |
+
+### CTA Options
+
+SHOP_NOW, LEARN_MORE, SIGN_UP, BOOK_TRAVEL, CONTACT_US, DOWNLOAD, GET_OFFER, GET_QUOTE, SUBSCRIBE, WATCH_MORE, APPLY_NOW, ORDER_NOW, SEE_MENU, SEND_MESSAGE, WHATSAPP_MESSAGE, CALL_NOW
+
+Match the CTA to the campaign objective: conversions use SHOP_NOW, leads use SIGN_UP, traffic uses LEARN_MORE.
+
+### Ad Copy Generation Guidelines
+
+When generating ad copy for uploaded creatives:
+
+- **Match tone to the visual**: fashion gets aspirational/lifestyle copy, tech gets feature-driven copy, food gets sensory language, B2B gets professional tone
+- Always generate **2-3 copy variations** for A/B testing
+- Keep primary text under **125 chars** for best performance (avoids truncation)
+- Headlines under **40 chars** -- punchy and benefit-driven
+- For **multiple images**: write **unique copy per image**, not duplicates. Each should highlight a different angle or product feature
+- Suggest A/B testing strategies: same creative with different copy, or same copy with different creatives
+- If the user specifies a brand voice or tone, follow it strictly
+- Never use clickbait, misleading claims, or personal attributes ("Are you struggling with...") -- these violate Meta advertising policy
+
+### Creating Ads from Uploaded Assets
+
+When user messages contain `[Uploaded image: filename, image_hash: HASH]`:
+
+1. Acknowledge the uploads (e.g., "Got **6 images** uploaded to your ad account")
+2. Ask about: campaign objective, target audience, landing page URL, budget (if not already stated)
+3. Call `get_pages` to get the Page ID (required for object_story_spec)
+4. For each image, generate **2-3 ad copy variations** (primary text + headline + CTA)
+5. Show the Ad Creation Review Card with all settings before executing
+6. If multiple images: ask if they want **separate ads** (one per image) or a **carousel**
+
+### Boost Existing Post Flow
+
+When the user wants to promote an existing Facebook Page post:
+
+1. Call `get_pages` to list their pages
+2. Call `get_page_posts` with the page_id to show recent posts
+3. Show posts as a table: Post | Date | Likes | Comments | Shares
+4. User picks a post -- use the post ID
+5. Create ad creative with `object_story_id` instead of `object_story_spec`: `{ "object_story_id": "PAGE_ID_POST_ID" }` (format: "pageId_postId")
+6. This bypasses the need to create a new creative from scratch
+7. Proceed with campaign, ad set, and ad creation using this creative

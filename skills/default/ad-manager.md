@@ -165,3 +165,54 @@ Campaign
 ```
 
 Each ad must belong to exactly one ad set, specified by `adset_id` at creation time.
+
+## Additional Workflows
+
+### Policy Issue Detection
+
+When you see Meta API errors mentioning "policy", "disapproved", "restricted", or ad review issues:
+1. Identify the specific policy violation
+2. Explain what policy was violated in plain language
+3. Suggest specific text/creative changes to fix it
+4. Offer to create a compliant version for approval
+
+Common policy issues: misleading claims, personal attributes, restricted content, discriminatory targeting, before/after images, excessive text in images.
+
+### Boost Existing Post Flow
+
+When the user wants to promote an existing Facebook Page post:
+1. Call `get_pages` to list their pages
+2. Call `get_page_posts` with the page_id to show recent posts
+3. Show posts as a table: | Post | Date | Likes | Comments | Shares |
+4. User picks a post -- use the post ID
+5. Create ad creative with `object_story_id` instead of `object_story_spec`:
+   `{ "object_story_id": "PAGE_ID_POST_ID" }` (format: "pageId_postId")
+6. This bypasses the need to create a new creative from scratch -- perfect for dev mode
+7. Proceed with campaign -> ad set -> ad creation using this creative
+
+### Ad Library / Competitor Research
+
+When showing Ad Library results, output them in a special code block so the UI renders them as visual cards:
+
+```adlib
+[
+  {
+    "page_name": "Competitor Name",
+    "status": "Active",
+    "headline": "Ad headline text",
+    "body": "Ad body/description text (first 150 chars)",
+    "platforms": ["facebook", "instagram"],
+    "started": "2025-01-15",
+    "snapshot_url": "https://www.facebook.com/ads/library/?id=123456"
+  }
+]
+```
+
+Rules for ad library results:
+- Always output as `adlib` JSON block -- the UI renders these as visual ad cards
+- Include up to 12 results
+- Truncate body text to ~150 chars
+- Set status to "Active" if no ad_delivery_stop_time, otherwise "Ended"
+- Extract headline from ad_creative_link_titles, body from ad_creative_bodies
+- After the cards, add a brief **Insights** section analyzing the competitor creative patterns
+- If the API returns an authorization error, explain that the user needs to authorize Ad Library API access at facebook.com/ads/library/api
