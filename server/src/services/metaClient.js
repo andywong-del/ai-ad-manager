@@ -1504,11 +1504,47 @@ export const getPages = async (token) => {
   return data.data;
 };
 
+// ─── Auto-resolve the ad account for a page's business ──────────────
+// Meta's "3-second video views" = video_play_actions from the correct ad account.
+// Chain: GET /{page_id}?fields=business → GET /{business_id}/owned_ad_accounts
+const _pageAdAccountCache = new Map(); // pageId → { adAccountId, ts }
+const PAGE_AD_CACHE_TTL = 10 * 60 * 1000; // 10 min
+
+const resolvePageAdAccount = async (token, pageId) => {
+  const cached = _pageAdAccountCache.get(pageId);
+  if (cached && Date.now() - cached.ts < PAGE_AD_CACHE_TTL) return cached.adAccountId;
+  try {
+    const { data: pageData } = await metaApi.get(`/${pageId}`, {
+      params: { access_token: token, fields: 'business' }
+    });
+    const bizId = pageData.business?.id;
+    if (!bizId) { _pageAdAccountCache.set(pageId, { adAccountId: null, ts: Date.now() }); return null; }
+    const { data: acctData } = await metaApi.get(`/${bizId}/owned_ad_accounts`, {
+      params: { access_token: token, fields: 'id,name', limit: 5 }
+    });
+    const adAccountId = acctData.data?.[0]?.id || null;
+    console.log(`[resolvePageAdAccount] page=${pageId} → biz=${bizId} → adAccount=${adAccountId}`);
+    _pageAdAccountCache.set(pageId, { adAccountId, ts: Date.now() });
+    return adAccountId;
+  } catch (err) {
+    console.log(`[resolvePageAdAccount] failed for page ${pageId}:`, err.response?.data?.error?.message || err.message);
+    _pageAdAccountCache.set(pageId, { adAccountId: null, ts: Date.now() });
+    return null;
+  }
+};
+
 export const getPageVideos = async (token, pageId, adAccountId, { after } = {}) => {
-  // Get the page access token (required for /{pageId}/videos)
   const pages = await getPages(token);
   const page = pages?.find(p => p.id === pageId);
   const pageToken = page?.access_token || token;
+
+  // Auto-resolve the correct ad account for this page's business
+  const resolvedAdAccount = await resolvePageAdAccount(token, pageId) || adAccountId;
+
+  // Build ad views map from the CORRECT ad account (in parallel with page videos)
+  const viewsMapPromise = resolvedAdAccount
+    ? getVideoViewsMap(token, resolvedAdAccount, { datePreset: 'maximum' })
+    : Promise.resolve({});
 
   try {
     const params = {
@@ -1518,36 +1554,49 @@ export const getPageVideos = async (token, pageId, adAccountId, { after } = {}) 
     };
     if (after) params.after = after;
 
-    const { data } = await metaApi.get(`/${pageId}/videos`, { params });
+    const [{ data }, viewsMap] = await Promise.all([
+      metaApi.get(`/${pageId}/videos`, { params }),
+      viewsMapPromise
+    ]);
     const rawPageVideos = (data.data || []).filter(v => !v.status || v.status.video_status === 'ready');
 
-    // Batch-fetch native video insights (blue_reels_play_count) for 3s-like view count
-    const nativeViews = {}; // video_id → play count
-    const videoIds = rawPageVideos.map(v => v.id);
-    for (let i = 0; i < videoIds.length; i += 25) {
-      const batch = videoIds.slice(i, i + 25);
+    // Also fetch IG media from linked IG account to detect crossposted videos
+    const igAccount = page?.instagram_business_account;
+    let igCrosspostMap = {}; // page_video_id or ig_media_id → true
+    if (igAccount?.id) {
       try {
-        const { data: batchData } = await metaApi.get('/', {
-          params: { ids: batch.join(','), fields: 'id,video_insights.metric(blue_reels_play_count)', access_token: pageToken }
+        const { data: igData } = await metaApi.get(`/${igAccount.id}/media`, {
+          params: { access_token: pageToken, fields: 'id,timestamp', limit: 50 }
         });
-        for (const [vid, info] of Object.entries(batchData)) {
-          const metric = info.video_insights?.data?.[0];
-          if (metric?.values?.[0]?.value != null) {
-            nativeViews[vid] = parseInt(metric.values[0].value, 10) || 0;
+        // Build a set of IG media timestamps for crosspost matching
+        const igTimestamps = new Set((igData.data || []).map(m => m.timestamp?.slice(0, 16)));
+        for (const v of rawPageVideos) {
+          if (v.created_time && igTimestamps.has(v.created_time.slice(0, 16))) {
+            igCrosspostMap[v.id] = true;
           }
         }
-      } catch { /* video_insights not available for some videos, skip */ }
+      } catch { /* IG crosspost detection failed, skip */ }
     }
 
-    // Use native video insights only — no ad account cross-matching
-    const pageVideos = rawPageVideos.map(v => ({
-      ...v,
-      three_second_views: nativeViews[v.id] || v.views || 0,
-      updated_time: v.updated_time
-    }));
+    const pageVideos = rawPageVideos.map(v => {
+      // Priority: ad-level 3s views (from correct ad account) → organic views
+      const adViews = viewsMap[v.id] || 0;
+      const isCrosspost = !!igCrosspostMap[v.id] || !!v.source_instagram_media_id;
+      return {
+        ...v,
+        three_second_views: adViews || v.views || 0,
+        updated_time: v.updated_time,
+        is_ig: isCrosspost,
+        sources: isCrosspost ? ['page', 'ig'] : ['page']
+      };
+    });
 
     const nextCursor = data.paging?.cursors?.after || null;
     const hasMore = !!data.paging?.next;
+
+    // Sort by 3s views descending (matches Meta's "Last used date" sort with boosted videos on top)
+    pageVideos.sort((a, b) => (b.three_second_views || 0) - (a.three_second_views || 0));
+
     return { videos: pageVideos, nextCursor: hasMore ? nextCursor : null };
   } catch (err) {
     console.error('getPageVideos error:', err.response?.data?.error?.message || err.message);
@@ -1555,15 +1604,10 @@ export const getPageVideos = async (token, pageId, adAccountId, { after } = {}) 
   }
 };
 
-// Resolve 3-second views for a video using viewsMap (exact video ID match only).
-const resolveViews = (viewsMap, videoId, length, organicViews = 0) => {
-  if (viewsMap[videoId]) return viewsMap[videoId];
-  return organicViews || 0;
-};
-
 export const getIgMedia = async (token, igAccountId, { pageId, adAccountId, after } = {}) => {
   // Use page token if available — page tokens carry instagram_basic scope
   let igToken = token;
+  let resolvedPageId = pageId;
   if (pageId) {
     try {
       const pages = await getPages(token);
@@ -1571,23 +1615,41 @@ export const getIgMedia = async (token, igAccountId, { pageId, adAccountId, afte
       if (page?.access_token) igToken = page.access_token;
     } catch { /* use user token */ }
   }
+  // If no pageId provided, find the page linked to this IG account
+  if (!resolvedPageId) {
+    try {
+      const pages = await getPages(token);
+      const linked = pages?.find(p => p.instagram_business_account?.id === igAccountId);
+      if (linked) { resolvedPageId = linked.id; igToken = linked.access_token || token; }
+    } catch { /* skip */ }
+  }
+
+  // Auto-resolve the correct ad account for this page's business
+  const resolvedAdAccount = resolvedPageId
+    ? await resolvePageAdAccount(token, resolvedPageId) || adAccountId
+    : adAccountId;
+  const viewsMapPromise = resolvedAdAccount
+    ? getVideoViewsMap(token, resolvedAdAccount, { datePreset: 'maximum' })
+    : Promise.resolve({});
 
   if (!after) {
     try {
-      const { data } = await metaApi.get(`/${igAccountId}/media`, {
-        params: {
-          access_token: igToken,
-          fields: 'id,media_type,media_url,thumbnail_url,caption,timestamp,permalink',
-          limit: 50
-        }
-      });
+      const [{ data }, viewsMap] = await Promise.all([
+        metaApi.get(`/${igAccountId}/media`, {
+          params: {
+            access_token: igToken,
+            fields: 'id,media_type,media_url,thumbnail_url,caption,timestamp,permalink',
+            limit: 50
+          }
+        }),
+        viewsMapPromise
+      ]);
       const videos = (data.data || []).filter(m => m.media_type === 'VIDEO');
       const nextCursor = data.paging?.cursors?.after || null;
       console.log(`[getIgMedia] Direct IG media: ${data.data?.length || 0} total, ${videos.length} videos`);
 
       // Batch-fetch native IG media views via /{media_id}/insights?metric=views
-      // Per Meta docs: 'views' metric is active for FEED, REELS, STORY
-      const igViews = {}; // media_id → view count
+      const igViews = {};
       for (let i = 0; i < videos.length; i += 25) {
         const batch = videos.slice(i, i + 25);
         await Promise.all(batch.map(async (v) => {
@@ -1597,44 +1659,83 @@ export const getIgMedia = async (token, igAccountId, { pageId, adAccountId, afte
             });
             const val = insData.data?.[0]?.values?.[0]?.value;
             if (val != null) igViews[v.id] = parseInt(val, 10) || 0;
-          } catch { /* views not available for this media */ }
+          } catch { /* skip */ }
         }));
       }
 
-      // Normalize IG video fields to match FB video format used by the UI
-      const normalized = videos.map(v => ({
-        ...v,
-        title: v.caption?.slice(0, 80) || 'Untitled',
-        picture: v.thumbnail_url,
-        created_time: v.timestamp,
-        updated_time: v.timestamp,
-        three_second_views: igViews[v.id] || 0,
-        source_instagram_media_id: v.id,
-        is_ig: true,
-      }));
-
-      // Merge crossposted page videos (they have views + duration)
-      if (pageId) {
+      // Also fetch page videos to get ad-level views for crossposted content
+      let pageVideoViews = {}; // crosspost matching by timestamp
+      if (resolvedPageId) {
         try {
-          const pagePages = await getPages(token);
-          const linkedPage = pagePages?.find(p => p.id === pageId);
+          const pages = await getPages(token);
+          const linkedPage = pages?.find(p => p.id === resolvedPageId);
           const pt = linkedPage?.access_token || token;
-          const { data: pvData } = await metaApi.get(`/${pageId}/videos`, {
+          const { data: pvData } = await metaApi.get(`/${resolvedPageId}/videos`, {
             params: { access_token: pt, fields: 'id,title,description,source,picture,length,created_time,updated_time,views,source_instagram_media_id', limit: 50 }
           });
-          const pageVids = (pvData.data || []).map(pv => ({
-            ...pv,
-            three_second_views: pv.views || 0,
-            is_ig: !!pv.source_instagram_media_id
-          }));
-          const igIds = new Set(normalized.map(n => n.id));
-          const extra = pageVids.filter(pv => !igIds.has(pv.id) && !igIds.has(pv.source_instagram_media_id));
-          console.log(`[getIgMedia] Merged: ${normalized.length} IG + ${extra.length} page videos`);
-          const merged = [...normalized, ...extra].sort((a, b) => (b.three_second_views || 0) - (a.three_second_views || 0));
-          return { videos: merged, nextCursor: data.paging?.next ? nextCursor : null };
-        } catch { /* page merge failed, return IG-only */ }
+          for (const pv of (pvData.data || [])) {
+            // Ad-level views for this page video
+            const adViews = viewsMap[pv.id] || 0;
+            if (pv.created_time) {
+              pageVideoViews[pv.created_time.slice(0, 16)] = {
+                views: adViews || pv.views || 0,
+                title: pv.title,
+                picture: pv.picture,
+                length: pv.length,
+                id: pv.id
+              };
+            }
+          }
+        } catch { /* skip */ }
       }
 
+      // Normalize IG video fields — use ad views from crossposted page video when available
+      const normalized = videos.map(v => {
+        const crosspost = v.timestamp ? pageVideoViews[v.timestamp.slice(0, 16)] : null;
+        const adViews = crosspost?.views || 0;
+        const nativeViews = igViews[v.id] || 0;
+        return {
+          ...v,
+          title: v.caption?.slice(0, 80) || 'Untitled',
+          picture: v.thumbnail_url,
+          created_time: v.timestamp,
+          updated_time: v.timestamp,
+          length: crosspost?.length,
+          three_second_views: Math.max(adViews, nativeViews),
+          source_instagram_media_id: v.id,
+          is_ig: true,
+          sources: crosspost ? ['ig', 'page'] : ['ig']
+        };
+      });
+
+      // Merge page-only videos (not crossposted) that have ad views
+      if (resolvedPageId) {
+        try {
+          const pages = await getPages(token);
+          const linkedPage = pages?.find(p => p.id === resolvedPageId);
+          const pt = linkedPage?.access_token || token;
+          const { data: pvData } = await metaApi.get(`/${resolvedPageId}/videos`, {
+            params: { access_token: pt, fields: 'id,title,description,source,picture,length,created_time,updated_time,views,source_instagram_media_id', limit: 50 }
+          });
+          const igTimestamps = new Set(videos.map(v => v.timestamp?.slice(0, 16)));
+          const extra = (pvData.data || [])
+            .filter(pv => !igTimestamps.has(pv.created_time?.slice(0, 16)))
+            .map(pv => ({
+              ...pv,
+              three_second_views: viewsMap[pv.id] || pv.views || 0,
+              is_ig: false,
+              sources: ['page']
+            }));
+          if (extra.length) {
+            const merged = [...normalized, ...extra];
+            merged.sort((a, b) => (b.three_second_views || 0) - (a.three_second_views || 0));
+            console.log(`[getIgMedia] Merged: ${normalized.length} IG + ${extra.length} page-only videos`);
+            return { videos: merged, nextCursor: data.paging?.next ? nextCursor : null };
+          }
+        } catch { /* skip */ }
+      }
+
+      normalized.sort((a, b) => (b.three_second_views || 0) - (a.three_second_views || 0));
       return { videos: normalized, nextCursor: data.paging?.next ? nextCursor : null };
     } catch (err) {
       console.log(`[getIgMedia] IG media endpoint failed (${err.response?.data?.error?.code || err.message}), trying page fallback...`);
@@ -1642,9 +1743,9 @@ export const getIgMedia = async (token, igAccountId, { pageId, adAccountId, afte
   }
 
   // Fallback: fetch videos from the linked FB Page
-  if (pageId) {
-    const pages = await getPages(token);
-    const page = pages?.find(p => p.id === pageId);
+  if (resolvedPageId) {
+    const [viewsMap, pages] = await Promise.all([viewsMapPromise, getPages(token)]);
+    const page = pages?.find(p => p.id === resolvedPageId);
     const pageToken = page?.access_token || token;
     try {
       const params = {
@@ -1653,14 +1754,15 @@ export const getIgMedia = async (token, igAccountId, { pageId, adAccountId, afte
         limit: 50
       };
       if (after) params.after = after;
-      const { data } = await metaApi.get(`/${pageId}/videos`, { params });
+      const { data } = await metaApi.get(`/${resolvedPageId}/videos`, { params });
       const videos = (data.data || []).map(v => ({
         ...v,
-        three_second_views: v.views || 0,
-        is_ig: !!v.source_instagram_media_id
+        three_second_views: viewsMap[v.id] || v.views || 0,
+        is_ig: !!v.source_instagram_media_id,
+        sources: v.source_instagram_media_id ? ['page', 'ig'] : ['page']
       }));
-      const nextCursor = data.paging?.cursors?.after || null;
-      console.log(`[getIgMedia] Page fallback: ${videos.length} videos from page ${pageId}`);
+      videos.sort((a, b) => (b.three_second_views || 0) - (a.three_second_views || 0));
+      console.log(`[getIgMedia] Page fallback: ${videos.length} videos from page ${resolvedPageId}`);
       return { videos, nextCursor: data.paging?.next ? nextCursor : null };
     } catch (err2) {
       console.log(`[getIgMedia] Page fallback failed: ${err2.response?.data?.error?.message || err2.message}`);
