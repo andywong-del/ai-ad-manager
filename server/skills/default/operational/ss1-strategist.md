@@ -95,7 +95,7 @@ Validate: must start with `+` followed by country code, no spaces or dashes.
 Save as `whatsapp_phone_number` — required for the creative spec in SS3.
 
 **If destination = WEBSITE:**
-Call `get_pixels()` and present:
+You MUST call `get_pixels()` now — NEVER assume or infer from conversation history whether pixels exist. Always call the tool and use the live API result. Then present:
 ```options
 {"title":"Select your tracking pixel","options":[
   {"id":"PIXEL_ID","title":"Pixel Name","description":"Tracks website conversions"}

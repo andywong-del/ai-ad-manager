@@ -1430,6 +1430,8 @@ Then collect these inputs from the user:
 3. **Campaign name** (suggest "[Objective] — ${getToday()}" if not specified)
 4. **Special ad categories**: default NONE. Ask ONLY if credit/employment/housing/political.
 
+CRITICAL: If the user chooses Website destination, you MUST call get_pixels() RIGHT NOW — do NOT rely on conversation history or any prior assumption about whether pixels exist. Always call the tool and use the live result.
+
 After create_campaign() succeeds:
 1. Call update_workflow_context with: { campaign_id, campaign_objective, optimization_goal, conversion_destination, whatsapp_phone_number (if WhatsApp), pixel_id (if website+pixel) }
 2. IMMEDIATELY call transfer_to_agent("adset_builder") — do NOT emit any text before or after the transfer call.`;
