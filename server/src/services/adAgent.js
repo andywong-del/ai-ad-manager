@@ -139,6 +139,21 @@ function createAdSet(args, c) {
     }
     params.targeting = JSON.stringify(params.targeting);
   }
+  // Auto-construct promoted_object for conversion-based optimization goals
+  if (!params.promoted_object) {
+    if (params.optimization_goal === 'OFFSITE_CONVERSIONS' && params.pixel_id) {
+      params.promoted_object = JSON.stringify({ pixel_id: params.pixel_id, custom_event_type: 'PURCHASE' });
+    } else if (params.optimization_goal === 'LEAD_GENERATION' && params.page_id) {
+      params.promoted_object = JSON.stringify({ page_id: params.page_id });
+    } else if (params.optimization_goal === 'PRODUCT_CATALOG_SALES' && params.product_catalog_id) {
+      params.promoted_object = JSON.stringify({ product_catalog_id: params.product_catalog_id });
+    }
+  } else if (typeof params.promoted_object === 'object') {
+    params.promoted_object = JSON.stringify(params.promoted_object);
+  }
+  // pixel_id and product_catalog_id are not direct Meta API params — remove after use
+  delete params.pixel_id;
+  delete params.product_catalog_id;
   return meta.createAdSet(ctx(c).token, ctx(c).adAccountId, params);
 }
 function updateAdSet({ ad_set_id, ...updates }, c) {
@@ -760,8 +775,8 @@ const adTools = [
   T('get_ad_sets', 'List all ad sets with targeting, budget, and optimization details.', getAdSets),
   T('get_ad_set', 'Get detailed info for a single ad set.', getAdSet,
     obj({ ad_set_id: str('Ad set ID') }, ['ad_set_id'])),
-  T('create_ad_set', 'Create a new ad set. Requires campaign_id, name, targeting (JSON string), optimization_goal, billing_event, daily_budget.', createAdSet,
-    obj({ campaign_id: str('Parent campaign ID'), name: str('Ad set name'), targeting: str('Targeting spec as JSON string, e.g. {"geo_locations":{"countries":["US"]},"age_min":18,"age_max":65}'), optimization_goal: str('e.g. REACH, LINK_CLICKS, CONVERSIONS, OFFSITE_CONVERSIONS'), billing_event: str('e.g. IMPRESSIONS, LINK_CLICKS'), daily_budget: num('Budget in cents'), status: str('ACTIVE or PAUSED') }, ['campaign_id', 'name', 'optimization_goal', 'billing_event'])),
+  T('create_ad_set', 'Create a new ad set. For OFFSITE_CONVERSIONS pass pixel_id so promoted_object is auto-built. For LEAD_GENERATION pass page_id.', createAdSet,
+    obj({ campaign_id: str('Parent campaign ID'), name: str('Ad set name'), targeting: str('Targeting spec as JSON string, e.g. {"geo_locations":{"countries":["US"]},"age_min":18,"age_max":65}'), optimization_goal: str('REACH, LINK_CLICKS, OFFSITE_CONVERSIONS, LEAD_GENERATION, CONVERSATIONS, PRODUCT_CATALOG_SALES'), billing_event: str('IMPRESSIONS or LINK_CLICKS'), daily_budget: num('Budget in cents'), status: str('ACTIVE or PAUSED'), pixel_id: str('Required when optimization_goal is OFFSITE_CONVERSIONS'), page_id: str('Required when optimization_goal is LEAD_GENERATION'), promoted_object: str('Optional — JSON string e.g. {"pixel_id":"...","custom_event_type":"PURCHASE"}. Auto-built if pixel_id is provided.') }, ['campaign_id', 'name', 'optimization_goal', 'billing_event'])),
   T('update_ad_set', 'Update an ad set (status, budget, targeting, etc). CONFIRM first.', updateAdSet,
     obj({ ad_set_id: str('Ad set ID'), status: str('ACTIVE or PAUSED'), daily_budget: num('Budget in cents'), name: str('New name') }, ['ad_set_id'])),
   T('delete_ad_set', 'Delete an ad set. CONFIRM first.', deleteAdSet,
@@ -1544,7 +1559,7 @@ Collect from the user:
 3. **Campaign name** (auto-propose "[Objective] — ${getToday()}" inline — proceed immediately unless user replies to rename)
 4. **Special ad categories**: silently default []. Do NOT ask unless credit/employment/housing/political.
 
-CRITICAL: If website destination, call get_pixels() NOW — never assume from history.
+CRITICAL: If website destination, call get_pixels() NOW — never assume from history. When calling create_ad_set with optimization_goal OFFSITE_CONVERSIONS, always pass pixel_id as a separate field — the tool will auto-build promoted_object from it.
 
 After create_campaign() succeeds:
 - Save campaign_id to workflow context immediately: { data: { campaign_id: "[id]", campaign_objective: "[obj]", optimization_goal: "[goal]", conversion_destination: "[dest]", whatsapp_phone_number: "[if applicable]", pixel_id: "[if applicable]" } }
