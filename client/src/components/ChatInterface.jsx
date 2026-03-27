@@ -291,50 +291,54 @@ const badgeLabel = (opt) => {
 const OptionCards = ({ data, onSend }) => {
   if (!data?.options) return null;
   const count = data.options.length;
-  const isCompact = count >= 7;
-  const gridCls = count <= 3 ? 'grid grid-cols-1 sm:grid-cols-3 divide-x divide-slate-100'
-    : count <= 6 ? 'grid grid-cols-1 sm:grid-cols-2 divide-x divide-slate-100'
-    : '';
+  // 1–3 short options: 3-col grid. 4+ options: full-width list (more readable for campaign creation steps)
+  const useGrid = count <= 3;
 
   return (
     <MetaCard title={data.title || 'Choose an option'} subtitle={data.subtitle || null}>
-      {isCompact ? (
-        <div className="max-h-[320px] overflow-y-auto divide-y divide-slate-100">
-          {data.options.map((opt, i) => (
-            <button key={i} onClick={() => onSend?.(`I choose: ${opt.title}`)}
-              className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-blue-50/50 transition-all group">
-              <span className="w-7 h-7 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 text-xs font-bold group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-600 transition-colors shrink-0">
-                {badgeLabel(opt)}
-              </span>
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-semibold text-slate-800 truncate">{opt.title}</p>
-                {opt.desc && <p className="text-xs text-slate-500 truncate">{opt.desc}</p>}
-              </div>
-              {opt.tag && <span className="text-[9px] font-bold bg-slate-900 text-white px-2 py-0.5 rounded-full shrink-0">{opt.tag}</span>}
-              <ArrowUpRight size={12} className="text-slate-300 group-hover:text-blue-600 transition-colors shrink-0" />
-            </button>
-          ))}
+      {useGrid ? (
+        <div className="grid grid-cols-1 sm:grid-cols-3 divide-x divide-slate-100">
+          {data.options.map((opt, i) => {
+            const desc = opt.description || opt.desc;
+            return (
+              <button key={i} onClick={() => onSend?.(`I choose: ${opt.title}`)}
+                className="flex flex-col px-4 py-4 text-left hover:bg-blue-50/50 transition-all group relative">
+                {opt.tag && (
+                  <span className="absolute top-2 right-3 text-[9px] font-bold bg-slate-900 text-white px-2 py-0.5 rounded-full">{opt.tag}</span>
+                )}
+                <div className="flex items-center gap-2.5 mb-2">
+                  <span className="w-7 h-7 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 text-xs font-bold group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-600 transition-colors">
+                    {badgeLabel(opt)}
+                  </span>
+                  <p className="text-[13px] font-semibold text-slate-800">{opt.title}</p>
+                </div>
+                {desc && <p className="text-xs text-slate-500 leading-relaxed flex-1 line-clamp-2">{desc}</p>}
+                <div className="flex items-center gap-1 mt-3 text-blue-600 text-[11px] font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
+                  <span>Select</span><ArrowUpRight size={11} />
+                </div>
+              </button>
+            );
+          })}
         </div>
       ) : (
-        <div className={gridCls}>
-          {data.options.map((opt, i) => (
-            <button key={i} onClick={() => onSend?.(`I choose: ${opt.title}`)}
-              className="flex flex-col px-4 py-4 text-left hover:bg-blue-50/50 transition-all group relative">
-              {opt.tag && (
-                <span className="absolute top-2 right-3 text-[9px] font-bold bg-slate-900 text-white px-2 py-0.5 rounded-full">{opt.tag}</span>
-              )}
-              <div className="flex items-center gap-2.5 mb-2">
-                <span className="w-7 h-7 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 text-xs font-bold group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-600 transition-colors">
+        <div className="divide-y divide-slate-100">
+          {data.options.map((opt, i) => {
+            const desc = opt.description || opt.desc;
+            return (
+              <button key={i} onClick={() => onSend?.(`I choose: ${opt.title}`)}
+                className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-blue-50/50 transition-all group">
+                <span className="w-7 h-7 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 text-xs font-bold group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-600 transition-colors shrink-0">
                   {badgeLabel(opt)}
                 </span>
-                <p className="text-[13px] font-semibold text-slate-800">{opt.title}</p>
-              </div>
-              <p className="text-xs text-slate-500 leading-relaxed flex-1 line-clamp-2">{opt.desc}</p>
-              <div className="flex items-center gap-1 mt-3 text-blue-600 text-[11px] font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
-                <span>Select</span><ArrowUpRight size={11} />
-              </div>
-            </button>
-          ))}
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-semibold text-slate-800">{opt.title}</p>
+                  {desc && <p className="text-xs text-slate-500 mt-0.5 line-clamp-2 leading-relaxed">{desc}</p>}
+                </div>
+                {opt.tag && <span className="text-[9px] font-bold bg-slate-900 text-white px-2 py-0.5 rounded-full shrink-0">{opt.tag}</span>}
+                <ArrowUpRight size={12} className="text-slate-300 group-hover:text-blue-600 transition-colors shrink-0" />
+              </button>
+            );
+          })}
         </div>
       )}
     </MetaCard>

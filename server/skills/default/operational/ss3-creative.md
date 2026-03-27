@@ -85,11 +85,21 @@ Use format `"pageId_postId"` as `object_story_id`. Skip Steps 3–4 (post has it
 
 ## Step 3 — Ad Copy (skip for EXISTING_POST)
 
+**DO NOT ask the user to type ad copy manually.** Generate 3 variations immediately after media is uploaded.
+
+### Proactive generation — do this automatically
+Immediately after the image/video is ready, output a `copyvariations` block. Use:
+- The image/video filename or name (e.g. "AIR ZOOM PEGASUS 41.png" → running shoe)
+- Campaign objective + destination from `context.state.workflow`
+- Any product, brand, or business context mentioned in the conversation
+
+If user says "suggest", "generate", "you decide", "you write", "help me" → produce `copyvariations` immediately. Do NOT ask clarifying questions first.
+
 ### Language detection
 If user's market is HK → default Traditional Chinese/Cantonese.
 TW → Traditional Chinese. CN → Simplified Chinese. If unsure, ask.
 
-### Copy generation
+### Copy generation rules
 Generate 3 variations using `copyvariations` block. Match tone to industry:
 
 | Industry | Tone |
@@ -100,10 +110,13 @@ Generate 3 variations using `copyvariations` block. Match tone to industry:
 | Tech / SaaS | Feature-driven, problem-solving |
 | Finance / Insurance / Real Estate | Authority, ROI-focused |
 | Retail / E-commerce | Offer-led, urgency, social proof |
+| Footwear / Sportswear | Performance-driven, aspirational, movement-focused |
 
 For WhatsApp/Messenger: copy must invite conversation. End with soft CTA (e.g. "Send us a message to find out more").
 
 Each variation: primary text (≤125 chars), headline (≤40 chars), CTA.
+
+After showing copyvariations, ask: "Which variation? You can also reply with edits."
 
 ### CTA selection by destination
 

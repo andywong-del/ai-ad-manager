@@ -18,7 +18,9 @@ leads_to: [ss3-creative]
 
 If `page_id` is already in `context.state.workflow`, skip this step.
 
-Call `get_pages()` if not already fetched. Present pages using page NAME (never raw IDs):
+Call `get_pages()`. Then:
+- **If only 1 page returned:** Auto-select it immediately. Show one line: "✅ Using **[Page Name]** — reply 'change page' to pick a different one." Proceed to Step 2 without waiting.
+- **If 2+ pages:** Present the options card using page NAME (never raw IDs):
 
 ```options
 {"title":"Which Page will run this campaign?","options":[
@@ -31,9 +33,17 @@ Call `get_pages()` if not already fetched. Present pages using page NAME (never 
 
 ## Step 2 — Audience Strategy
 
+**Default fast path:** Propose BROAD targeting first and ask for a quick confirm:
+
+> **Audience:** Broad targeting (Recommended) — Meta optimises automatically. Reply "yes" to proceed, or pick a different strategy below.
+
+If user says "yes", "ok", "broad", "proceed", or similar → use BROAD immediately, skip to Step 3.
+
+If user wants to customise, show the full options:
+
 ```options
 {"title":"How do you want to target?","options":[
-  {"id":"BROAD","title":"Broad Targeting","description":"Let Meta find the best audience — recommended for most campaigns"},
+  {"id":"BROAD","title":"Broad Targeting","description":"Let Meta find the best audience — recommended for most campaigns","tag":"Recommended"},
   {"id":"INTEREST","title":"Interest-Based","description":"Target by specific interests, behaviors, and demographics"},
   {"id":"CUSTOM","title":"Custom Audience","description":"Retarget website visitors, video viewers, or customer lists"},
   {"id":"LOOKALIKE","title":"Lookalike Audience","description":"Reach new people similar to your best customers"},

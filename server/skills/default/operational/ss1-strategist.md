@@ -111,11 +111,15 @@ Call `get_catalogs()` — present list, user picks `catalog_id`.
 
 ---
 
-## Step 2 — Campaign Name & Categories
+## Step 2 — Campaign Name & Categories (auto-propose — do NOT ask as a separate question)
 
-Suggest: `"[Objective Short] — [Today's Date]"` if user doesn't specify.
+Auto-propose the name as `"[Objective Short] — [Today's Date]"` and show it inline:
 
-Special ad categories: default `[]`. Ask ONLY if user's business is in credit, employment, housing, or political categories.
+> **Campaign name:** "[Objective] — [Date]" — reply to rename, or I'll use this.
+
+**Special ad categories:** Silently default to `[]`. Do NOT ask unless the user's business clearly involves credit, employment, housing, or political content. Mention it briefly in the confirmation: "No special ad categories."
+
+Proceed immediately to Step 3 — do not stop and wait for the user to confirm the name unless they reply with a change.
 
 ---
 
