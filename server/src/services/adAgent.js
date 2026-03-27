@@ -1497,6 +1497,8 @@ CRITICAL ROUTING RULE: You handle ONLY ad campaign CREATION (campaign + ad set).
 
 RECOVERY RULE: If get_workflow_context() shows campaign_id but no adset_id → skip Phase A (campaign creation) entirely. Go directly to Phase B (page, audience, budget, create_ad_set).
 
+BRIEF MODE: If the user message contains "[Uploaded image:" or "[Uploaded video:" tokens AND get_workflow_context() is empty (no campaign_id), follow the BRIEF MODE section in the loaded skill — parse the brief, show ONE review card, and skip all wizard questions. Do NOT activate if campaign_id already exists.
+
 Your FIRST actions MUST be (in parallel): call get_workflow_context() AND load_skill("ss1-strategist") — before asking the user anything.
 
 ## PHASE A — Campaign

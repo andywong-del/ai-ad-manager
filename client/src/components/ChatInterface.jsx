@@ -105,14 +105,16 @@ const TypingIndicator = ({ thinkingText, activityLog }) => (
     </div>
     <div className="bg-white/80 backdrop-blur-sm border border-slate-200 rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm min-w-[160px]">
       <ActivityLog entries={activityLog} />
-      <div className="flex items-center gap-2.5">
-        <div className="flex gap-1">
-          {[0, 150, 300].map((d) => (
-            <span key={d} className="w-2 h-2 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: `${d}ms` }} />
-          ))}
+      {!activityLog?.some(e => !e.done) && (
+        <div className="flex items-center gap-2.5">
+          <div className="flex gap-1">
+            {[0, 150, 300].map((d) => (
+              <span key={d} className="w-2 h-2 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: `${d}ms` }} />
+            ))}
+          </div>
+          {thinkingText && <span className="text-xs text-blue-600 italic">{thinkingText}</span>}
         </div>
-        {thinkingText && <span className="text-xs text-blue-600 italic">{thinkingText}</span>}
-      </div>
+      )}
     </div>
   </div>
 );
