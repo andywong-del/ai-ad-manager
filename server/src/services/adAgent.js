@@ -1451,21 +1451,24 @@ After COMPLETING any major action, you MUST:
 
 # AD CREATION — DELEGATE TO SPECIALIST AGENTS
 
-When the user wants to CREATE an ad or campaign (phrases like "create a campaign", "create an ad", "run an ad", "launch an ad", "I want to advertise"), ALWAYS delegate to the appropriate specialist agent.
+When the user wants to CREATE an ad or campaign (phrases like "create a campaign", "create an ad", "run an ad", "launch an ad", "boost my post", "I want to advertise"), OR when workflow state shows an in-progress creation, ALWAYS delegate to the appropriate specialist agent.
 
 **Step 1 — Check workflow state first:**
-Call get_workflow_context() to read the saved state, then route based on what IDs are present:
+Call get_workflow_context() to read the saved state, then route based on what's present:
 
 | What's in workflow state | Transfer to |
 |---|---|
+| \`creation_stage: "ss1_active"\` (SS1 is mid-flow) | \`campaign_strategist\` — regardless of what the user said |
 | No campaign_id (starting fresh) | \`campaign_strategist\` |
-| Has campaign_id, no adset_id | \`campaign_strategist\` (recovery — skips Phase A, does Phase B) |
+| Has campaign_id, no adset_id | \`campaign_strategist\` (recovery) |
 | Has adset_id, no creative_id | \`creative_builder\` |
 | Has creative_id, no ad_id | \`ad_launcher\` |
 
+**CRITICAL:** If \`creation_stage: "ss1_active"\` is set, the user is in the middle of the campaign creation wizard (e.g. they just picked an objective, answered a question, or confirmed a review card). Do NOT analyse their message as a new intent — immediately transfer to \`campaign_strategist\`.
+
 **NEVER** detect the stage from conversation history — always read from workflow state.
 
-Transfer immediately — do NOT attempt to run the creation flow yourself. The specialist agents handle the entire creation flow including the step-by-step skill guidance.
+Transfer immediately — do NOT attempt to run the creation flow yourself.
 
 Note: The \`campaign-manager\` skill is for managing EXISTING campaigns (pause, edit, copy). For new campaign CREATION, always delegate to \`campaign_strategist\`.
 
@@ -1540,8 +1543,8 @@ SMART DEFAULTS — never ask the user for these, apply silently:
 - Pixel / UTM tracking: skip entirely
 
 STEP 1 — FIRST actions (in parallel, before anything else):
-call get_workflow_context() AND load_skill("ss1-strategist")
-Do NOT call any other tools yet.
+call get_workflow_context() AND load_skill("ss1-strategist") AND update_workflow_context({ data: { creation_stage: "ss1_active" } })
+The update_workflow_context call marks that SS1 is active so ad_manager always routes back here on the next turn. Do NOT call any other tools yet.
 
 STEP 2 — Detect path and respond immediately:
 
@@ -1577,7 +1580,8 @@ Targeting spec (broad default):
 Budget is always in CENTS: $200/day = 20000.
 
 After create_ad_set() succeeds:
-1. Call update_workflow_context with all relevant IDs and flags (campaign_id, campaign_objective, optimization_goal, conversion_destination, adset_id, page_id, plus bulk_mode/boost_mode/object_story_id/pixel_id/whatsapp_phone_number as applicable)
+1. Call update_workflow_context with all relevant IDs and flags: { data: { campaign_id, campaign_objective, optimization_goal, conversion_destination, adset_id, page_id, creation_stage: null, plus bulk_mode/boost_mode/object_story_id/pixel_id/whatsapp_phone_number as applicable } }
+   IMPORTANT: include creation_stage: null to clear the routing flag now that SS1 is done.
 2. IMMEDIATELY call transfer_to_agent("creative_builder") — do NOT emit any text before or after the transfer call.`;
 
 const buildSs3Instruction = () => `You are Step 2 of 3 in the ad creation workflow: Creative Assembly.
