@@ -130,9 +130,9 @@ Ask: **"Pre-flight check passed. Ready to go live?"**
 Update all 3 entities to ACTIVE in sequence:
 
 ```
-update_campaign(campaign_id, status: "ACTIVE")
-update_ad_set(adset_id, status: "ACTIVE")
-update_ad(ad_id, status: "ACTIVE")
+update_campaign(campaign_id: "[from workflow]", status: "ACTIVE")
+update_ad_set(ad_set_id: "[adset_id from workflow]", status: "ACTIVE")
+update_ad(ad_id: "[from workflow]", status: "ACTIVE")
 ```
 
 ---
@@ -140,7 +140,7 @@ update_ad(ad_id, status: "ACTIVE")
 ## Step 7 — Handoff to ad_manager
 
 After activation succeeds:
-1. Call `update_workflow_context({ ad_id, activation_status: "ACTIVE" })`
+1. Call `update_workflow_context({ data: { ad_id: "[id]", activation_status: "ACTIVE" } })`
 2. IMMEDIATELY call `transfer_to_agent("ad_manager")` — no text before the transfer.
 
 `ad_manager` will deliver the final success summary and quick replies.

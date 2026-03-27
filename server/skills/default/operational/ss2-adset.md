@@ -164,7 +164,7 @@ create_ad_set(
 | App | `{"application_id":"APP_ID","object_store_url":"URL"}` |
 
 **After success:**
-1. Call `update_workflow_context({ adset_id, page_id })`
+1. Call `update_workflow_context({ data: { adset_id: "[id]", page_id: "[id]" } })`
 2. IMMEDIATELY call `transfer_to_agent("creative_builder")` — no text before or after.
 
 ---

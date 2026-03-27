@@ -226,5 +226,5 @@ create_ad_creative(
 ```
 
 **After create_ad_creative() succeeds:**
-1. Call `update_workflow_context({ creative_id, ad_format })`
+1. Call `update_workflow_context({ data: { creative_id: "[id]", ad_format: "[format]" } })`
 2. IMMEDIATELY call `transfer_to_agent("ad_launcher")` — no text before or after.

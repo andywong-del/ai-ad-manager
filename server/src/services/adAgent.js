@@ -614,20 +614,28 @@ async function preflightCheck({ campaign_id }, c) {
       pass('Ads', `${adList.length} ad(s) found`);
     }
 
-    // 5. Pixel check for conversion objectives
+    // 5. Pixel check — only for website conversion objectives, NOT messaging/lead-form
+    // Pixel is NOT required for CONVERSATIONS (WhatsApp/Messenger/IG DM) or LEAD_GENERATION (lead forms)
     const convObjectives = ['OUTCOME_SALES', 'OUTCOME_LEADS'];
-    if (convObjectives.includes(campaign.objective)) {
+    const pixelOptimizationGoals = ['OFFSITE_CONVERSIONS', 'VALUE'];
+    const messagingGoals = ['CONVERSATIONS', 'LEAD_GENERATION'];
+    const needsPixel = convObjectives.includes(campaign.objective) &&
+      adSetList.some(as => pixelOptimizationGoals.includes(as.optimization_goal)) &&
+      !adSetList.every(as => messagingGoals.includes(as.optimization_goal));
+    if (needsPixel) {
       try {
         const pixels = await meta.getPixels(token, adAccountId);
         const pixelList = pixels?.data || pixels || [];
         if (pixelList.length) {
-          pass('Pixel (required for conversions)', `${pixelList.length} pixel(s) available`);
+          pass('Pixel (required for website conversions)', `${pixelList.length} pixel(s) available`);
         } else {
-          fail('Pixel (required for conversions)', 'No pixel found for this conversion-based campaign', 'Create a Meta Pixel and install it on your website');
+          fail('Pixel (required for website conversions)', 'No pixel found — required for website conversion campaigns', 'Create a Meta Pixel and install it on your website');
         }
       } catch {
         warn('Pixel check', 'Could not verify pixel status', 'Manually verify your pixel is installed and firing');
       }
+    } else if (convObjectives.includes(campaign.objective) && adSetList.some(as => messagingGoals.includes(as.optimization_goal))) {
+      pass('Pixel check', 'Not required — messaging/lead-form campaign (WhatsApp, Messenger, or Lead Form)');
     }
 
     // 6. TOS check
@@ -943,10 +951,14 @@ const adTools = [
   T('update_workflow_context',
     'Save important data (IDs, names, metrics, selections) so it auto-flows to the next step. Call this after EVERY tool that returns data you will need later. Also use to save user_level ("beginner" or "expert").',
     async (args, context) => {
+      // Accept both { data: {...} } and flat { campaign_id: ..., ... } patterns
+      // Skill files pass flat objects; tool schema expects data:{} wrapper — handle both
+      const data = (args.data && typeof args.data === 'object') ? args.data : args;
       const current = context.state.get('workflow', {});
-      const updated = { ...current, ...args.data };
+      const updated = { ...current, ...data };
       context.state.set('workflow', updated);
-      return { saved: Object.keys(args.data), workflow: updated };
+      const savedKeys = Object.keys(data).filter(k => k !== 'data');
+      return { saved: savedKeys, workflow: updated };
     },
     obj({ data: { type: 'object', description: 'Key-value pairs to save. Examples: {"campaign_id":"123","page_id":"456","top_product":"Summer Dress","user_level":"beginner"}' } }, ['data'])),
 ];
@@ -1359,21 +1371,23 @@ After COMPLETING any major action, you MUST:
 
 # AD CREATION — DELEGATE TO SPECIALIST AGENTS
 
-When the user wants to CREATE an ad or campaign (phrases like "create a campaign", "create an ad", "run an ad", "launch an ad", "I want to advertise"), ALWAYS use transfer_to_agent to route to the appropriate specialist based on workflow stage:
+When the user wants to CREATE an ad or campaign (phrases like "create a campaign", "create an ad", "run an ad", "launch an ad", "I want to advertise"), ALWAYS delegate to the appropriate specialist agent.
 
-| Workflow stage | Transfer to |
+**Step 1 — Check workflow state first:**
+Call get_workflow_context() to read the saved state, then route based on what IDs are present:
+
+| What's in workflow state | Transfer to |
 |---|---|
-| No campaign created yet (starting fresh) | \`campaign_strategist\` |
-| Campaign created, no ad set yet | \`adset_builder\` |
-| Ad set created, no creative yet | \`creative_builder\` |
-| Creative ready, not yet launched | \`ad_launcher\` |
+| No campaign_id (starting fresh) | \`campaign_strategist\` |
+| Has campaign_id, no adset_id | \`adset_builder\` |
+| Has adset_id, no creative_id | \`creative_builder\` |
+| Has creative_id, no ad_id | \`ad_launcher\` |
 
-Detect stage from conversation history:
-- create_campaign succeeded → past Stage 1
-- create_ad_set succeeded → past Stage 2
-- create_ad_creative succeeded → past Stage 3
+**NEVER** detect the stage from conversation history — always read from workflow state.
 
-Transfer immediately — do NOT attempt to run the creation flow yourself.`;
+Transfer immediately — do NOT attempt to run the creation flow yourself. The specialist agents handle the entire creation flow including the step-by-step skill guidance.
+
+Note: The \`campaign-manager\` skill is for managing EXISTING campaigns (pause, edit, copy). For new campaign CREATION, always delegate to \`campaign_strategist\`.`;
 
 // (Old detailed flows removed — now in skills/default/*.md, loaded on-demand via load_skill tool)
 
@@ -1388,7 +1402,7 @@ const ss1Tools = pick(
 );
 
 const ss2Tools = pick(
-  'get_pages', 'get_custom_audiences', 'get_saved_audiences', 'targeting_search',
+  'get_pages', 'get_minimum_budgets', 'get_custom_audiences', 'get_saved_audiences', 'targeting_search',
   'targeting_browse', 'targeting_suggestions', 'targeting_validation',
   'get_reach_estimate', 'get_delivery_estimate', 'get_connected_instagram_accounts',
   'create_ad_set', 'get_workflow_context', 'update_workflow_context', 'load_skill'
@@ -1414,6 +1428,8 @@ ABSOLUTE RULE: NEVER fabricate data. Only show numbers from tool results.
 
 OUTPUT RULE: NEVER use <execute_tool>, print(), or any code execution format. Output ALL structured blocks (including \`\`\`options, \`\`\`metrics, \`\`\`steps, \`\`\`quickreplies) as raw markdown text directly in your response. Do NOT wrap them in any execution tags.
 
+CRITICAL ROUTING RULE: You handle ONLY ad campaign CREATION. You MUST NEVER call transfer_to_agent("ad_manager"). When a user says "Sales", "Leads", "Traffic", "Awareness", "Engagement", or "App Promotion" — they are selecting a CAMPAIGN OBJECTIVE, not requesting performance analytics. Treat it as their answer to "What's your campaign goal?" and proceed with the next step. Do not perform performance analysis. Do not route back to ad_manager.
+
 Your FIRST actions MUST be (in parallel): call get_workflow_context() AND load_skill("ss1-strategist") — before asking the user anything. get_workflow_context() gives you all IDs and settings saved by prior steps. load_skill gives you detailed step-by-step guidance.
 
 Your job: resolve the user's goal into a Meta campaign object.
@@ -1429,7 +1445,9 @@ Then collect these inputs from the user:
 2. **Destination** (determines optimization_goal):
    | Destination | optimization_goal | Extra needed |
    |---|---|---|
-   | WhatsApp | LEAD_GENERATION | Phone number (E.164 format) — collect NOW |
+   | WhatsApp | CONVERSATIONS | Phone number (E.164 format) — collect NOW |
+   | Messenger | CONVERSATIONS | none extra |
+   | Instagram DM | CONVERSATIONS | none extra |
    | Website + Pixel | OFFSITE_CONVERSIONS | pixel_id from get_pixels() |
    | Website (no pixel) | LINK_CLICKS | none |
    | Lead Form | LEAD_GENERATION | form must already exist — call get_lead_forms() |
@@ -1440,7 +1458,8 @@ Then collect these inputs from the user:
 CRITICAL: If the user chooses Website destination, you MUST call get_pixels() RIGHT NOW — do NOT rely on conversation history or any prior assumption about whether pixels exist. Always call the tool and use the live result.
 
 After create_campaign() succeeds:
-1. Call update_workflow_context with: { campaign_id, campaign_objective, optimization_goal, conversion_destination, whatsapp_phone_number (if WhatsApp), pixel_id (if website+pixel) }
+1. Call update_workflow_context with: { data: { campaign_id: "[id]", campaign_objective: "[obj]", optimization_goal: "[goal]", conversion_destination: "[dest]" } }
+   Include whatsapp_phone_number and pixel_id in the data object if applicable.
 2. IMMEDIATELY call transfer_to_agent("adset_builder") — do NOT emit any text before or after the transfer call.`;
 
 const buildSs2Instruction = () => `You are Step 2 of 4 in the ad creation workflow: Audience, Targeting & Ad Set.
@@ -1473,7 +1492,7 @@ Collect these in order:
 5. **Bid strategy**: LOWEST_COST (default) / BID_CAP / COST_CAP
 
 After create_ad_set() succeeds:
-1. Call update_workflow_context with: { adset_id, page_id }
+1. Call update_workflow_context with: { data: { adset_id: "[id]", page_id: "[id]" } }
 2. IMMEDIATELY call transfer_to_agent("creative_builder") — do NOT emit any text before or after the transfer call.`;
 
 const buildSs3Instruction = () => `You are Step 3 of 4 in the ad creation workflow: Creative Assembly.
@@ -1508,7 +1527,7 @@ Use the workflow context returned by get_workflow_context() — do NOT guess or 
 5. **WhatsApp creative**: object_story_spec MUST include whatsapp_phone_number from context.
 
 After create_ad_creative() succeeds:
-1. Call update_workflow_context with: { creative_id, ad_format }
+1. Call update_workflow_context with: { data: { creative_id: "[id]", ad_format: "[format]" } }
 2. IMMEDIATELY call transfer_to_agent("ad_launcher") — do NOT emit any text before or after the transfer call.`;
 
 const buildSs4Instruction = () => `You are Step 4 of 4 in the ad creation workflow: Tracking, Assembly & Launch.
@@ -1552,7 +1571,7 @@ Follow this exact sequence:
    Update campaign, ad set, and ad status to ACTIVE.
 
 7. After activation succeeds:
-   Call update_workflow_context with: { ad_id, activation_status: "ACTIVE" }
+   Call update_workflow_context with: { data: { ad_id: "[id]", activation_status: "ACTIVE" } }
    Then IMMEDIATELY call transfer_to_agent("ad_manager") — do NOT emit any text before the transfer call.
    ad_manager will deliver the final success summary to the user.`;
 

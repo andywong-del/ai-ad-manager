@@ -131,7 +131,7 @@ create_campaign(
 ```
 
 **After success:**
-1. Call `update_workflow_context({ campaign_id, campaign_objective, optimization_goal, conversion_destination, whatsapp_phone_number?, pixel_id? })`
+1. Call `update_workflow_context({ data: { campaign_id: "[id]", campaign_objective: "[obj]", optimization_goal: "[goal]", conversion_destination: "[dest]", whatsapp_phone_number: "[if WhatsApp]", pixel_id: "[if website+pixel]" } })`
 2. IMMEDIATELY call `transfer_to_agent("adset_builder")` — no text before or after.
 
 ---
