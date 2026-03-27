@@ -1405,6 +1405,8 @@ TODAY: ${getToday()}
 
 ABSOLUTE RULE: NEVER fabricate data. Only show numbers from tool results.
 
+OUTPUT RULE: NEVER use <execute_tool>, print(), or any code execution format. Output ALL structured blocks (including \`\`\`options, \`\`\`metrics, \`\`\`steps, \`\`\`quickreplies) as raw markdown text directly in your response. Do NOT wrap them in any execution tags.
+
 Your FIRST action MUST be: call load_skill("ss1-strategist") — before asking the user anything. This gives you detailed step-by-step guidance, option card formats, and API specs for this step.
 
 Your job: resolve the user's goal into a Meta campaign object.
@@ -1437,6 +1439,8 @@ TODAY: ${getToday()}
 
 ABSOLUTE RULE: NEVER fabricate data. Only show numbers from tool results.
 
+OUTPUT RULE: NEVER use <execute_tool>, print(), or any code execution format. Output ALL structured blocks (including \`\`\`options, \`\`\`metrics, \`\`\`steps, \`\`\`quickreplies) as raw markdown text directly in your response. Do NOT wrap them in any execution tags.
+
 Your FIRST action MUST be: call load_skill("ss2-adset") — before asking the user anything. This gives you detailed targeting spec formats, option cards, budget guidance, and create_ad_set API specs.
 
 Read campaign_id, optimization_goal, and conversion_destination from session state (workflow key) or conversation history.
@@ -1467,6 +1471,8 @@ const buildSs3Instruction = () => `You are Step 3 of 4 in the ad creation workfl
 TODAY: ${getToday()}
 
 ABSOLUTE RULE: NEVER fabricate data. Only show numbers from tool results.
+
+OUTPUT RULE: NEVER use <execute_tool>, print(), or any code execution format. Output ALL structured blocks (including \`\`\`options, \`\`\`metrics, \`\`\`steps, \`\`\`quickreplies, \`\`\`copyvariations) as raw markdown text directly in your response. Do NOT wrap them in any execution tags.
 
 Your FIRST action MUST be: call load_skill("ss3-creative") — before asking the user anything. This gives you image/video specs, object_story_spec formats for all destinations (including WhatsApp), copy generation guidance, and CTA option cards.
 
@@ -1500,6 +1506,8 @@ const buildSs4Instruction = () => `You are Step 4 of 4 in the ad creation workfl
 TODAY: ${getToday()}
 
 ABSOLUTE RULE: NEVER fabricate data. Only show numbers from tool results.
+
+OUTPUT RULE: NEVER use <execute_tool>, print(), or any code execution format. Output ALL structured blocks (including \`\`\`options, \`\`\`metrics, \`\`\`steps, \`\`\`adpreview, \`\`\`quickreplies) as raw markdown text directly in your response. Do NOT wrap them in any execution tags.
 
 Your FIRST action MUST be: call load_skill("ss4-launcher") — before asking the user anything. This gives you the review gate format, preflight checklist presentation, preview format (mobile + desktop), activation sequence, and the final success summary format.
 
