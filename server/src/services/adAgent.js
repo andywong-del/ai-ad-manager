@@ -933,6 +933,13 @@ const adTools = [
     obj({ skill_name: str('Skill ID to load, e.g. "campaign-manager", "targeting-audiences", "creative-manager", "insights-reporting"') }, ['skill_name'])),
 
   // ── Workflow Context ────────────────────────────────────────────────────
+  T('get_workflow_context',
+    'Retrieve the full workflow context saved by previous steps. Call this FIRST when you start a new step to get all IDs, settings, and selections from prior steps.',
+    async (_args, context) => {
+      const workflow = context.state.get('workflow', {});
+      return { workflow };
+    }),
+
   T('update_workflow_context',
     'Save important data (IDs, names, metrics, selections) so it auto-flows to the next step. Call this after EVERY tool that returns data you will need later. Also use to save user_level ("beginner" or "expert").',
     async (args, context) => {
@@ -1377,25 +1384,25 @@ const pick = (...names) => names.map(n => _toolByName[n]).filter(Boolean);
 const ss1Tools = pick(
   'get_ad_account_details', 'get_minimum_budgets', 'get_pages',
   'get_pixels', 'get_lead_forms', 'get_catalogs', 'create_campaign',
-  'update_workflow_context', 'load_skill'
+  'get_workflow_context', 'update_workflow_context', 'load_skill'
 );
 
 const ss2Tools = pick(
   'get_pages', 'get_custom_audiences', 'get_saved_audiences', 'targeting_search',
   'targeting_browse', 'targeting_suggestions', 'targeting_validation',
   'get_reach_estimate', 'get_delivery_estimate', 'get_connected_instagram_accounts',
-  'create_ad_set', 'update_workflow_context', 'load_skill'
+  'create_ad_set', 'get_workflow_context', 'update_workflow_context', 'load_skill'
 );
 
 const ss3Tools = pick(
   'get_ad_images', 'get_ad_videos', 'get_page_posts', 'get_page_videos',
   'upload_ad_image', 'upload_ad_video', 'get_ad_video_status',
-  'create_ad_creative', 'update_workflow_context', 'load_skill'
+  'create_ad_creative', 'get_workflow_context', 'update_workflow_context', 'load_skill'
 );
 
 const ss4Tools = pick(
   'create_ad', 'update_ad', 'update_campaign', 'update_ad_set',
-  'preflight_check', 'get_ad_preview', 'update_workflow_context', 'load_skill'
+  'preflight_check', 'get_ad_preview', 'get_workflow_context', 'update_workflow_context', 'load_skill'
 );
 
 // ── Sub-agent instructions ────────────────────────────────────────────────────
@@ -1407,7 +1414,7 @@ ABSOLUTE RULE: NEVER fabricate data. Only show numbers from tool results.
 
 OUTPUT RULE: NEVER use <execute_tool>, print(), or any code execution format. Output ALL structured blocks (including \`\`\`options, \`\`\`metrics, \`\`\`steps, \`\`\`quickreplies) as raw markdown text directly in your response. Do NOT wrap them in any execution tags.
 
-Your FIRST action MUST be: call load_skill("ss1-strategist") — before asking the user anything. This gives you detailed step-by-step guidance, option card formats, and API specs for this step.
+Your FIRST actions MUST be (in parallel): call get_workflow_context() AND load_skill("ss1-strategist") — before asking the user anything. get_workflow_context() gives you all IDs and settings saved by prior steps. load_skill gives you detailed step-by-step guidance.
 
 Your job: resolve the user's goal into a Meta campaign object.
 
@@ -1443,9 +1450,9 @@ ABSOLUTE RULE: NEVER fabricate data. Only show numbers from tool results.
 
 OUTPUT RULE: NEVER use <execute_tool>, print(), or any code execution format. Output ALL structured blocks (including \`\`\`options, \`\`\`metrics, \`\`\`steps, \`\`\`quickreplies) as raw markdown text directly in your response. Do NOT wrap them in any execution tags.
 
-Your FIRST action MUST be: call load_skill("ss2-adset") — before asking the user anything. This gives you detailed targeting spec formats, option cards, budget guidance, and create_ad_set API specs.
+Your FIRST actions MUST be (in parallel): call get_workflow_context() AND load_skill("ss2-adset") — before asking the user anything. get_workflow_context() returns all IDs and settings from Step 1 (campaign_id, campaign_objective, optimization_goal, conversion_destination, etc.). load_skill gives you detailed targeting spec formats, option cards, budget guidance, and create_ad_set API specs.
 
-Read campaign_id, optimization_goal, and conversion_destination from session state (workflow key) or conversation history.
+Use the workflow context returned by get_workflow_context() — do NOT guess or assume values from conversation history.
 
 Collect these in order:
 
@@ -1476,9 +1483,9 @@ ABSOLUTE RULE: NEVER fabricate data. Only show numbers from tool results.
 
 OUTPUT RULE: NEVER use <execute_tool>, print(), or any code execution format. Output ALL structured blocks (including \`\`\`options, \`\`\`metrics, \`\`\`steps, \`\`\`quickreplies, \`\`\`copyvariations) as raw markdown text directly in your response. Do NOT wrap them in any execution tags.
 
-Your FIRST action MUST be: call load_skill("ss3-creative") — before asking the user anything. This gives you image/video specs, object_story_spec formats for all destinations (including WhatsApp), copy generation guidance, and CTA option cards.
+Your FIRST actions MUST be (in parallel): call get_workflow_context() AND load_skill("ss3-creative") — before asking the user anything. get_workflow_context() returns all IDs and settings from Steps 1-2 (campaign_id, optimization_goal, conversion_destination, adset_id, page_id, whatsapp_phone_number, etc.). load_skill gives you image/video specs, object_story_spec formats, copy generation guidance, and CTA option cards.
 
-Read page_id, conversion_destination, and whatsapp_phone_number (if set) from session state (workflow key) or conversation history.
+Use the workflow context returned by get_workflow_context() — do NOT guess or assume values from conversation history.
 
 1. **Format** — ask user:
    - IMAGE → upload_ad_image() → image_hash
@@ -1511,9 +1518,9 @@ ABSOLUTE RULE: NEVER fabricate data. Only show numbers from tool results.
 
 OUTPUT RULE: NEVER use <execute_tool>, print(), or any code execution format. Output ALL structured blocks (including \`\`\`options, \`\`\`metrics, \`\`\`steps, \`\`\`adpreview, \`\`\`quickreplies) as raw markdown text directly in your response. Do NOT wrap them in any execution tags.
 
-Your FIRST action MUST be: call load_skill("ss4-launcher") — before asking the user anything. This gives you the review gate format, preflight checklist presentation, preview format (mobile + desktop), activation sequence, and the final success summary format.
+Your FIRST actions MUST be (in parallel): call get_workflow_context() AND load_skill("ss4-launcher") — before asking the user anything. get_workflow_context() returns all IDs and settings from Steps 1-3 (campaign_id, campaign_objective, optimization_goal, conversion_destination, adset_id, page_id, creative_id, ad_format, etc.). load_skill gives you the review gate format, preflight checklist presentation, preview format, activation sequence, and the final success summary format.
 
-Read campaign_id, adset_id, creative_id, ad_format, and conversion_destination from session state (workflow key) or conversation history.
+Use the workflow context returned by get_workflow_context() — do NOT guess or assume values from conversation history.
 
 Follow this exact sequence:
 
