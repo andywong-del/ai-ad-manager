@@ -77,23 +77,51 @@ const CreationStepBanner = ({ step }) => {
 
 // ── Typing indicator ──────────────────────────────────────────────────────────
 const ActivityLog = ({ entries }) => {
+  const [expanded, setExpanded] = useState(true);
+
+  // Auto-collapse 1.5s after all entries complete
+  useEffect(() => {
+    if (entries?.length && entries.every(e => e.done)) {
+      const t = setTimeout(() => setExpanded(false), 1500);
+      return () => clearTimeout(t);
+    } else if (entries?.some(e => !e.done)) {
+      setExpanded(true);
+    }
+  }, [entries]);
+
   if (!entries?.length) return null;
+  const allDone = entries.every(e => e.done);
+  const runningCount = entries.filter(e => !e.done).length;
+
   return (
-    <div className="mb-1.5 space-y-0.5">
-      {entries.map((entry) => (
-        <div key={entry.id} className="flex items-center gap-2 text-[11px] py-0.5">
-          {entry.done
-            ? <CheckCircle2 size={11} className="text-emerald-500 shrink-0" />
-            : <div className="w-2.5 h-2.5 rounded-full border-2 border-blue-400 border-t-transparent animate-spin shrink-0" />
-          }
-          <span className={entry.done ? 'text-slate-400' : 'text-slate-600 font-medium'}>
-            {entry.label}
-          </span>
-          {entry.summary && (
-            <span className="ml-auto text-slate-400 tabular-nums">{entry.summary}</span>
-          )}
+    <div className="mb-1.5">
+      <button
+        onClick={() => setExpanded(v => !v)}
+        className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500 hover:text-slate-700 transition-colors w-full text-left"
+      >
+        <ChevronRight size={10} className={`transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`} />
+        {allDone
+          ? `${entries.length} action${entries.length > 1 ? 's' : ''} completed`
+          : `${runningCount} action${runningCount > 1 ? 's' : ''} running…`}
+      </button>
+      {expanded && (
+        <div className="mt-1 space-y-0.5 pl-4">
+          {entries.map((entry) => (
+            <div key={entry.id} className="flex items-center gap-2 text-[11px] py-0.5">
+              {entry.done
+                ? <CheckCircle2 size={11} className="text-emerald-500 shrink-0" />
+                : <div className="w-2.5 h-2.5 rounded-full border-2 border-blue-400 border-t-transparent animate-spin shrink-0" />
+              }
+              <span className={entry.done ? 'text-slate-400' : 'text-slate-600 font-medium'}>
+                {entry.label}
+              </span>
+              {entry.summary && (
+                <span className="ml-auto text-slate-400 tabular-nums">{entry.summary}</span>
+              )}
+            </div>
+          ))}
         </div>
-      ))}
+      )}
     </div>
   );
 };
@@ -348,8 +376,20 @@ const badgeLabel = (opt) => {
   return opt.title?.[0]?.toUpperCase() || '?';
 };
 
-const OptionCards = ({ data, onSend }) => {
+const OptionCards = ({ data, onSend, isAnswered, selectedTitle }) => {
   if (!data?.options) return null;
+
+  // Collapsed state: show a single chip with the selected option
+  if (isAnswered && selectedTitle) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-xl text-[13px] my-1">
+        <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
+        <span className="font-semibold text-emerald-800">{selectedTitle}</span>
+        <span className="text-emerald-500 text-[11px] ml-auto">Selected</span>
+      </div>
+    );
+  }
+
   const count = data.options.length;
   // 1–3 short options: 3-col grid. 4+ options: full-width list (more readable for campaign creation steps)
   const useGrid = count <= 3;
@@ -1244,7 +1284,7 @@ const SaveMenu = ({ messageId, onSave, folders = [] }) => {
 };
 
 // ── Message bubble ────────────────────────────────────────────────────────────
-const MessageBubble = ({ message, isLatest, onSend, isTyping, onSaveItem, folders }) => {
+const MessageBubble = ({ message, isLatest, onSend, isTyping, onSaveItem, folders, isAnswered, answeredWith }) => {
   if (message.type === 'report') return (<><ReportMessage message={message} timestamp={message.timestamp} /><div className="mb-2" /></>);
   if (message.type === 'table') return (<><TableMessage message={message} />{isLatest && message.actions?.length > 0 && <QuickReplies actions={message.actions} onSend={onSend} disabled={isTyping} />}<div className="mb-6" /></>);
 
@@ -1254,6 +1294,8 @@ const MessageBubble = ({ message, isLatest, onSend, isTyping, onSaveItem, folder
     const { chatText } = splitChatAndCanvas(message.text);
     const segments = parseMarkdownTable(chatText);
     const hasWide = segments.some(s => s.type !== 'text');
+    // Extract the selected option title from the user's reply (strip "I choose: " prefix)
+    const selectedTitle = answeredWith ? answeredWith.replace(/^I choose:\s*/i, '').trim() : null;
     return (
       <>
         <div className="flex items-end gap-3 mb-2 group">
@@ -1272,7 +1314,7 @@ const MessageBubble = ({ message, isLatest, onSend, isTyping, onSaveItem, folder
                   case 'table': return <StyledTable key={i} columns={seg.columns} rows={seg.rows} />;
                   case 'adlib': return <AdLibraryCards key={i} ads={seg.ads} />;
                   case 'metrics': return <MetricCards key={i} data={seg.data} />;
-                  case 'options': return <OptionCards key={i} data={seg.data} onSend={onSend} />;
+                  case 'options': return <OptionCards key={i} data={seg.data} onSend={onSend} isAnswered={isAnswered} selectedTitle={selectedTitle} />;
                   case 'insights': return <InsightCards key={i} data={seg.data} onSend={onSend} />;
                   case 'score': return <ScoreCard key={i} data={seg.data} />;
                   case 'copyvariations': return <CopyVariations key={i} data={seg.data} onSend={onSend} />;
@@ -1282,7 +1324,7 @@ const MessageBubble = ({ message, isLatest, onSend, isTyping, onSaveItem, folder
                   case 'comparison': return <ComparisonCard key={i} data={seg.data} />;
                   case 'budget': return <BudgetCard key={i} data={seg.data} />;
                   case 'trend': return <TrendCard key={i} data={seg.data} />;
-          case 'adpreview': return <AdPreviewBlock key={i} data={seg.data} />;
+                  case 'adpreview': return <AdPreviewBlock key={i} data={seg.data} />;
                   default: return <div key={i} className="whitespace-pre-wrap">{renderRichText(seg.content)}</div>;
                 }
               })}
@@ -1884,9 +1926,25 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, creationStep, 
           <CreationStepBanner step={creationStep} />
           <div className="flex-1 overflow-y-auto">
             <div className="max-w-3xl mx-auto px-4 pt-6 pb-2">
-              {messages.map((msg) => (
-                <MessageBubble key={msg.id} message={msg} isLatest={msg.id === lastId} onSend={handleSend} isTyping={isTyping} onSaveItem={onSaveItem} folders={folders} />
-              ))}
+              {messages.map((msg, idx) => {
+                // Find the first user message after this agent message (if any)
+                const nextUserMsg = msg.role === 'agent'
+                  ? messages.slice(idx + 1).find(m => m.role === 'user')
+                  : null;
+                return (
+                  <MessageBubble
+                    key={msg.id}
+                    message={msg}
+                    isLatest={msg.id === lastId}
+                    onSend={handleSend}
+                    isTyping={isTyping}
+                    onSaveItem={onSaveItem}
+                    folders={folders}
+                    isAnswered={!!nextUserMsg}
+                    answeredWith={nextUserMsg?.text || ''}
+                  />
+                );
+              })}
               {isTyping && <TypingIndicator thinkingText={thinkingText} activityLog={activityLog} />}
               <div ref={endRef} />
             </div>
