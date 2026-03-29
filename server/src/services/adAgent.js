@@ -1582,6 +1582,7 @@ ROUTER — ss1_substep IS SET → handle user's reply to the pending question:
     create_ad_set(campaign_id, name: "Boost Ad Set — ${getToday()}", optimization_goal: "POST_ENGAGEMENT", billing_event: "IMPRESSIONS", bid_strategy: "LOWEST_COST_WITHOUT_CAP", daily_budget: [daily_budget_cents from workflow], status: "PAUSED", targeting: {"geo_locations":{"countries":["[country from workflow]"]},"age_min":18,"age_max":65,"targeting_optimization":"none"})
     update_workflow_context({ data: { campaign_id, campaign_objective: "OUTCOME_ENGAGEMENT", optimization_goal: "POST_ENGAGEMENT", adset_id, page_id: [from workflow], boost_mode: true, object_story_id: [from workflow], creation_stage: null, ss1_substep: null } })
     IMMEDIATELY transfer_to_agent("creative_builder")
+  On edit/change: update that field and re-show the review card. Keep ss1_substep: "b_review". Do NOT create anything yet.
 
 ▸ ss1_substep = "c1" (objective card shown, user picked an objective):
   Parse objective from message: Sales→OUTCOME_SALES, Leads→OUTCOME_LEADS, Traffic→OUTCOME_TRAFFIC, Awareness→OUTCOME_AWARENESS, Engagement→OUTCOME_ENGAGEMENT, App→OUTCOME_APP_PROMOTION.
@@ -1726,16 +1727,38 @@ PATH C — GUIDED (no bulk_mode, no boost_mode):
   update_workflow_context({ data: { ss3_substep: "c_format" } })
   Show format \`\`\`options card: IMAGE / VIDEO / CAROUSEL / EXISTING_POST.
 
-▸ ss3_substep = "c_format" (format card shown, user picked format):
-  Parse chosen format. Handle accordingly:
-    IMAGE: upload_ad_image() → returns image_hash. Show filename to user, NOT the raw hash.
-    VIDEO: upload_ad_video() → immediately get_ad_video_status(video_id). If NOT ready: poll until ready. Do NOT proceed until status = "ready".
-    CAROUSEL: collect 2-10 cards (each needs image upload + headline + destination URL).
-    EXISTING_POST: get_page_posts(page_id from workflow) → show \`\`\`options card → user picks → object_story_id = "[pageId_postId]" → create_ad_creative immediately (no copy step) → update_workflow_context({ data: { creative_id, ad_format: "EXISTING_POST", ss3_substep: null, creation_stage: "ss4_active" } }) → transfer_to_agent("ad_launcher").
-  After media ready (IMAGE/VIDEO/CAROUSEL):
-    update_workflow_context({ data: { image_hash: [if image], video_id: [if video], ss3_substep: "c_copy" } })
-    IMMEDIATELY generate 3 \`\`\`copyvariations (use filename + campaign_objective + conversion_destination from workflow).
-    Ask: "Which variation? You can also reply with edits."
+▸ ss3_substep = "c_format" (format card shown, user just picked a format):
+  Parse chosen format from user message. Then:
+    IMAGE: update_workflow_context({ data: { ss3_format: "IMAGE", ss3_substep: "c_upload" } })
+           Reply: "Got it — single image. Please attach your image (JPG or PNG, max 30MB, ideal size: 1080×1080 for Feed or 1080×1920 for Stories)."
+    VIDEO: update_workflow_context({ data: { ss3_format: "VIDEO", ss3_substep: "c_upload" } })
+           Reply: "Got it — video ad. Please attach your video file (MP4 or MOV, max 4GB)."
+    CAROUSEL: update_workflow_context({ data: { ss3_format: "CAROUSEL", ss3_substep: "c_upload" } })
+              Reply: "Got it — carousel. Please send me 2–10 images, one per message, each with a short headline (max 40 chars) and a destination URL."
+    EXISTING_POST: get_page_posts(page_id from workflow) → show \`\`\`options card → update_workflow_context({ data: { ss3_format: "EXISTING_POST", ss3_substep: "c_upload" } })
+                   Reply below card: "Which post would you like to promote?"
+
+▸ ss3_substep = "c_upload" (waiting for user to send media):
+  Check what's in the user message:
+    [Uploaded image: FILENAME, image_hash: HASH] token present → IMAGE is ready.
+      Parse image_hash and filename from token. (Do NOT call upload_ad_image() — hash is already provided.)
+      update_workflow_context({ data: { image_hash: HASH, ss3_substep: "c_copy" } })
+      IMMEDIATELY generate 3 \`\`\`copyvariations using filename + campaign_objective + conversion_destination from workflow.
+      Ask: "Which variation? You can also reply with custom edits."
+
+    [Uploaded video: FILENAME, video_id: ID] token present → VIDEO is ready to check.
+      call get_ad_video_status(video_id).
+      If status = "ready": update_workflow_context({ data: { video_id: ID, ss3_substep: "c_copy" } })
+        IMMEDIATELY generate 3 \`\`\`copyvariations. Ask: "Which variation?"
+      If NOT ready: "Video is processing — I'll check again shortly." Poll get_ad_video_status every 30s. Do NOT advance ss3_substep until ready.
+
+    EXISTING_POST selection (user picked a post from options card):
+      Parse object_story_id = "[page_id]_[post_id]" from selection.
+      create_ad_creative(name: "Boost Creative — ${getToday()}", object_story_spec: { "page_id": "[page_id]", "object_story_id": "[object_story_id]" })
+      update_workflow_context({ data: { creative_id: "[id]", ad_format: "EXISTING_POST", ss3_substep: null, creation_stage: "ss4_active" } })
+      IMMEDIATELY transfer_to_agent("ad_launcher")
+
+    No media in message → user may have replied with text. Gently re-prompt: "I'm waiting for your [image/video] file — please attach it to your next message."
 
 ▸ ss3_substep = "c_copy" (copyvariations shown, user picked variation):
   Parse selection. create_ad_creative(name: "[format] Creative — ${getToday()}", object_story_spec: [built from workflow: image_hash/video_id + page_id + chosen copy + conversion_destination])
