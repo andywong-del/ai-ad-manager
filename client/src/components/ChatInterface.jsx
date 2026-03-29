@@ -173,7 +173,11 @@ export const parseMarkdownTable = (text) => {
         const data = JSON.parse(jsonBuf.trim());
         if (blockMatch === 'adlib' && Array.isArray(data)) segments.push({ type: 'adlib', ads: data });
         else segments.push({ type: blockMatch, data });
-      } catch {}
+      } catch (e) {
+        // JSON parse failed — fall back to showing raw text so content isn't silently lost
+        console.warn(`[parseMarkdownTable] failed to parse ${blockMatch} block:`, e.message);
+        if (jsonBuf.trim()) segments.push({ type: 'text', content: '```' + blockMatch + '\n' + jsonBuf + '```' });
+      }
       continue;
     }
     if (isTableRow(lines[i]) && i + 1 < lines.length && isSeparator(lines[i + 1])) {

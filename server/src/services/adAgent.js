@@ -1559,7 +1559,7 @@ const ss1Tools = pick(
 );
 
 const ss3Tools = pick(
-  'get_ad_images', 'get_ad_videos', 'get_page_posts', 'get_page_videos',
+  'get_ad_images', 'get_ad_videos', 'get_pages', 'get_page_posts', 'get_page_videos',
   'upload_ad_image', 'upload_ad_video', 'get_ad_video_status',
   'create_ad_creative', 'get_workflow_context', 'update_workflow_context', 'load_skill'
 );
@@ -1839,8 +1839,9 @@ PATH C — GUIDED (no bulk_mode, no boost_mode):
 
 ▸ ss3_substep = "c_copy" (copyvariations shown, user picked variation):
   Parse selection. create_ad_creative(name: "[format] Creative — ${getToday()}", object_story_spec: [built from workflow: image_hash/video_id + page_id + chosen copy + conversion_destination])
-  update_workflow_context({ data: { creative_id: "[id]", ad_format: "[format]", ss3_substep: null, creation_stage: "ss4_active" } })
-  IMMEDIATELY transfer_to_agent("ad_launcher")
+  On SUCCESS: update_workflow_context({ data: { creative_id: "[id]", ad_format: "[format]", ss3_substep: null, creation_stage: "ss4_active" } }) → IMMEDIATELY transfer_to_agent("ad_launcher")
+  On FAILURE where error mentions "page" or "Page ID": call get_pages() → show \`\`\`options card → ask user to confirm the correct page → update_workflow_context({ data: { page_id: "[selected]" } }) → retry create_ad_creative with the corrected page_id.
+  On FAILURE (any other error): show the error message and ask if they want to retry or go back.
 
 ───────────────────────────────────────
 WHATSAPP CTA: always use whatsapp_phone_number from workflow. NEVER hardcode a phone number.
