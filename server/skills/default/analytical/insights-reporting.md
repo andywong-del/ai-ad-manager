@@ -145,8 +145,8 @@ Once ad sets return, map `optimization_goal` to the primary metric using table 0
 - Never average ROAS across a Sales campaign and a WhatsApp campaign.
 - **Output layout for all-campaigns overview:**
   1. One diagnostic sentence covering total account spend + overall status emoji
-  2. One `metrics` block: Total Spend, Total Reach, Account CTR
-  3. One section per active goal type (e.g. `### WhatsApp Campaigns`, `### Lead Campaigns`), each with its own primary metric, markdown table, and mini `insights` card
+  2. One `metrics` block: **Total Spend only** — do NOT show goal-specific KPIs (leads, conversations, ROAS) here because they belong to different campaign types and mixing them is misleading. Total Reach and CTR are OK.
+  3. One section per active goal type, each with its own primary metric, compact campaign summary, and mini `insights` card
   4. One combined `quickreplies` at the end
 
 **0e. ROAS rule:** Only compute ROAS when `optimization_goal` is `VALUE` or `OFFSITE_CONVERSIONS` with `custom_event_type = PURCHASE`. For all other goals, ROAS is meaningless — do not compute or show it anywhere.
@@ -168,10 +168,12 @@ Once ad sets return, map `optimization_goal` to the primary metric using table 0
 Call **both periods in parallel** for each campaign:
 - **get_object_insights (current period)** — fields relevant to detected goal:
   - All goals: `spend,impressions,clicks,ctr,cpm,reach,frequency,actions,cost_per_action_type`
-  - Messaging/conversations: add `onsite_conversion.messaging_conversation_started_7d`
+  - Messaging/conversations: add `onsite_conversion.messaging_conversation_started_7d` — **this is the ONLY correct field for WhatsApp/Messenger conversation count**. Do NOT use `actions` total or any other conversation action type. Meta shows `messaging_conversation_started_7d` in Ads Manager as "Conversations Started".
   - Sales/ROAS: add `action_values,purchase_roas`
   - Video/awareness: add `video_p25_watched_actions,video_p75_watched_actions,video_p100_watched_actions,video_avg_time_watched_actions,video_thruplay_watched_actions`
 - **get_object_insights (previous period)** — same fields
+
+**Do NOT use `get_account_insights` to derive primary metrics (leads, conversations, purchases).** The account-level endpoint aggregates all action types together — the numbers will be wrong. Use `get_object_insights` per campaign and sum the specific action type yourself.
 
 Fetch ALL campaigns with `status = ACTIVE` — do not filter or limit at this stage. An account with 5 active campaigns must show all 5, not 3.
 
