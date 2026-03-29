@@ -115,9 +115,13 @@ get_ad_sets()
 get_account_insights(date_preset: "last_7d")
 ```
 
-`optimization_goal` from ad sets is the source of truth. `objective` from campaigns is secondary. Account insights fetch starts immediately — no waiting for campaign/adset data first.
+**0b. `optimization_goal` from ad sets is the ONLY source of truth for metric selection.**
+- NEVER use campaign `objective` alone — it is wrong for mixed-destination campaigns.
+- NEVER infer the goal from the campaign name (e.g., "Sales_Wts_" does not mean ROAS).
+- A campaign with `objective = OUTCOME_SALES` + WhatsApp destination has `optimization_goal = CONVERSATIONS` on its ad sets → treat it as a **Messaging** campaign, show Cost per Conversation, not ROAS or CPL.
+- Always call `get_ad_sets` and read the `optimization_goal` field directly before choosing any metric.
 
-**0b.** Once ad sets return, map `optimization_goal` to the primary metric using table 0c below.
+Once ad sets return, map `optimization_goal` to the primary metric using table 0c below.
 
 **0c. Map to primary metric using this table:**
 
@@ -169,7 +173,7 @@ Call **both periods in parallel** for each campaign:
   - Video/awareness: add `video_p25_watched_actions,video_p75_watched_actions,video_p100_watched_actions,video_avg_time_watched_actions,video_thruplay_watched_actions`
 - **get_object_insights (previous period)** — same fields
 
-Active campaigns only: `status = ACTIVE` AND spend > $0 in the reporting period. Limit to top 15 by spend.
+Fetch ALL campaigns with `status = ACTIVE` — do not filter or limit at this stage. An account with 5 active campaigns must show all 5, not 3.
 
 > **Trend requirement:** Dual-period fetch is mandatory for all 7-day+ reports. Compute % delta in Step 2.
 > **No previous data:** If previous period returns $0 spend or no data, skip delta — omit `prev` and `trend` fields in the insights card and set `status` from absolute thresholds (Strategic Handoff Summary).
@@ -212,86 +216,75 @@ Use `"positive"` status when cost metrics improve > 10% or volume/ratio metrics 
 ### Step 3 -- Present with goal-appropriate structured blocks
 
 **Output block sequence — always in this exact order:**
-1. Diagnostic statement (🟢/🟡/🚨 + 2–3 sentences) — **mandatory first**
-2. Bold headline (one sentence, primary metric)
-3. `metrics` block (hero KPIs)
-4. `trend` block — only if date range ≥ 7 days; skip for single-day or shorter ranges
-5. Markdown table (per-campaign/adset breakdown, grouped by goal for mixed accounts)
-6. `insights` card (primary metric first, then Spend, then up to 3 supporting metrics)
-7. `steps` block (3–5 prioritized actions, highest impact first)
-8. `quickreplies`
+1. Diagnostic statement (🟢/🟡/🚨 + 2–3 sentences)
+2. `metrics` block — account-level hero KPIs only (max 4 metrics)
+3. `insights` card — primary metric + trend/status (max 4 items)
+4. **Compact campaign summary** — NOT a full table (see format below)
+5. `trend` block — only if date range ≥ 7 days
+6. `quickreplies` — always end here; full detail is opt-in via quickreplies
+
+**DO NOT output a full markdown table by default.** A table listing every campaign with 8+ columns is unreadable in chat. Instead use the compact summary format below. Full table is only shown if user explicitly asks "show all campaigns" or "show full breakdown".
 
 ---
 
 **DIAGNOSTIC-FIRST RULE (mandatory — output this before ANY block):**
 
-Write 2–3 sentences interpreting the primary metric with trend direction and an action signal. Lead with the status emoji:
-- 🟢 on track / improving
-- 🟡 warning — monitoring needed
-- 🚨 critical — action required
+Write 2–3 sentences with status emoji, primary metric value + WoW change, and one action signal. Keep it to 2 lines max.
 
-Examples:
-- 🚨 **CPL rose +15% this week (HK$50 → HK$57.50).** Lead volume also dropped 12%. Suggest reviewing audience overlap or refreshing creative copy.
-- 🟢 **WhatsApp conversations held steady at 42 this week (flat vs last week).** Cost per conversation improved slightly to $85. Campaign is healthy — consider scaling budget.
-- 🟡 **ROAS dipped from 3.5x to 2.9x week-on-week (−17%).** Spend is stable, suggesting conversion rate dropped. Check pixel attribution and creative fatigue.
+- 🟢 **28 WhatsApp conversations last 7 days at $180/conv (flat vs last week).** Budget on track. Top performer: Reels at $168/conv.
+- 🚨 **CPL jumped +15% this week (HK$50 → HK$57).** Lead volume also dropped 12%. Worst adset needs creative refresh.
+- 🟡 **ROAS dipped from 3.5x to 2.9x (−17% WoW).** Spend stable — likely conversion rate drop. Check pixel and creative fatigue.
 
 ---
 
-**Bold headline** — one sentence with the PRIMARY metric, not always ROAS.
-
-Examples by goal:
-- Messaging: **"Your WhatsApp campaign delivered 42 conversations last 7 days at $85 per conversation."**
-- Leads: **"Lead campaigns generated 128 leads at $24 CPL — 3 ad sets need attention."**
-- Sales: **"Your sales campaigns returned 3.2x ROAS on $4,500 spend last 7 days."**
-- Traffic: **"Traffic campaigns drove 8,400 landing page views at $0.42 each."**
-- Awareness: **"Awareness campaign reached 245K unique users at $4.20 CPM."**
-
 ```metrics
-Hero KPIs — always include Spend. Then based on goal:
-- Messaging: Conversations, Cost per Conversation, Reach, Frequency
-- Leads: Leads, CPL, CTR, Reach
-- Sales (ROAS): ROAS, CPA (purchase), Revenue, Conversions
-- Traffic: Landing Page Views, CPC, CTR, CPM
-- Awareness: Reach, CPM, Frequency, Impressions
-- Video: ThruPlays, Cost per ThruPlay, Video View Rate, Avg Watch Time
+Account-level hero KPIs — always include Spend. Then based on goal (max 4 total):
+- Messaging: Total Spend, Conversations, Cost per Conversation, Reach
+- Leads: Total Spend, Leads, CPL, CTR
+- Sales (ROAS): Total Spend, ROAS, Revenue, Conversions
+- Traffic: Total Spend, Landing Page Views, CPC, CTR
+- Awareness: Total Spend, Reach, CPM, Frequency
 ```
 
-```trend
-Day-by-day performance chart -- ALWAYS include for any report covering 7+ days
-Use PRIMARY metric as the second series (not always ROAS)
-```
-
-Markdown table -- campaign/ad set breakdown. Column 4 must be the PRIMARY METRIC for that campaign's goal, not a universal ROAS column. For mixed accounts, group by goal type.
-
-**`insights` card — mandatory format with trend and status fields:**
+**`insights` card — mandatory, max 4 items, primary metric first:**
 
 ```insights
 [
-  { "metric": "CPL", "value": 57.50, "prev": 50.00, "trend": "+15%", "status": "warning" },
-  { "metric": "Leads", "value": 112, "prev": 128, "trend": "-12.5%", "status": "warning" },
-  { "metric": "CTR", "value": "1.6%", "prev": "2.1%", "trend": "-23.8%", "status": "warning" },
-  { "metric": "Spend", "value": 6450, "prev": 6200, "trend": "+4%", "status": "ok" }
+  { "metric": "Cost per Conv", "value": 180.86, "prev": 161.48, "trend": "+12%", "status": "warning" },
+  { "metric": "Conversations", "value": 28, "prev": 31, "trend": "-9.7%", "status": "ok" },
+  { "metric": "CTR", "value": "1.8%", "prev": "2.1%", "trend": "-14%", "status": "warning" },
+  { "metric": "Spend", "value": 5064, "prev": 4980, "trend": "+1.7%", "status": "ok" }
 ]
 ```
 
-Rules for the `insights` card:
-- Always use real computed values from the dual-period fetch — never estimate.
-- `value` = current period. `prev` = previous period. Both required when trend data exists.
-- `status` must be one of: `ok`, `warning`, `critical`, `positive`.
-- List the primary metric FIRST. Then supporting metrics (Spend always included).
-- NEVER include ROAS in the insights card unless `optimization_goal` is `OFFSITE_CONVERSIONS` (purchase) or `VALUE`.
+**Compact campaign summary (default — NOT a table):**
 
-```score
-Audit scorecard when running health checks.
-```
+Show max 2–3 lines total:
+- Best performer: `[Campaign short name] — [N] [primary result] @ [cost]` ✅
+- Needs attention (only if warning/critical): `[Campaign short name] — [reason in 5 words]` ⚠️
+- If all campaigns are healthy: one line saying so
 
-```steps
-Prioritized action plan.
+Example:
+> ✅ **Best:** FB Retargeting Reels — 10 conv @ $168
+> ⚠️ **Review:** IG Carousel — $233/conv (+40% above avg)
+
+Use shortened campaign names (strip prefix patterns like "Sales_Wts_FB_Retargeting_Onda Pro_" — keep only the descriptive part).
+
+```trend
+Day-by-day chart — only if date range ≥ 7 days.
+Series 1: Spend. Series 2: PRIMARY metric (e.g. Conversations, not ROAS).
 ```
 
 ```quickreplies
-Contextual follow-up actions.
+Always end with drill-down options. Examples:
+["Show all 5 campaigns", "Pause worst performer", "Scale Reels budget", "Check last 30 days"]
 ```
+
+Quickreply rules:
+- First button = "Show all [N] campaigns" — this is how user opts into full table
+- Second button = most urgent action from diagnostic
+- Third + fourth = scaling opportunity + period comparison
+- NEVER include "Improve ROAS" for messaging or lead campaigns
 
 ---
 
