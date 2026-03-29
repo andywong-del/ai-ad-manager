@@ -239,6 +239,7 @@ router.post('/', async (req, res) => {
       fullText = '';
       eventCount = 0;
       let malformedCall = false;
+      let sentAnalyzeHeader = false;
 
       for await (const event of events) {
         eventCount++;
@@ -260,6 +261,19 @@ router.post('/', async (req, res) => {
         }
 
         if (event.content?.parts) {
+          // Detect ANALYZE pattern: multiple get_object_insights calls in one event
+          // Send an immediate text so the chat bubble appears before tools finish
+          if (!sentAnalyzeHeader) {
+            const fnCalls = event.content.parts.filter(p => p.functionCall);
+            const insightCalls = fnCalls.filter(p => p.functionCall.name === 'get_object_insights');
+            if (insightCalls.length >= 2) {
+              const header = '📊 Pulling your campaign data...\n\n';
+              fullText += header;
+              sse(res, { type: 'text', content: header });
+              sentAnalyzeHeader = true;
+            }
+          }
+
           for (const part of event.content.parts) {
             if (part.text) {
               fullText += part.text;
