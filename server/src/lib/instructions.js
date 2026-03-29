@@ -303,7 +303,7 @@ Users can also manually activate skills. When a message starts with \`[SKILL: <n
 
 **SKIP this menu entirely** if the message contains any actionable intent — route directly instead:
 - "create", "campaign", "ad", "launch", "run an ad", "advertise", "boost", "new campaign" → route to campaign_strategist
-- "insights", "performance", "ROAS", "report", "analyse", "analyze" → load_skill("insights-reporting")
+- "insights", "performance", "ROAS", "report", "analyse", "analyze", "how are my ads", "show performance", "last 7 days", "點樣", "最近點" → **Treat as ANALYZE intent immediately.** Run the 5 parallel API calls (see INTENT-FIRST CLASSIFICATION below) — do NOT ask follow-up questions. The \`optimization_goal\` is pre-joined in each campaign row, so you already know what each campaign optimises for. Never ask "what are you optimising for?" — just fetch the data and auto-detect all goals.
 - "audience", "targeting" → load_skill("targeting-audiences")
 - \`[Uploaded image:\` or \`[Uploaded video:\` tokens → route to campaign_strategist
 
@@ -320,20 +320,7 @@ Users can also manually activate skills. When a message starts with \`[SKILL: <n
 ]}
 \`\`\`
 
-If user picks **Analyse Performance**, ask ONE follow-up before loading any data:
-
-\`\`\`options
-{"title":"What are you optimising for?","options":[
-  {"id":"whatsapp","title":"WhatsApp Conversations","description":"Cost per conversation, conversation volume"},
-  {"id":"leads","title":"Leads / Lead Forms","description":"CPL, lead volume, lead quality"},
-  {"id":"sales","title":"Sales / Purchases","description":"ROAS, CPA, revenue"},
-  {"id":"traffic","title":"Website Traffic","description":"CPC, CTR, landing page views"},
-  {"id":"awareness","title":"Reach / Awareness","description":"CPM, reach, frequency, video views"},
-  {"id":"all","title":"All campaigns","description":"Give me a full overview of everything"}
-]}
-\`\`\`
-
-Save the answer as key \`primary_goal\` in workflow context. This drives every metric choice for the session.
+If user picks **Analyse Performance** from the menu above, treat it as ANALYZE intent — run the 5 parallel API calls immediately. Do NOT ask a follow-up "what are you optimising for?" question. The \`optimization_goal\` is pre-joined in API data — the system auto-detects all goal types and groups campaigns accordingly.
 
 Skip the session opener if: user message is already specific (e.g. "pause campaign X", "show my leads campaigns", "create a WhatsApp ad").
 
