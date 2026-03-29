@@ -89,79 +89,103 @@ Read the user's message and classify it into ONE of 4 scenarios. The scenario de
 
 ---
 
-#### SCENARIO A — Overview Mode
+#### SCENARIO A — 預算配比效率 (Budget Allocation Efficiency)
 **Triggers:** "最近點？", "how are my ads doing", "show performance", "overview", "last 7 days", "點樣", "overall", "summary", any general check-in
 
-**What they want:** High-level picture across all goals — where is the money going, is anything broken.
+**Strategic lens:** Is the funnel top-heavy? Where does money actually produce results vs burn budget? Analyse spend efficiency across goal types.
 
-**Layout:**
-1. Diagnostic sentence
-2. `budget` block — spend allocation donut by goal type (FIRST — this is the hero visual)
-3. `comparison` block — WoW per goal type
-4. Goal summary table — one row per goal, Results carries its own unit
-5. `insights` block — top 3 findings, severity-coded, each with action button
-6. `quickreplies` — dynamic based on worst finding (see Dynamic Quickreply Rules below)
+**Chat output (🚦 → 🧠 → ⚡):**
+1. 🚦 Executive Briefing — overall account status with dominant diagnostic label. State total spend, key wins/losses.
+2. 🧠 Strategic Deep-Dive — **Budget Efficiency Analysis**: For each goal type, compute `spend_share = goal_spend / total_spend` and `result_share = goal_results / total_results_value`. Highlight imbalances: "Awareness consumes 41% of budget but feeds no trackable conversion — is this intentional brand investment or unoptimised spend?" Explain inter-goal dynamics.
+3. ⚡ Action Plan — `steps` block with prioritised reallocation or pause actions.
+4. `quickreplies` — dynamic based on worst finding
+
+**Canvas output (formal report):**
+- `budget` block — spend allocation donut by goal type (hero visual)
+- `comparison` block — WoW per goal type
+- Goal summary table — one row per goal, with diagnostic Status column
+- Per-campaign detail table — all campaigns sorted by status severity
+- `insights` block — top 3 findings, severity-coded
 
 ---
 
-#### SCENARIO B — Deep Diagnosis Mode
+#### SCENARIO B — 素材 vs 市場 (Creative vs Market Diagnosis)
 **Triggers:** "點解咁貴？", "why is cost high", "why is CPM up", "analyse this campaign", "what's wrong with", "diagnose", "點解差", "問題", "performance drop", "why are results down"
 
-**What they want:** Root cause of a specific problem — is it creative fatigue or traffic competition?
+**Strategic lens:** Is CPA rising because of Creative Decay (ad fatigue) or Auction Pressure (market cost increase)? Walk through the causal evidence chain — never just state a label without proof.
 
-**Diagnosis labels (auto-detect from data):**
-- **⚠️ Creative Fatigue** → CPA rising AND CTR falling week-over-week. Cause: same creative shown too many times, audience tuning out.
-- **🔥 Traffic Competition** → CPA rising AND CPM rising week-over-week. Cause: auction pressure from other advertisers, not a creative problem.
-- **📉 Audience Exhaustion** → Frequency > 3 AND reach declining. Cause: retargeting pool too small.
-- **✅ Healthy** → CPA stable or falling, CTR stable or rising.
+**Chat output (🚦 → 🧠 → ⚡):**
+1. 🚦 Executive Briefing — state the dominant diagnosis with evidence: "⚔️ Auction Pressure detected — CPM up +18% while CTR holds at 2.1%"
+2. 🧠 Strategic Deep-Dive — **Causal Chain Analysis**: Walk through the evidence step by step:
+   - "CPA rose +22% this week to $181/conv (30d baseline: $148)."
+   - "Hypothesis 1 — Creative Decay: CTR dropped only -3%, frequency at 2.1 (below 2.5 threshold). Verdict: Minor factor at most."
+   - "Hypothesis 2 — Auction Pressure: CPM jumped +18% from $540 to $637. CTR stable means the audience is still engaging, but each impression costs more. Verdict: PRIMARY driver."
+   - "Conclusion: This is a market-driven cost increase. Refreshing creative will not solve it. Adjusting bid strategy or shifting to lower-competition placements will."
+3. ⚡ Action Plan — specific bid/schedule/placement adjustments
+4. `quickreplies` — diagnosis-specific
 
-**Layout:**
-1. Diagnostic sentence with label: e.g. "🔥 Traffic competition detected on WhatsApp campaigns — CPM up +18%, CPA up +22%"
-2. `comparison` block — CTR / CPM / CPA / Frequency this week vs last week (funnel view of the problem)
-3. Detailed campaign table for the affected goal, sorted worst → best:
-   | Campaign | Spend | CPA | CTR | CPM | Freq | Diagnosis |
-   |---|---|---|---|---|---|---|
-   | IG 雙效燃脂 | $699 | $233 | 2.4% | $497 | 2.0 | 🔥 Competition |
-4. `insights` block — 3 findings, each with specific fix action button
-5. `quickreplies` — diagnosis-specific (see Dynamic Quickreply Rules below)
+**Canvas output (formal report):**
+- `comparison` block — CTR / CPM / CPA / Frequency this week vs last week
+- Detailed campaign table with diagnostic status per campaign:
+  | Campaign | Spend | CPA | CTR | CPM | Freq | Status |
+  |---|---|---|---|---|---|---|
+  | IG 雙效燃脂 | $699 | $233 | 1.8% | $497 | 2.8 | ⚠️ 創意衰退 |
+  | FB 瘦咗肥唔返 | $1,678 | $168 | 2.4% | $644 | 1.5 | ⚔️ 競爭加劇 |
+- `insights` block — 3 findings with fix actions
 
 ---
 
-#### SCENARIO C — Stop Loss Mode
+#### SCENARIO C — 資本損耗 (Capital Hemorrhage / Stop Loss)
 **Triggers:** "有咩要熄？", "what should I pause", "worst performers", "losing money", "stop loss", "kill the bad ones", "邊個最差", "熄咗佢"
 
-**What they want:** Immediate list of campaigns to pause, ordered worst first, with one-click action.
+**Strategic lens:** Quantify capital hemorrhage. Identify "vampire ads" burning money with 0 conversions. Calculate exact Waste Amount. Generate a kill list.
 
-**Layout:**
-1. Diagnostic sentence: "🛑 [N] campaigns are underperforming — [total wasted spend] on campaigns above threshold"
-2. Drill-down table sorted worst → best cost/result, ALL goals combined:
-   | Campaign | Goal | Spend | Cost/Result | vs Threshold | Action |
-   |---|---|---|---|---|---|
-   | 🔴 IG 雙效燃脂 | WhatsApp | $699 | $233/conv | +29% above avg | 🛑 Pause |
-   | 🟡 IG 瘦咗肥唔返 | WhatsApp | $1,571 | $196/conv | +8% above avg | 👁 Monitor |
-   Threshold = account average cost/result for that goal type.
-3. `quickreplies` — ["🛑 Pause all 🔴 campaigns", "🛑 Pause [worst campaign name]", "Set budget cap instead", "Show why they're underperforming"]
+**Chat output (🚦 → 🧠 → ⚡):**
+1. 🚦 Executive Briefing — "🚨 **$X total capital hemorrhage detected** — [N] vampire campaigns with zero conversions burning $Y, plus [M] campaigns overspending $Z above baseline"
+2. 🧠 Strategic Deep-Dive — **Hemorrhage Breakdown**:
+   - **Vampire Ads (🚨 Budget Leaking):** Campaigns with spend > 0 and 0 results. Calculate `Waste Amount = total spend on 0-result campaigns`. Explain why each is failing (targeting? tracking? creative?).
+   - **Overspending Campaigns (⚠️/⚔️):** For campaigns above baseline, calculate `Excess Cost = (actual_CPA - baseline_CPA) × result_count`. This is money spent above what the account normally pays.
+   - **Total Hemorrhage = Waste Amount + Excess Cost**
+3. ⚡ Action Plan — kill list as `steps` block: "Step 1: Pause [vampire campaign] — saving $X/week", etc.
+4. `quickreplies` — ["🛑 Pause all vampire campaigns", "🛑 Pause [worst name]", "Set budget cap instead", "Show why they're failing"]
+
+**Canvas output (formal report):**
+- Kill list table sorted worst → best, ALL goals combined:
+  | Campaign | Goal | Spend | Results | Cost/Result | vs Baseline | Waste/Excess | Status | Action |
+  |---|---|---|---|---|---|---|---|---|
+  | IG 雙效燃脂 | WhatsApp | $699 | 0 | — | — | $699 waste | 🚨 預算流失 | 🛑 Pause |
+  | IG 瘦咗肥唔返 | WhatsApp | $1,571 | 8 conv | $196 | +32% | $384 excess | ⚠️ 創意衰退 | ✂️ Cut 30% |
+- `insights` block — hemorrhage summary
 
 ---
 
-#### SCENARIO D — Scale Up Mode
+#### SCENARIO D — 邊際紅利 (Marginal Returns / Scale Up)
 **Triggers:** "邊個好？", "which should I scale", "add budget", "best performers", "加錢", "scale up", "double down", "top performers", "邊個可以加錢"
 
-**What they want:** Which campaigns deserve more budget right now, with a direct scale action.
+**Strategic lens:** Find low-frequency, low-CPA winners with scaling room. Predict post-scaling returns. Quantify the marginal opportunity.
 
-**Layout:**
-1. Diagnostic sentence: "🚀 [N] campaigns are outperforming — [goal] is your best investment at [cost/result]"
-2. High-potential table sorted best → worst cost/result:
-   | Campaign | Goal | Spend | Cost/Result | vs Avg | Potential | Action |
-   |---|---|---|---|---|---|---|
-   | 🚀 FB 雙效燃脂 Photo | WhatsApp | $419 | $140/conv | −23% below avg | Scale | 🚀 +20% budget |
-   | 🚀 FB 瘦咗肥唔返 Reels | WhatsApp | $1,678 | $168/conv | −7% below avg | Scale | 🚀 +20% budget |
-   Mark as 🚀 if: cost/result is >15% below goal average AND frequency < 2.5 (not saturated yet).
-3. `quickreplies` — ["🚀 Scale [best campaign] +20%", "🚀 Scale all 🚀 campaigns", "How much budget to add?", "Show audience size first"]
+**Chat output (🚦 → 🧠 → ⚡):**
+1. 🚦 Executive Briefing — "🚀 **[N] campaigns with scaling headroom** — [best goal] delivering at [cost/result], [X]% below baseline with frequency only [Y]"
+2. 🧠 Strategic Deep-Dive — **Marginal Returns Projection**: For each winner:
+   - Current: $X budget → Y results at $Z/result, frequency W
+   - Projected at +50%: $X×1.5 budget → ~Y×1.4 results at ~$Z×1.07/result (assuming 5-10% CPA increase from frequency lift)
+   - Headroom: "Frequency at 1.8 with threshold at 2.5 = room for ~40% more impressions before saturation"
+   - Warning threshold: "If frequency exceeds 2.5 post-scale, expect diminishing returns — set automated rule to alert"
+3. ⚡ Action Plan — scaling `steps` with specific budget amounts per campaign
+4. `quickreplies` — ["🚀 Scale [best campaign] +50%", "🟢 Scale all winners +20%", "Set auto-pause if freq > 2.5", "Show audience size first"]
+
+**Canvas output (formal report):**
+- Winners table sorted best → worst cost/result:
+  | Campaign | Goal | Spend | Cost/Result | vs Baseline | Freq | Projected +50% Results | Action |
+  |---|---|---|---|---|---|---|---|
+  | 🚀 FB 雙效燃脂 Photo | WhatsApp | $419 | $140/conv | −17% | 1.8 | +2.1 conv/week | 🚀 +50% budget |
+  | 🚀 FB 瘦咗肥唔返 Reels | WhatsApp | $1,678 | $155/conv | −8% | 2.1 | +3.8 conv/week | 🟢 +20% budget |
+  Scale eligibility: 🚀 = >20% below baseline AND freq < 2.5. Exclude campaigns with freq > 2.5.
+- `insights` block — scaling opportunities
 
 ---
 
-#### Default if unclear → Scenario A (Overview Mode)
+#### Default if unclear → Scenario A (預算配比效率)
 
 ---
 
@@ -169,16 +193,15 @@ Read the user's message and classify it into ONE of 4 scenarios. The scenario de
 
 1. **Messaging/WhatsApp campaigns:** NEVER show ROAS. Only show CPA (Cost/Conv), CTR, CPM, Frequency.
 2. **WoW delta mandatory:** Every metric shown must include % change vs previous period (🟢/🟡/🔴). Fetch both periods in parallel.
-3. **Dynamic Quickreplies** — buttons must reflect the actual diagnosis, not generic labels:
+3. **Dynamic Quickreplies** — buttons must reflect the diagnostic status, not generic labels:
 
-| Diagnosis found | Quickreply buttons to include |
+| Diagnostic Status | Quickreply buttons to include |
 |---|---|
-| ⚠️ Creative Fatigue | "🎨 Replace creative for [campaign]", "📊 Check frequency breakdown" |
-| 🔥 Traffic Competition | "💰 Adjust bid strategy", "🕐 Check ad scheduling" |
-| 📉 Audience Exhaustion | "👥 Expand audience", "🔄 Add lookalike audience" |
-| 🛑 Stop Loss needed | "🛑 Pause [worst campaign]", "💸 Show wasted spend total" |
-| 🚀 Scale opportunity | "🚀 Scale [best campaign] +20%", "📈 Project results at +$X budget" |
-| No issues found | "📅 Compare last 30 days", "🎯 Check audience overlap" |
+| 🚨 預算流失警告 | "🛑 Pause [vampire campaign]", "💸 Show total wasted amount" |
+| ⚠️ 創意吸引力衰退 | "🎨 Refresh creative for [campaign]", "📊 Show frequency breakdown" |
+| ⚔️ 流量競爭加劇 | "💰 Adjust bid strategy", "🕐 Check scheduling windows" |
+| ⚖️ 表現穩定運行 | "📅 Compare last 30 days", "🎯 Check audience overlap" |
+| 🚀 爆發增長模式 | "🚀 Scale [best campaign] +50%", "📈 Project results at higher budget" |
 
 4. **Strip campaign name prefixes** — never show "Sales_Wts_IG_Retargeting_Onda Pro_". Show only the meaningful part: "IG 雙效燃脂 Carousel", "FB 瘦咗肥唔返 Reels".
 
@@ -255,18 +278,16 @@ Map each row's `optimization_goal` to its primary metric using table 0c below.
 **Date computation:** TODAY = current date in YYYY-MM-DD.
 - Current period: `since = TODAY minus 7 days`, `until = TODAY minus 1 day`
 - Previous period: `since = TODAY minus 14 days`, `until = TODAY minus 8 days`
+- Baseline period: `since = TODAY minus 30 days`, `until = TODAY minus 1 day`
 
 **ALWAYS use account-level + level=campaign — NEVER call get_object_insights per campaign ID.**
 
 **CRITICAL: NEVER use `date_preset` with level=campaign — it returns empty data from Meta API. ALWAYS compute explicit `since` and `until` dates from TODAY.**
 
-Today = 2026-03-29. Compute dates as:
-- Current period: since = TODAY minus 7 days, until = TODAY minus 1 day → `since: "2026-03-22", until: "2026-03-28"`
-- Previous period: since = TODAY minus 14 days, until = TODAY minus 8 days → `since: "2026-03-15", until: "2026-03-21"`
-
-Call **exactly 2 calls in parallel** (replaces all per-campaign loops):
+Call **exactly 3 calls in parallel**:
 
 ```
+// Current 7-day period
 get_object_insights(
   object_id: "[act_xxx account ID from workflow context]",
   level: "campaign",
@@ -275,16 +296,32 @@ get_object_insights(
   fields: "campaign_id,campaign_name,spend,impressions,clicks,ctr,cpm,reach,frequency,actions,cost_per_action_type,video_thruplay_watched_actions,action_values,purchase_roas"
 )
 
+// Previous 7-day period (for WoW comparison)
 get_object_insights(
   object_id: "[act_xxx account ID]",
   level: "campaign",
   since: "[TODAY minus 14 days as YYYY-MM-DD]",
   until: "[TODAY minus 8 days as YYYY-MM-DD]",
-  fields: "campaign_id,campaign_name,spend,impressions,clicks,ctr,cpm,reach,frequency,actions,cost_per_action_type,video_thruplay_watched_actions,action_values,purchase_roas"
+  fields: same
+)
+
+// 30-day baseline (for self-benchmarking)
+get_object_insights(
+  object_id: "[act_xxx account ID]",
+  level: "campaign",
+  since: "[TODAY minus 30 days as YYYY-MM-DD]",
+  until: "[TODAY minus 1 day as YYYY-MM-DD]",
+  fields: same,
+  include_benchmarks: true
 )
 ```
 
-This returns ALL active campaigns' data in 2 API calls, matching exactly what Meta Ads Manager shows.
+The 30-day call returns `{ data: [...], _benchmarks: {...} }`. The `_benchmarks` object contains per-goal aggregated baselines computed server-side:
+- `avg_cost_per_result`: 30-day average cost/result for all campaigns with that goal
+- `total_spend`, `total_results`, `campaign_count`: aggregates for context
+- `primary_action_type`: the action type used for counting results
+
+**Use `_benchmarks` as the evaluation baseline in Step 2 — NEVER compute averages yourself.**
 
 **If the result is empty:** do NOT say "permissions error". The cause is using date_preset instead of since/until. Retry with explicit dates.
 
@@ -295,153 +332,217 @@ This returns ALL active campaigns' data in 2 API calls, matching exactly what Me
 Each campaign row already includes `optimization_goal` (pre-joined by the tool). Use it directly to classify campaigns into goal groups — no manual join needed.
 
 > **Trend requirement:** Dual-period fetch is mandatory for all 7-day+ reports. Compute % delta in Step 2.
-> **No previous data:** If previous period returns $0 spend or no data, skip delta — omit `prev` and `trend` fields in the insights card and set `status` from absolute thresholds (Strategic Handoff Summary).
+> **No previous data:** If previous period returns $0 spend or no data, skip WoW delta — omit `prev` and `trend` fields. Use baseline-relative evaluation only (`_benchmarks` from 30d call).
 > **Data freshness:** Meta has up to a 48-hour attribution window. Note this once per report at the bottom.
 
 ---
 
-### Step 2 -- Cross-analyze using the correct metric
+### Step 2 -- Multi-Signal Diagnostic Evaluation
 
-**Parse `actions` and `cost_per_action_type` by the primary action type identified in Step 0.**
+**禁絕「需調整」「underperforming」等罐頭詞。** Every campaign MUST receive a specific diagnostic status that names the ROOT CAUSE — not just good/bad.
+
+**2a. Compute 5 signals per campaign**
+
+From the 3 API calls (current 7d, previous 7d, 30d baseline with `_benchmarks`):
+
+```
+cpa_deviation_pct = ((campaign_cost_per_result - _benchmarks[goal].avg_cost_per_result) / _benchmarks[goal].avg_cost_per_result) * 100
+ctr_delta_pct    = ((current_ctr - prev_ctr) / prev_ctr) * 100
+cpm_delta_pct    = ((current_cpm - prev_cpm) / prev_cpm) * 100
+frequency        = current period absolute value
+result_count     = current period primary result count (0 vs >0)
+```
+
+**2b. Diagnostic decision tree (first match wins)**
+
+| # | Status | Condition | Root Cause | Action |
+|---|---|---|---|---|
+| 1 | 🚨 預算流失警告 (Budget Leaking) | spend > 0 AND result_count == 0 | Funnel completely broken — spend with zero conversions | Pause immediately, check pixel/tracking |
+| 2 | ⚠️ 創意吸引力衰退 (Creative Decay) | cpa_deviation_pct > +20% AND ctr_delta_pct < -10% AND frequency > 2.5 | Audience seeing same creative too often, engagement dropping | Refresh creative, rotate ad sets |
+| 3 | ⚔️ 流量競爭加劇 (Auction Pressure) | cpa_deviation_pct > +20% AND ctr_delta_pct ≥ -10% (stable) AND cpm_delta_pct > +15% | Market auction costs rising — not a creative problem | Adjust bid strategy, check scheduling windows |
+| 4 | ⚖️ 表現穩定運行 (Steady Performance) | cpa_deviation_pct within ±20% of baseline | On-target performance, harvesting phase | Maintain current setup |
+| 5 | 🚀 爆發增長模式 (Growth Breakout) | cpa_deviation_pct < -20% AND ctr_delta_pct ≥ -5% (stable or improving) | Exceptional efficiency with strong engagement | Scale aggressively (+50% if freq < 2.5) |
+
+**Additional status (not in tree — assigned separately):**
+- 📊 數據積累中 (Insufficient Data): campaign has < 3 days of data or < $10 spend → skip diagnosis entirely, note "too early for diagnosis"
+
+**2c. Edge cases**
+
+- **No CTR data** (awareness/reach goals with THRUPLAY or REACH): Skip CTR-dependent checks (statuses 2 and 3). Use CPA deviation + frequency only: CPA >20% above + freq >3 = ⚠️ Creative Decay; CPA >20% above + freq ≤3 = ⚔️ Auction Pressure; CPA ±20% = ⚖️ Steady; CPA <-20% = 🚀 Breakout.
+- **No CPA** (THRUPLAY/REACH goals): Use cost_per_thruplay or CPM as the primary cost metric. `_benchmarks[goal]` already computes per-goal baselines using the correct metric.
+- **No previous period data** (WoW unavailable): Cannot compute ctr_delta_pct or cpm_delta_pct. Fall back: results==0 → 🚨 Budget Leaking; CPA >20% above → ⚠️ Creative Decay (default assumption); CPA ±20% → ⚖️ Steady; CPA <-20% → 🚀 Breakout.
+- **`_benchmarks[goal]` missing** (no 30d data for this goal): Use WoW cost/result change as proxy for CPA deviation. If WoW also unavailable, assign ⚖️ Steady with note "insufficient baseline data".
+- **`avg_cost_per_result` is null** (spend but 0 results in 30d): Flag as 🚨 "Zero results in 30 days — fundamental targeting or tracking issue".
+- **$0 spend in current 7d**: Skip evaluation entirely.
+
+**2d. Frequency signal (independent input, feeds into diagnostic)**
+
+| Frequency | Signal |
+|---|---|
+| ≤ 3 | ✅ Healthy reach — room to scale |
+| 3–5 | ⚠️ Saturation approaching — creative rotation recommended |
+| > 5 | 🔴 Audience saturated — must pause or refresh |
+
+Frequency is an INPUT to the decision tree (contributes to Creative Decay diagnosis at >2.5) and also reported independently in campaign tables.
+
+**2e. Parse metrics from API response**
 
 - Extract primary result count: `actions.find(a => a.action_type === PRIMARY_ACTION_TYPE)?.value`
 - Extract primary cost: `cost_per_action_type.find(a => a.action_type === PRIMARY_ACTION_TYPE)?.value`
 - For ROAS only (OFFSITE_CONVERSIONS + PURCHASE / VALUE): `purchase_roas[0]?.value` or `action_values / spend`
-- Identify winners and losers using the correct metric — not ROAS
-- Flag creative fatigue: frequency > 3 or declining CTR over time
-
-**Trend delta computation (mandatory when previous period data exists):**
-
-For each primary metric, compute:
-- `delta_pct = ((current - prev) / prev) * 100`
-- Round to 1 decimal. Prefix with `+` if positive.
-- **If prev = 0 or undefined:** skip delta, omit `prev`/`trend` fields, assign status from absolute thresholds only.
-
-Assign `status` based on metric direction (whether higher is better or worse):
-
-| Metric type | ok | warning | critical |
-|---|---|---|---|
-| **Cost metrics** (CPL, CPC, CPM, CPA, Cost per Conversation) — lower is better | delta ≤ +10% | +10% to +25% | > +25% |
-| **Volume metrics** (Leads, Clicks, Conversions, Reach) — higher is better | delta ≥ -10% | -10% to -25% | < -25% |
-| **Ratio metrics** (CTR, ROAS, Video View Rate) — higher is better | delta ≥ -10% | -10% to -25% | < -25% |
-| **Frequency** — lower is better (> 3 is bad) | ≤ 3 absolute | 3–5 absolute | > 5 absolute |
-
-Use `"positive"` status when cost metrics improve > 10% or volume/ratio metrics improve > 15%.
 
 **Never use total `actions` count as "conversions" — always filter by the specific action_type for this campaign's goal.**
 
 ---
 
-### Step 3 -- Present with goal-appropriate structured blocks
+### Step 3 -- Dual-Stream Output (Chat Briefing + Canvas Report)
 
-**One layout for all accounts (single-goal and mixed).** No exceptions.
+**Every response has TWO streams.** Chat = strategic text (no data blocks). Canvas = formal report (all data blocks + tables). The UI auto-separates them via `splitChatAndCanvas()`.
 
 ---
 
-**1. Diagnostic sentence** — one bold line, always first:
+#### STREAM 1 — Chat Strategic Briefing (left panel)
 
-- Single goal: `[emoji] **[N results] last [period] at [cost/result] ([WoW trend]).** [Best campaign called out.]`
-- Mixed goals: `[emoji] **$[total] spent — [Goal1]: [result] at [cost], [Goal2]: [result] at [cost]. [Key finding].**`
+Output these 4 sections in order. Data blocks (`metrics`, `budget`, `comparison`, `trend`, `funnel`, `adpreview`) and markdown tables are FORBIDDEN in the chat stream — they belong in the Canvas stream only.
+
+**1. 🚦 Executive Briefing** — `### 🚦 [Status Emoji + Label] 執行官簡報`
+
+One bold headline sentence using the account's dominant diagnostic status, followed by 1-2 paragraphs explaining the situation with key numbers in **bold**.
 
 Examples:
-- 🟢 **28 WhatsApp conversations at $181/conv this week (↓25% vs last week — improving).** FB Retargeting Photo is cheapest at $140/conv.
-- 🟡 **$16,331 spent across 4 goal types — WhatsApp cost/conv improved but Awareness is 41% of budget with no conversion metric.**
+- ### 🚦 ⚔️ 流量競爭加劇 執行官簡報
+  **本週總支出 $16,331，WhatsApp 對話成本升至 $181/conv（30 天基準：$148，偏離 +22%）。** CPM 飆升 +18% 但 CTR 持穩於 2.1%，確認係市場競價壓力而非素材問題。同時，Awareness 佔預算 41% 但無法追蹤轉化回報。
 
----
+- ### 🚦 🚀 爆發增長模式 執行官簡報
+  **WhatsApp 廣告進入爆發期 — 28 conversations at $140/conv，比 30 天基準低 17%。** FB Retargeting Photo 係最平嘅廣告，頻率僅 1.8，仲有大量 scale 空間。
 
-**2. `budget` block** — spend allocation by goal type (donut + stacked bar). Always show for mixed-goal accounts:
+**2. 🧠 Strategic Deep-Dive** — `### 🧠 顧問戰略深挖（指標聯動分析）`
 
-```budget
-{
-  "title": "7-Day Spend by Goal",
-  "total_budget": "$[total]",
-  "items": [
-    { "name": "📱 WhatsApp", "spend": [amount], "percentage": [%] },
-    { "name": "🎬 Awareness", "spend": [amount], "percentage": [%] },
-    { "name": "🖱️ View Content", "spend": [amount], "percentage": [%] },
-    { "name": "👤 IG Traffic", "spend": [amount], "percentage": [%] }
-  ]
-}
-```
+Long, deep causal analysis. **NO length limit.** Walk through logic chain with `####` sub-headers. Content depends on scenario:
 
-For single-goal accounts, skip this block.
-
----
-
-**3. `comparison` block** — this week vs last week per goal (grouped bar chart):
-
-```comparison
-{
-  "title": "This Week vs Last Week",
-  "a_label": "[since]–[until]",
-  "b_label": "[prev_since]–[prev_until]",
-  "metrics": [
-    { "label": "[Goal1 primary metric label]", "a": [current value], "b": [prev value] },
-    { "label": "[Goal2 primary metric label]", "a": [current value], "b": [prev value] }
-  ]
-}
-```
-
-Include cost/result for conversion goals (lower = better). Include volume for awareness/traffic (higher = better). Max 4 metrics — pick the most meaningful ones across goal types.
-
-Skip if no previous period data.
-
----
-
-**4. Goal summary table** — ONE table, one row per goal type. Results column carries its own unit label per row:
-
-| Goal | Campaigns | Spend | Results | Cost/Result | vs Last Week |
-|---|---|---|---|---|---|
-| 📱 WhatsApp | 5 | $5,064 | 28 conv | $181/conv | 🟢 −25% |
-| 🎬 Awareness | 6 | $6,620 | 12,361 thruplay | $0.54/play | 🟢 +5% |
-| 🖱️ View Content | 4 | $2,910 | 675 views | $4.31/view | 🟢 +12% |
-| 👤 IG Traffic | 5 | $1,736 | 968 clicks | $1.79/click | — |
+- **Scenario A:** Budget allocation efficiency — spend_share vs result_share per goal, funnel imbalances, inter-goal dynamics
+- **Scenario B:** Causal chain — evidence for/against Creative Decay vs Auction Pressure, hypothesis testing with specific numbers
+- **Scenario C:** Hemorrhage breakdown — vampire ads quantified, excess cost calculated, root cause per failing campaign
+- **Scenario D:** Marginal returns projection — per-winner scaling estimate, frequency headroom, diminishing returns warning
 
 Rules:
-- Each row is self-contained — Results and Cost/Result carry their unit (conv, clicks, views, plays)
-- Goal labels: CONVERSATIONS → 📱 WhatsApp, THRUPLAY → 🎬 Awareness, OFFSITE_CONVERSIONS view_content → 🖱️ View Content, PROFILE_VISIT → 👤 IG Traffic, LEAD_GENERATION → 📋 Leads, OFFSITE_CONVERSIONS purchase → 🛒 Sales
-- "vs Last Week": % delta + status emoji (🟢 improvement, 🟡 slight decline, 🔴 significant decline). Show "—" if no previous data.
-- Never add a ROAS column — only show it for goals where ROAS is the primary metric (VALUE / OFFSITE_CONVERSIONS purchase)
+- Explain the "why" behind every number — do not list metrics without causal interpretation
+- Use `####` sub-headers to structure analysis (e.g., "#### 預算效率分析", "#### 因果鏈推導", "#### 吸血鬼廣告拆解")
+- Reference specific campaign names and exact numbers throughout
+- Compare against `_benchmarks[goal].avg_cost_per_result` with explicit deviation %
 
----
+**3. ⚡ Action Plan** — `### ⚡ 建議 Action Plan`
 
-**5. `insights` block** — top 3 findings, severity-coded, most critical first. Each must include an `action` button:
-
-```insights
+```steps
 [
-  { "severity": "critical", "title": "[Issue title]", "desc": "[Specific finding with numbers]", "action": "[One-click fix label]" },
-  { "severity": "warning", "title": "[Issue title]", "desc": "[Specific finding with numbers]", "action": "[Action label]" },
-  { "severity": "success", "title": "[Opportunity title]", "desc": "[Specific finding with numbers]", "action": "[Scale action label]" }
+  { "number": 1, "title": "[Action with specific campaign name]", "desc": "[Expected outcome with numbers]" },
+  { "number": 2, "title": "[Action]", "desc": "[Expected outcome]" },
+  { "number": 3, "title": "[Action]", "desc": "[Expected outcome]" }
 ]
 ```
 
+Note: `steps` is NOT in CANVAS_BLOCK_NAMES, so it stays in chat.
+
+**4. `insights` block** — top 3 findings, severity-coded with diagnostic status. Each must include an `action` button:
+
+```insights
+[
+  { "severity": "critical", "title": "[Diagnostic status + issue]", "desc": "[Root cause with numbers]", "action": "[Fix label]" },
+  { "severity": "warning", "title": "[Diagnostic status + issue]", "desc": "[Root cause with numbers]", "action": "[Action label]" },
+  { "severity": "success", "title": "[Diagnostic status + opportunity]", "desc": "[Numbers + projection]", "action": "[Scale label]" }
+]
+```
+
+Note: `insights` is NOT in CANVAS_BLOCK_NAMES, so it stays in chat (interactive action buttons).
+
+**5. `quickreplies`** — always 4 buttons, mapped to diagnostic status:
+
+| Dominant Status | Button 1 | Button 2 | Button 3 | Button 4 |
+|---|---|---|---|---|
+| 🚨 Budget Leaking | "🛑 Pause [vampire campaign]" | "Show all 0-result campaigns" | "Check pixel/tracking" | "Back to overview" |
+| ⚠️ Creative Decay | "🎨 Refresh creative for [campaign]" | "Show frequency breakdown" | "Scale best performers" | "Compare last 30 days" |
+| ⚔️ Auction Pressure | "💰 Adjust bid strategy" | "Check scheduling windows" | "Show CPM trend" | "Compare placements" |
+| ⚖️ Steady | "Show all [N] [Goal] campaigns" | "Compare last 30 days" | "Check audience overlap" | "Scale best performers" |
+| 🚀 Growth Breakout | "🚀 Scale [campaign] +50%" | "Scale all winners +20%" | "Set auto-pause if freq > 2.5" | "Show audience size" |
+
 ---
 
-**6. `quickreplies`** — always 4 buttons, specific to the findings:
-- Button 1: drill into worst-performing goal — "Show all [N] [Goal] campaigns ranked"
-- Button 2: most urgent action with specific campaign name — "Pause [campaign name]"
-- Button 3: scale opportunity — "Scale [top campaign name]"
-- Button 4: next analysis — "Compare last 30 days" or "Check creative fatigue"
+#### STREAM 2 — Canvas Formal Audit Report (right panel)
+
+After the chat sections, emit data blocks and tables. These get auto-stripped from chat by `splitChatAndCanvas()` and rendered in the canvas panel.
+
+**IMPORTANT: Only use block types in CANVAS_BLOCK_NAMES (`metrics`, `budget`, `comparison`, `trend`, `funnel`, `adpreview`) and markdown tables in this section.** Other blocks (`insights`, `steps`, `quickreplies`) and plain text will NOT be stripped and would bleed into chat. Keep text between blocks to an absolute minimum — one short label line before each block is acceptable.
+
+**KPI summary:**
+```metrics
+[
+  { "label": "Total Spend", "value": "$[amount]", "trend": "[+/-]% vs last week" },
+  { "label": "[Primary Goal] Results", "value": "[count] [unit]", "trend": "[+/-]%" },
+  { "label": "[Primary Goal] Cost/Result", "value": "$[amount]", "trend": "[+/-]%" },
+  { "label": "Active Campaigns", "value": "[N]" }
+]
+```
+
+```budget
+{
+  "title": "7-Day Spend by Goal — [Account Name]",
+  "total_budget": "$[total]",
+  "items": [
+    { "name": "📱 WhatsApp", "spend": [amount], "percentage": [%] },
+    { "name": "🎬 Awareness", "spend": [amount], "percentage": [%] }
+  ]
+}
+```
+
+```comparison
+{
+  "title": "[since]–[until] vs [prev_since]–[prev_until]",
+  "a_label": "This Week",
+  "b_label": "Last Week",
+  "metrics": [
+    { "label": "[Goal primary metric]", "a": [current], "b": [prev] }
+  ]
+}
+```
+
+| Goal | Campaigns | Spend | Results | Cost/Result | Status | vs Last Week |
+|---|---|---|---|---|---|---|
+| 📱 WhatsApp | 5 | $5,064 | 28 conv | $181/conv | ⚔️ 競爭加劇 | +22% |
+| 🎬 Awareness | 6 | $6,620 | 12,361 thruplay | $0.54/play | ⚖️ 穩定運行 | +5% |
+
+Goal labels: CONVERSATIONS → 📱 WhatsApp, THRUPLAY → 🎬 Awareness, OFFSITE_CONVERSIONS view_content → 🖱️ View Content, PROFILE_VISIT → 👤 IG Traffic, LEAD_GENERATION → 📋 Leads, OFFSITE_CONVERSIONS purchase → 🛒 Sales. Goal-group status = most severe diagnostic among its campaigns.
+
+| Campaign | Goal | Spend | Results | Cost/Result | CPM | CTR | Freq | Status |
+|---|---|---|---|---|---|---|---|---|
+| IG 雙效燃脂 | WhatsApp | $699 | 0 | — | $497 | 1.8% | 2.8 | 🚨 預算流失 |
+| IG 瘦咗肥唔返 | WhatsApp | $1,571 | 8 conv | $196 | $583 | 2.1% | 2.3 | ⚠️ 創意衰退 |
+| FB 瘦咗肥唔返 | WhatsApp | $1,678 | 10 conv | $168 | $644 | 2.4% | 1.5 | 🚀 爆發增長 |
+
+Rules:
+- Each row uses the campaign's INDIVIDUAL diagnostic status from Step 2
+- Strip naming prefixes — show only meaningful part ≤ 35 chars
+- Never add a ROAS column unless goal = VALUE / OFFSITE_CONVERSIONS purchase
+- Sort by status severity: 🚨 first → ⚠️ → ⚔️ → ⚖️ → 🚀 last
 
 ---
 
-**DRILL-DOWN: When user asks "Show all [N] [Goal] campaigns"**
+#### DRILL-DOWN: When user asks "Show all [N] [Goal] campaigns"
 
-Show a ranked table for that goal only, sorted worst → best by cost/result. Use the goal's correct primary metric. Color-code status column:
+**Chat:** Brief diagnostic commentary on this goal group + `steps` with top 1-2 actions + `quickreplies`.
 
-| Campaign | Spend | Results | Cost/Result | CPM | Status |
-|---|---|---|---|---|---|
-| 🔴 IG 雙效燃脂 Carousel | $699 | 3 conv | $233/conv | $497 | Pause candidate |
-| 🟡 IG 瘦咗肥唔返 Reels | $1,571 | 8 conv | $196/conv | $583 | Monitor |
-| 🟡 IG 鬆褲頭 Carousel | $697 | 4 conv | $174/conv | $514 | Monitor |
-| 🟢 FB 瘦咗肥唔返 Reels | $1,678 | 10 conv | $168/conv | $644 | Top performer |
-| 🟢 FB 雙效燃脂 Photo | $419 | 3 conv | $140/conv | $419 | Top performer |
+**Canvas:** Ranked table for that goal only, sorted worst → best by cost/result, with diagnostic status:
+
+| Campaign | Spend | Results | Cost/Result | CPM | CTR | Freq | Status |
+|---|---|---|---|---|---|---|---|
+| IG 雙效燃脂 Carousel | $699 | 3 conv | $233/conv | $497 | 1.8% | 2.8 | ⚠️ 創意衰退 |
+| IG 瘦咗肥唔返 Reels | $1,571 | 8 conv | $196/conv | $583 | 2.1% | 2.3 | ⚔️ 競爭加劇 |
+| FB 瘦咗肥唔返 Reels | $1,678 | 10 conv | $168/conv | $644 | 2.4% | 1.5 | ⚖️ 穩定運行 |
+| FB 雙效燃脂 Photo | $419 | 3 conv | $140/conv | $419 | 2.6% | 1.8 | 🚀 爆發增長 |
 
 Rules:
 - Sort by cost/result descending (most expensive = worst = top row)
-- Status thresholds per cost/result: top 33% = 🟢, middle 33% = 🟡, bottom 33% = 🔴
-- Strip naming prefixes — show only the meaningful part (creative/audience/format) ≤ 35 chars
-- Follow with quickreplies: ["Pause 🔴 [campaign name]", "Scale 🟢 [campaign name]", "Show creative breakdown", "Back to overview"]
+- Use campaign's INDIVIDUAL diagnostic status — never generic labels like "Pause candidate" or "Monitor"
+- Follow with `quickreplies`: ["🛑 Pause [worst campaign]", "🚀 Scale [best campaign]", "🎨 Show creative breakdown", "Back to overview"]
 
 ---
 
@@ -689,66 +790,62 @@ Per active campaign:
 
 ## Strategic Handoff Summary
 
-Apply thresholds based on the campaign's `optimization_goal`, not universally.
+**All evaluations use the multi-signal diagnostic decision tree from Step 2.** The diagnostic status determines the recommended skill:
 
-### Messaging / WhatsApp / Messenger Campaigns (optimization_goal = CONVERSATIONS)
+| Diagnostic Status | Root Cause | Action | Recommended Skill |
+|---|---|---|---|
+| 🚨 預算流失警告 | Funnel broken — spend with 0 results | Pause immediately, diagnose tracking | `tracking-conversions` → `campaign-manager` |
+| ⚠️ 創意吸引力衰退 | Ad fatigue — CTR↓ + freq > 2.5 | Refresh creative, rotate ad sets | `creative-manager` |
+| ⚔️ 流量競爭加劇 | Market costs rising — CPM↑ + CTR stable | Adjust bid/schedule/placement | `campaign-manager` |
+| ⚖️ 表現穩定運行 | On-target, harvesting phase | Maintain, monitor weekly | — |
+| 🚀 爆發增長模式 | Exceptional efficiency + strong engagement | Scale aggressively, test new audiences | `campaign-manager` + `targeting-audiences` |
 
-| Finding | Severity | Recommended Skill |
-|---------|----------|-------------------|
-| Cost per conversation rising > 20% WoW | Warning | `campaign-manager` -- review bid strategy |
-| Cost per conversation > 3x account average | Critical | `targeting-audiences` -- audience too broad or wrong segment |
+### Goal-specific signals (supplement diagnostic status)
+
+#### Messaging / WhatsApp (CONVERSATIONS)
+| Finding | Severity | Skill |
+|---|---|---|
+| ⚠️ Creative Decay + worsening WoW | Critical — actively deteriorating | `targeting-audiences` -- audience too broad |
 | Conversations < 5 in 7 days | Warning | `creative-manager` -- test new message creative |
 | Frequency > 3 | Warning | `creative-manager` -- rotate creatives |
-| High cost, low conversation rate | Critical | `creative-manager` -- CTA or message copy issue |
 
-### Lead Generation Campaigns (optimization_goal = LEAD_GENERATION)
-
-| Finding | Severity | Recommended Skill |
-|---------|----------|-------------------|
-| CPL rising > 20% WoW | Warning | `campaign-manager` -- budget or bid adjustment |
-| CPL > 3x account historical average | Critical | `targeting-audiences` -- audience review |
-| Lead volume dropping, spend stable | Warning | `tracking-conversions` -- verify lead form or pixel |
+#### Lead Generation (LEAD_GENERATION)
+| Finding | Severity | Skill |
+|---|---|---|
+| ⚠️/⚔️ status + lead volume dropping | Critical | `tracking-conversions` -- verify lead form or pixel |
 | Frequency > 3 | Warning | `creative-manager` -- rotate creatives |
 | CTR declining WoW | Warning | `creative-manager` -- creative refresh |
 
-### Sales / Purchase Campaigns (optimization_goal = OFFSITE_CONVERSIONS or VALUE)
-
-| Finding | Severity | Recommended Skill |
-|---------|----------|-------------------|
-| ROAS < 1x | Critical | `campaign-manager` -- pause or restructure |
+#### Sales / Purchase (OFFSITE_CONVERSIONS or VALUE)
+| Finding | Severity | Skill |
+|---|---|---|
+| ROAS < 1x (absolute — regardless of baseline) | Critical | `campaign-manager` -- pause or restructure |
 | ROAS < 1.5x | Warning | `campaign-manager` -- budget reallocation |
-| CPA (purchase) rising > 20% WoW | Warning | `targeting-audiences` -- audience overlap or fatigue |
+| 🚀 Growth Breakout + high ROAS + low budget | Opportunity | `campaign-manager` -- scale budget aggressively |
 | Conversions dropping, spend stable | Warning | `tracking-conversions` -- verify pixel + attribution |
-| High ROAS, low budget | Opportunity | `campaign-manager` -- scale budget |
-| ROAS < 1x with audience issues | Critical | `targeting-audiences` -- review overlap before pausing |
 
-### Traffic Campaigns (optimization_goal = LINK_CLICKS or LANDING_PAGE_VIEWS)
-
-| Finding | Severity | Recommended Skill |
-|---------|----------|-------------------|
-| CPC rising > 20% WoW | Warning | `creative-manager` -- ad relevance declining |
-| CTR < 0.5% | Warning | `creative-manager` -- creative not compelling |
+#### Traffic (LINK_CLICKS / LANDING_PAGE_VIEWS)
+| Finding | Severity | Skill |
+|---|---|---|
+| CTR < 0.5% (absolute) | Warning | `creative-manager` -- creative not compelling |
 | Landing page view rate < 60% of clicks | Warning | `tracking-conversions` -- check pixel + page speed |
 | Frequency > 4 | Critical | `creative-manager` -- urgent new creative |
 
-### Awareness / Reach Campaigns (optimization_goal = REACH or THRUPLAY)
-
-| Finding | Severity | Recommended Skill |
-|---------|----------|-------------------|
-| CPM rising > 30% WoW | Warning | `targeting-audiences` -- audience too narrow |
-| Frequency > 5 | Critical | `creative-manager` -- audience saturated, new creative needed |
+#### Awareness / Reach (REACH / THRUPLAY)
+| Finding | Severity | Skill |
+|---|---|---|
+| Frequency > 5 | Critical | `creative-manager` -- audience saturated |
 | Video completion rate < 20% | Warning | `creative-manager` -- hook is not working |
 | ThruPlay rate < 15% | Warning | `creative-manager` -- video too long or weak opening |
 
-### Universal (apply to all campaign types)
-
-| Finding | Severity | Recommended Skill |
-|---------|----------|-------------------|
-| CTR declining week-over-week | Warning | `creative-manager` -- creative refresh |
+### Universal (all campaign types)
+| Finding | Severity | Skill |
+|---|---|---|
+| CTR declining WoW | Warning | `creative-manager` -- creative refresh |
 | Audience overlap > 30% | Warning | `targeting-audiences` -- consolidate |
 | Pixel firing errors | Critical | `tracking-conversions` -- fix pixel setup |
 | Budget unevenly distributed | Warning | `campaign-manager` -- rebalance |
-| Placement CPA variance > 50% | Warning | `adset-manager` -- placement optimisation |
+| Frequency > 3 + declining reach | Warning | `creative-manager` -- audience exhaustion |
 | No automation rules | Info | `automation-rules` -- set up guardrails |
 
 ---
@@ -866,13 +963,13 @@ Every analysis MUST include an `insights` block in this exact structure:
 | Status | Meaning | Icon shown in UI |
 |---|---|---|
 | `ok` | Within normal range or < 10% change in bad direction | 🟢 |
-| `warning` | 10–25% deterioration (cost rising / volume falling) | 🟡 |
-| `critical` | > 25% deterioration or absolute threshold breach | 🚨 |
-| `positive` | > 10% improvement (cost falling / volume rising) | ✅ |
+| `warning` | 20-50% above 30d baseline, or 10-25% WoW deterioration | 🟡 |
+| `critical` | >50% above 30d baseline, or >25% WoW deterioration | 🚨 |
+| `positive` | 20-50% below baseline (outperforming) | ✅ |
 
 **When no previous period data is available** (e.g. first-ever report, campaign < 7 days old):
 - Omit `prev` and `trend` fields.
-- Set `status` based on absolute thresholds from the Strategic Handoff Summary section.
+- Set `status` from baseline-relative evaluation only (`_benchmarks` from 30d call).
 
 ### Special Block Types
 

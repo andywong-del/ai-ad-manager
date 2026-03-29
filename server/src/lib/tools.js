@@ -8,6 +8,80 @@ import { activeSessions } from './sessionBus.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SKILLS_DIR = path.resolve(__dirname, '../../skills/default');
 
+// ── Goal → Action Type mapping (source of truth for benchmark computation) ──
+const GOAL_ACTION_MAP = {
+  CONVERSATIONS: { action_type: 'onsite_conversion.messaging_conversation_started_7d', metric_field: 'actions' },
+  LEAD_GENERATION: { action_type: ['lead', 'onsite_conversion.lead_grouped'], metric_field: 'actions' },
+  OFFSITE_CONVERSIONS: {
+    action_type: ['offsite_conversion.fb_pixel_purchase', 'offsite_conversion.fb_pixel_lead',
+                  'offsite_conversion.fb_pixel_view_content', 'landing_page_view'],
+    metric_field: 'actions', resolve: 'first_found',
+  },
+  LINK_CLICKS: { action_type: 'link_click', metric_field: 'actions' },
+  LANDING_PAGE_VIEWS: { action_type: 'landing_page_view', metric_field: 'actions' },
+  THRUPLAY: { action_type: 'video_view', metric_field: 'video_thruplay_watched_actions' },
+  REACH: { action_type: null, metric_field: 'impressions' },
+  POST_ENGAGEMENT: { action_type: 'post_engagement', metric_field: 'actions' },
+  PROFILE_VISIT: { action_type: 'link_click', metric_field: 'actions' },
+  VALUE: { action_type: 'purchase', metric_field: 'actions' },
+};
+
+// Extract result count from a campaign row based on its optimization_goal
+function extractResults(row, goal) {
+  const mapping = GOAL_ACTION_MAP[goal];
+  if (!mapping) return { results: 0, action_type_used: null };
+  const spend = parseFloat(row.spend) || 0;
+
+  // REACH: result = impressions
+  if (goal === 'REACH') {
+    return { results: parseInt(row.impressions) || 0, action_type_used: 'impressions', spend };
+  }
+  // THRUPLAY: results from video_thruplay_watched_actions field
+  if (mapping.metric_field === 'video_thruplay_watched_actions') {
+    const thruplays = row.video_thruplay_watched_actions;
+    const val = Array.isArray(thruplays) && thruplays.length > 0 ? parseInt(thruplays[0].value) || 0 : 0;
+    return { results: val, action_type_used: 'video_thruplay', spend };
+  }
+  // Standard: look in actions array
+  const actions = row.actions || [];
+  const types = mapping.resolve === 'first_found' ? mapping.action_type
+    : Array.isArray(mapping.action_type) ? mapping.action_type : [mapping.action_type];
+  for (const at of types) {
+    const found = actions.find(a => a.action_type === at);
+    if (found) return { results: parseInt(found.value) || 0, action_type_used: at, spend };
+  }
+  return { results: 0, action_type_used: types[0], spend };
+}
+
+// Compute per-goal aggregated benchmarks from enriched campaign insights
+function computeBenchmarks(insights) {
+  const buckets = {};
+  for (const row of insights) {
+    const goal = row.optimization_goal;
+    if (!goal) continue;
+    const spend = parseFloat(row.spend) || 0;
+    if (spend === 0) continue;
+    const { results, action_type_used } = extractResults(row, goal);
+    if (!buckets[goal]) {
+      buckets[goal] = { total_spend: 0, total_results: 0, campaign_count: 0, primary_action_type: action_type_used };
+    }
+    buckets[goal].total_spend += spend;
+    buckets[goal].total_results += results;
+    buckets[goal].campaign_count += 1;
+  }
+  const benchmarks = {};
+  for (const [goal, b] of Object.entries(buckets)) {
+    benchmarks[goal] = {
+      avg_cost_per_result: b.total_results > 0 ? +(b.total_spend / b.total_results).toFixed(2) : null,
+      total_spend: +b.total_spend.toFixed(2),
+      total_results: b.total_results,
+      campaign_count: b.campaign_count,
+      primary_action_type: b.primary_action_type,
+    };
+  }
+  return benchmarks;
+}
+
 // ── Helper: extract token + adAccountId ─────────────────────────────────────
 // Uses the user's real token (long-lived, from FB login → token exchange).
 // ADK stores state as { value: {...}, delta: {...} } — read from .value
@@ -306,7 +380,7 @@ function getAccountInsights({ date_preset = 'last_7d', since, until }, c) {
   const timeRange = (since && until) ? { since, until } : null;
   return meta.getInsights(token, adAccountId, date_preset, timeRange);
 }
-async function getObjectInsights({ object_id, date_preset = 'last_7d', since, until, breakdowns, fields, level }, c) {
+async function getObjectInsights({ object_id, date_preset = 'last_7d', since, until, breakdowns, fields, level, include_benchmarks }, c) {
   const { token, adAccountId } = ctx(c);
 
   // If level is set (e.g. "campaign"), auto-use account ID and convert date_preset → since/until.
@@ -371,6 +445,13 @@ async function getObjectInsights({ object_id, date_preset = 'last_7d', since, un
       console.warn(`[getObjectInsights] Failed to enrich optimization_goal: ${err.message}`);
       // Non-fatal — return insights without enrichment
     }
+  }
+
+  // When include_benchmarks=true + level=campaign, compute per-goal aggregated baselines
+  if (include_benchmarks && level === 'campaign' && Array.isArray(insights)) {
+    const _benchmarks = computeBenchmarks(insights);
+    console.log(`[getObjectInsights] Computed benchmarks for ${Object.keys(_benchmarks).length} goal groups`);
+    return { data: insights, _benchmarks };
   }
 
   return insights;
@@ -895,8 +976,8 @@ const adTools = [
   // ── Insights ────────────────────────────────────────────────────────────
   T('get_account_insights', 'Get account-level performance for a date range. For exact Ads Manager matching, use since+until params (includes today).', getAccountInsights,
     obj({ date_preset: str('today, yesterday, last_3d, last_7d, last_14d, last_28d, last_30d, last_90d, this_month, last_month'), since: str('Start date YYYY-MM-DD for explicit range (overrides date_preset)'), until: str('End date YYYY-MM-DD for explicit range (use today to include partial data)') })),
-  T('get_object_insights', 'Get detailed insights for any campaign/ad set/ad/account. Pass act_xxx as object_id with level=campaign|adset|ad to get all objects at that level in one call (matches Meta Ads Manager totals). Use since+until for exact date matching.', getObjectInsights,
-    obj({ object_id: str('Campaign ID, ad set ID, ad ID, or act_xxx account ID'), date_preset: str('Date range preset'), since: str('Start date YYYY-MM-DD (overrides date_preset)'), until: str('End date YYYY-MM-DD'), level: str('campaign, adset, or ad — use with act_xxx object_id to get all objects at that level in one API call'), breakdowns: str('age, gender, country, placement, device_platform'), fields: str('Custom fields (default: spend,impressions,clicks,ctr,cpm,cpc,actions,action_values,frequency,reach,cost_per_action_type)') }, ['object_id'])),
+  T('get_object_insights', 'Get detailed insights for any campaign/ad set/ad/account. Pass act_xxx as object_id with level=campaign|adset|ad to get all objects at that level in one call. Use since+until for exact date matching. Pass include_benchmarks=true with level=campaign to get per-goal baselines (_benchmarks) for performance evaluation.', getObjectInsights,
+    obj({ object_id: str('Campaign ID, ad set ID, ad ID, or act_xxx account ID'), date_preset: str('Date range preset'), since: str('Start date YYYY-MM-DD (overrides date_preset)'), until: str('End date YYYY-MM-DD'), level: str('campaign, adset, or ad — use with act_xxx object_id to get all objects at that level in one API call'), breakdowns: str('age, gender, country, placement, device_platform'), fields: str('Custom fields (default: spend,impressions,clicks,ctr,cpm,cpc,actions,action_values,frequency,reach,cost_per_action_type)'), include_benchmarks: { type: 'boolean', description: 'When true with level=campaign, returns { data: [...], _benchmarks: { [goal]: { avg_cost_per_result, total_spend, total_results, campaign_count } } }' } }, ['object_id'])),
 
   // ── Account Info ────────────────────────────────────────────────────────
   T('get_ad_account_details', 'Get account details: balance, spend cap, timezone, currency.', getAdAccountDetails),
