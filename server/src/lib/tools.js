@@ -461,6 +461,153 @@ async function getObjectInsights({ object_id, date_preset = 'last_7d', since, un
   return insights;
 }
 
+// ─── Analyze Performance (single API call → 3 periods) ─────────────────────
+async function analyzePerformance(_, c) {
+  const { token, adAccountId } = ctx(c);
+  if (!token) return { error: 'Not logged in.' };
+  if (!adAccountId) return { error: 'No ad account selected.' };
+
+  const t0 = Date.now();
+  const now = new Date();
+  const fmt = (d) => d.toISOString().split('T')[0];
+  const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+  const since30 = new Date(now); since30.setDate(now.getDate() - 30);
+
+  const FIELDS = 'campaign_id,campaign_name,spend,impressions,clicks,ctr,cpm,reach,frequency,actions,cost_per_action_type,video_thruplay_watched_actions,action_values,purchase_roas';
+
+  // Single API call: 30-day daily breakdown at campaign level
+  const [dailyRows, adSets] = await Promise.all([
+    meta.getObjectInsights(token, adAccountId, {
+      level: 'campaign',
+      fields: FIELDS,
+      time_range: JSON.stringify({ since: fmt(since30), until: fmt(yesterday) }),
+      time_increment: 1,
+    }),
+    meta.getAdSets(token, adAccountId),
+  ]);
+
+  console.log(`[analyzePerformance] API calls took ${Date.now() - t0}ms (${dailyRows?.length || 0} daily rows, ${adSets?.length || 0} ad sets)`);
+
+  // Build goal map from ad sets
+  const goalMap = {};
+  for (const adSet of adSets) {
+    if (adSet.campaign_id && adSet.optimization_goal && !goalMap[adSet.campaign_id]) {
+      goalMap[adSet.campaign_id] = adSet.optimization_goal;
+    }
+  }
+
+  // Split daily rows into 3 periods and aggregate per campaign
+  const since7 = new Date(now); since7.setDate(now.getDate() - 7);
+  const since14 = new Date(now); since14.setDate(now.getDate() - 14);
+  const since8 = new Date(now); since8.setDate(now.getDate() - 8);
+
+  const current7dStart = fmt(since7);
+  const prev7dStart = fmt(since14);
+  const prev7dEnd = fmt(since8);
+
+  // Accumulator: { [campaign_id]: { current: {...}, previous: {...}, baseline: {...} } }
+  const campaigns = {};
+
+  const mergeActions = (existing, incoming) => {
+    if (!incoming) return existing || [];
+    if (!existing) return [...incoming];
+    const map = {};
+    for (const a of existing) map[a.action_type] = parseInt(a.value) || 0;
+    for (const a of incoming) map[a.action_type] = (map[a.action_type] || 0) + (parseInt(a.value) || 0);
+    return Object.entries(map).map(([action_type, value]) => ({ action_type, value: String(value) }));
+  };
+
+  const mergeRow = (acc, row) => {
+    if (!acc) {
+      return {
+        campaign_id: row.campaign_id,
+        campaign_name: row.campaign_name,
+        spend: parseFloat(row.spend) || 0,
+        impressions: parseInt(row.impressions) || 0,
+        clicks: parseInt(row.clicks) || 0,
+        reach: parseInt(row.reach) || 0,
+        actions: row.actions ? [...row.actions] : [],
+        cost_per_action_type: row.cost_per_action_type ? [...row.cost_per_action_type] : [],
+        video_thruplay_watched_actions: row.video_thruplay_watched_actions ? [...row.video_thruplay_watched_actions] : [],
+        action_values: row.action_values ? [...row.action_values] : [],
+      };
+    }
+    acc.spend += parseFloat(row.spend) || 0;
+    acc.impressions += parseInt(row.impressions) || 0;
+    acc.clicks += parseInt(row.clicks) || 0;
+    acc.reach += parseInt(row.reach) || 0;
+    acc.actions = mergeActions(acc.actions, row.actions);
+    acc.video_thruplay_watched_actions = mergeActions(acc.video_thruplay_watched_actions, row.video_thruplay_watched_actions);
+    acc.action_values = mergeActions(acc.action_values, row.action_values);
+    return acc;
+  };
+
+  for (const row of (dailyRows || [])) {
+    const cid = row.campaign_id;
+    if (!cid) continue;
+    const dateStart = row.date_start; // YYYY-MM-DD
+    if (!dateStart) continue;
+
+    if (!campaigns[cid]) campaigns[cid] = { current: null, previous: null, baseline: null };
+
+    // Baseline: all 30 days
+    campaigns[cid].baseline = mergeRow(campaigns[cid].baseline, row);
+
+    // Current 7d: dateStart >= since7 (i.e., >= today-7)
+    if (dateStart >= current7dStart) {
+      campaigns[cid].current = mergeRow(campaigns[cid].current, row);
+    }
+    // Previous 7d: prev7dStart <= dateStart <= prev7dEnd
+    if (dateStart >= prev7dStart && dateStart <= prev7dEnd) {
+      campaigns[cid].previous = mergeRow(campaigns[cid].previous, row);
+    }
+  }
+
+  // Compute derived fields and enrich with optimization_goal
+  const computeDerived = (agg) => {
+    if (!agg) return null;
+    agg.spend = +agg.spend.toFixed(2);
+    agg.ctr = agg.impressions > 0 ? +((agg.clicks / agg.impressions) * 100).toFixed(2) : 0;
+    agg.cpm = agg.impressions > 0 ? +((agg.spend / agg.impressions) * 1000).toFixed(2) : 0;
+    agg.frequency = agg.reach > 0 ? +(agg.impressions / agg.reach).toFixed(2) : 0;
+    return agg;
+  };
+
+  const current7d = [];
+  const previous7d = [];
+  const baseline30d = [];
+
+  for (const [cid, periods] of Object.entries(campaigns)) {
+    const goal = goalMap[cid] || null;
+    if (periods.current) {
+      const row = computeDerived(periods.current);
+      row.optimization_goal = goal;
+      current7d.push(row);
+    }
+    if (periods.previous) {
+      const row = computeDerived(periods.previous);
+      row.optimization_goal = goal;
+      previous7d.push(row);
+    }
+    if (periods.baseline) {
+      const row = computeDerived(periods.baseline);
+      row.optimization_goal = goal;
+      baseline30d.push(row);
+    }
+  }
+
+  const _benchmarks = computeBenchmarks(baseline30d);
+
+  console.log(`[analyzePerformance] Total time: ${Date.now() - t0}ms — ${current7d.length} campaigns, ${Object.keys(_benchmarks).length} goal groups`);
+
+  return {
+    current_7d: current7d,
+    previous_7d: previous7d,
+    baseline_30d: baseline30d,
+    _benchmarks,
+  };
+}
+
 // ─── Account Info ───────────────────────────────────────────────────────────
 function getAdAccountDetails(_, c) {
   const { token, adAccountId } = ctx(c);
@@ -982,6 +1129,7 @@ const adTools = [
     obj({ date_preset: str('today, yesterday, last_3d, last_7d, last_14d, last_28d, last_30d, last_90d, this_month, last_month'), since: str('Start date YYYY-MM-DD for explicit range (overrides date_preset)'), until: str('End date YYYY-MM-DD for explicit range (use today to include partial data)') })),
   T('get_object_insights', 'Get detailed insights for any campaign/ad set/ad/account. Pass act_xxx as object_id with level=campaign|adset|ad to get all objects at that level in one call. Use since+until for exact date matching. Pass include_benchmarks=true with level=campaign to get per-goal baselines (_benchmarks) for performance evaluation.', getObjectInsights,
     obj({ object_id: str('Campaign ID, ad set ID, ad ID, or act_xxx account ID'), date_preset: str('Date range preset'), since: str('Start date YYYY-MM-DD (overrides date_preset)'), until: str('End date YYYY-MM-DD'), level: str('campaign, adset, or ad — use with act_xxx object_id to get all objects at that level in one API call'), breakdowns: str('age, gender, country, placement, device_platform'), fields: str('Custom fields (default: spend,impressions,clicks,ctr,cpm,cpc,actions,action_values,frequency,reach,cost_per_action_type)'), include_benchmarks: { type: 'boolean', description: 'When true with level=campaign, returns { data: [...], _benchmarks: { [goal]: { avg_cost_per_result, total_spend, total_results, campaign_count } } }' } }, ['object_id'])),
+  T('analyze_performance', 'All-in-one ANALYZE tool. Makes a single Meta API call (30-day daily breakdown) and returns 3 pre-split periods: current_7d, previous_7d, baseline_30d, plus _benchmarks. Each campaign row includes optimization_goal pre-joined. Use this for ANALYZE intent instead of calling get_object_insights 3 times.', analyzePerformance),
 
   // ── Account Info ────────────────────────────────────────────────────────
   T('get_ad_account_details', 'Get account details: balance, spend cap, timezone, currency.', getAdAccountDetails),

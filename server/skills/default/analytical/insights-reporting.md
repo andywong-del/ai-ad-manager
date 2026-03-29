@@ -273,50 +273,22 @@ Map each row's `optimization_goal` to its primary metric using table 0c below.
 
 ---
 
-### Step 1 -- Gather data (after goal is known)
+### Step 1 -- Gather data (already loaded by ANALYZE intent)
 
-**Date computation:** TODAY = current date in YYYY-MM-DD.
-- Current period: `since = TODAY minus 7 days`, `until = TODAY minus 1 day`
-- Previous period: `since = TODAY minus 14 days`, `until = TODAY minus 8 days`
-- Baseline period: `since = TODAY minus 30 days`, `until = TODAY minus 1 day`
-
-**ALWAYS use account-level + level=campaign — NEVER call get_object_insights per campaign ID.**
-
-**CRITICAL: NEVER use `date_preset` with level=campaign — it returns empty data from Meta API. ALWAYS compute explicit `since` and `until` dates from TODAY.**
-
-Call **exactly 3 calls in parallel**:
+**The ANALYZE intent has already called `analyze_performance()` before this skill loads.** The tool makes a single Meta API call (30-day daily breakdown) and returns all 3 periods pre-split:
 
 ```
-// Current 7-day period
-get_object_insights(
-  object_id: "[act_xxx account ID from workflow context]",
-  level: "campaign",
-  since: "[TODAY minus 7 days as YYYY-MM-DD]",
-  until: "[TODAY minus 1 day as YYYY-MM-DD]",
-  fields: "campaign_id,campaign_name,spend,impressions,clicks,ctr,cpm,reach,frequency,actions,cost_per_action_type,video_thruplay_watched_actions,action_values,purchase_roas"
-)
-
-// Previous 7-day period (for WoW comparison)
-get_object_insights(
-  object_id: "[act_xxx account ID]",
-  level: "campaign",
-  since: "[TODAY minus 14 days as YYYY-MM-DD]",
-  until: "[TODAY minus 8 days as YYYY-MM-DD]",
-  fields: same
-)
-
-// 30-day baseline (for self-benchmarking)
-get_object_insights(
-  object_id: "[act_xxx account ID]",
-  level: "campaign",
-  since: "[TODAY minus 30 days as YYYY-MM-DD]",
-  until: "[TODAY minus 1 day as YYYY-MM-DD]",
-  fields: same,
-  include_benchmarks: true
-)
+{
+  current_7d: [...],    // Last 7 days, aggregated per campaign
+  previous_7d: [...],   // Days 8-14 ago, aggregated per campaign (for WoW comparison)
+  baseline_30d: [...],  // Full 30 days, aggregated per campaign
+  _benchmarks: {...}    // Per-goal aggregated baselines
+}
 ```
 
-The 30-day call returns `{ data: [...], _benchmarks: {...} }`. The `_benchmarks` object contains per-goal aggregated baselines computed server-side:
+Each campaign row includes: campaign_id, campaign_name, spend, impressions, clicks, ctr, cpm, reach, frequency, actions, video_thruplay_watched_actions, action_values, optimization_goal (pre-joined from ad sets).
+
+The `_benchmarks` object contains per-goal aggregated baselines computed server-side:
 - `avg_cost_per_result`: 30-day average cost/result for all campaigns with that goal
 - `total_spend`, `total_results`, `campaign_count`: aggregates for context
 - `primary_action_type`: the action type used for counting results

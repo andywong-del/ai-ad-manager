@@ -129,6 +129,7 @@ function toolCallLabel(name, args) {
     update_campaign:         () => 'Updating campaign',
     update_ad_set:           () => 'Updating ad set',
     update_ad:               () => 'Updating ad',
+    analyze_performance:     () => 'Analyzing campaign performance',
     load_skill:              () => `Loading skill "${args.skill_name || ''}"`,
     get_workflow_context:    () => 'Reading workflow state',
     update_workflow_context: () => 'Saving progress',
@@ -261,12 +262,13 @@ router.post('/', async (req, res) => {
         }
 
         if (event.content?.parts) {
-          // Detect ANALYZE pattern: multiple get_object_insights calls in one event
+          // Detect ANALYZE pattern: analyze_performance or multiple get_object_insights calls
           // Send an immediate text so the chat bubble appears before tools finish
           if (!sentAnalyzeHeader) {
             const fnCalls = event.content.parts.filter(p => p.functionCall);
-            const insightCalls = fnCalls.filter(p => p.functionCall.name === 'get_object_insights');
-            if (insightCalls.length >= 2) {
+            const isAnalyze = fnCalls.some(p => p.functionCall.name === 'analyze_performance')
+              || fnCalls.filter(p => p.functionCall.name === 'get_object_insights').length >= 2;
+            if (isAnalyze) {
               const header = '📊 Pulling your campaign data...\n\n';
               fullText += header;
               sse(res, { type: 'text', content: header });
