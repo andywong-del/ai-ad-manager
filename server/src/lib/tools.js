@@ -312,10 +312,11 @@ function getObjectInsights({ object_id, date_preset = 'last_7d', since, until, b
   // If level is set (e.g. "campaign"), auto-use account ID and convert date_preset → since/until.
   // Meta API returns empty data for level=campaign with date_preset, so explicit dates are required.
   if (level) {
-    // Default to account ID when level is set and no object_id or object_id looks wrong
-    if (!object_id || (!object_id.startsWith('act_') && !object_id.match(/^\d+$/))) {
+    // Default to account ID when level is set. The AI often passes a fake placeholder like "act_1234567890".
+    // Always override with the real account ID from session context when level is set.
+    if (!object_id || object_id !== adAccountId) {
+      console.log(`[getObjectInsights] Overriding object_id=${object_id} → ${adAccountId} (level=${level})`);
       object_id = adAccountId;
-      console.log(`[getObjectInsights] Auto-set object_id to ${adAccountId} (level=${level})`);
     }
     // Auto-convert date_preset to explicit since/until
     if (!since || !until) {
