@@ -81,15 +81,43 @@ GET /api/insights/async/:reportRunId/results
 
 ## Analysis Workflow
 
-Follow this systematic flow for every report request. Detect goal first, gather data second, analyze third, present with structured blocks, then hand off to strategic skills.
+**Always follow this order:** Route intent → fetch data in parallel → analyze → present → hand off.
 
-### Step 0 -- Detect Goal & Select Primary Metric (ALWAYS do this first)
+### Step -1 -- Route Intent to Report Type (FIRST — before any tool call)
 
-Before fetching any data, determine what the campaign is actually optimising for. This drives every metric choice downstream.
+Map the user's message to the correct report type immediately. Do NOT ask — infer and proceed.
 
-**0a. Call `get_campaigns`** to read `objective` for each campaign.
+| User says | Run |
+|---|---|
+| "how are my ads doing", "show performance", "check my campaigns", "點樣", any general overview | Weekly Performance Report (§1) |
+| "what's wrong", "any problems", "issues", "not working", "點解差" | Problems & Quick Wins (§3) |
+| "this month", "monthly", "last month" | Monthly Performance Report (§2) |
+| "which creative", "best ad", "worst ad", "creative performance" | Creative Performance Analysis (§4) |
+| "budget", "spending", "pacing", "underspend" | Budget Pacing Check (§11) |
+| "compare", "vs", "last week vs this week" | Compare Campaigns / Periods (§12) |
+| "audience", "demographic", "who's seeing", "age", "gender", "placement" | Demographic & Placement Breakdown (§8) |
+| "health check", "audit", "account score" | Full Account Health Audit (§6) |
+| "trend", "over time", "last 30 days" | Trend Analysis (§7) |
+| "a/b test", "split test", "variant", "winner" | A/B Test Results (§10) |
+| "competitor", "market" | Competitor & Market Research (§9) |
 
-**0b. Call `get_ad_sets`** to read `optimization_goal` for each active ad set. This is the source of truth — `optimization_goal` overrides `objective` for metric selection.
+**Default if unclear → Weekly Performance Report (§1).**
+
+---
+
+### Step 0 -- Detect Goal & Select Primary Metric
+
+**0a. Run ALL THREE in parallel — never wait sequentially:**
+
+```
+get_campaigns()
+get_ad_sets()
+get_account_insights(date_preset: "last_7d")
+```
+
+`optimization_goal` from ad sets is the source of truth. `objective` from campaigns is secondary. Account insights fetch starts immediately — no waiting for campaign/adset data first.
+
+**0b.** Once ad sets return, map `optimization_goal` to the primary metric using table 0c below.
 
 **0c. Map to primary metric using this table:**
 
@@ -109,29 +137,43 @@ Before fetching any data, determine what the campaign is actually optimising for
 | `APP_INSTALLS` | CPI | `mobile_app_install` | Cost per Install |
 | `VALUE` | ROAS | `purchase` + `action_values` | ROAS |
 
-**0d. For mixed accounts** (multiple campaigns with different goals), group by optimization_goal and apply the correct metric to each group. Never average ROAS across a Sales campaign and a WhatsApp campaign.
+**0d. Mixed account handling** (multiple campaigns with different goals):
+- Never average ROAS across a Sales campaign and a WhatsApp campaign.
+- **Output layout for all-campaigns overview:**
+  1. One diagnostic sentence covering total account spend + overall status emoji
+  2. One `metrics` block: Total Spend, Total Reach, Account CTR
+  3. One section per active goal type (e.g. `### WhatsApp Campaigns`, `### Lead Campaigns`), each with its own primary metric, markdown table, and mini `insights` card
+  4. One combined `quickreplies` at the end
 
-**0e. ROAS rule:** Only compute ROAS when `optimization_goal` is `VALUE` or `OFFSITE_CONVERSIONS` with `custom_event_type = PURCHASE`. For all other goals, ROAS is meaningless — do not show it.
+**0e. ROAS rule:** Only compute ROAS when `optimization_goal` is `VALUE` or `OFFSITE_CONVERSIONS` with `custom_event_type = PURCHASE`. For all other goals, ROAS is meaningless — do not compute or show it anywhere.
 
-**0f. Clarify intent if ambiguous:** If the user's request doesn't make it clear what they want to optimise (e.g. "how are my ads doing?" on a mixed account), ask ONE clarifying question before pulling data:
-> "Your account has campaigns with different goals — sales, WhatsApp conversations, and traffic. Which would you like to focus on, or should I cover all of them?"
+**0f. NEVER gate data with a clarifying question before showing results.**
+- Generic queries ("how are my ads doing?", "show me performance", "點樣") → run all-campaigns overview grouped by goal type. No question first.
+- Goal-specific queries ("how are my WhatsApp campaigns?") → focus only on that goal type.
+- Clarifying questions are ONLY allowed AFTER presenting data, as follow-up `quickreplies` (e.g. "Want to drill into any specific campaign?").
+- If an account has NO active campaigns, say so once and offer: "Start a new campaign?" as a quickreply.
 
 ---
 
 ### Step 1 -- Gather data (after goal is known)
 
-- **get_account_insights** with appropriate date_preset
-- **get_object_insights** — call **TWICE** for each active campaign (in parallel):
-  - **Current period:** `time_range: { since: TODAY-7, until: TODAY-1 }` — fields relevant to detected goal:
-    - All goals: `spend,impressions,clicks,ctr,cpm,reach,frequency,actions,cost_per_action_type`
-    - Messaging/conversations: add `onsite_conversion.messaging_conversation_started_7d`
-    - Sales/ROAS: add `action_values,purchase_roas`
-    - Video/awareness: add `video_p25_watched_actions,video_p75_watched_actions,video_p100_watched_actions,video_avg_time_watched_actions,video_thruplay_watched_actions`
-  - **Previous period:** `time_range: { since: TODAY-14, until: TODAY-8 }` — same fields
-- **get_ad_sets** if optimization_goal is needed for any campaign (always needed on first analysis)
+**Date computation:** TODAY = current date in YYYY-MM-DD.
+- Current period: `since = TODAY minus 7 days`, `until = TODAY minus 1 day`
+- Previous period: `since = TODAY minus 14 days`, `until = TODAY minus 8 days`
 
-> **Trend requirement:** The dual-period fetch is mandatory for all 7-day and longer reports. Store both results and compute % delta in Step 2.
-> **Data freshness:** Meta has up to a 48-hour attribution window. Always note this when presenting recent data.
+Call **both periods in parallel** for each campaign:
+- **get_object_insights (current period)** — fields relevant to detected goal:
+  - All goals: `spend,impressions,clicks,ctr,cpm,reach,frequency,actions,cost_per_action_type`
+  - Messaging/conversations: add `onsite_conversion.messaging_conversation_started_7d`
+  - Sales/ROAS: add `action_values,purchase_roas`
+  - Video/awareness: add `video_p25_watched_actions,video_p75_watched_actions,video_p100_watched_actions,video_avg_time_watched_actions,video_thruplay_watched_actions`
+- **get_object_insights (previous period)** — same fields
+
+Active campaigns only: `status = ACTIVE` AND spend > $0 in the reporting period. Limit to top 15 by spend.
+
+> **Trend requirement:** Dual-period fetch is mandatory for all 7-day+ reports. Compute % delta in Step 2.
+> **No previous data:** If previous period returns $0 spend or no data, skip delta — omit `prev` and `trend` fields in the insights card and set `status` from absolute thresholds (Strategic Handoff Summary).
+> **Data freshness:** Meta has up to a 48-hour attribution window. Note this once per report at the bottom.
 
 ---
 
@@ -150,6 +192,7 @@ Before fetching any data, determine what the campaign is actually optimising for
 For each primary metric, compute:
 - `delta_pct = ((current - prev) / prev) * 100`
 - Round to 1 decimal. Prefix with `+` if positive.
+- **If prev = 0 or undefined:** skip delta, omit `prev`/`trend` fields, assign status from absolute thresholds only.
 
 Assign `status` based on metric direction (whether higher is better or worse):
 
@@ -167,6 +210,18 @@ Use `"positive"` status when cost metrics improve > 10% or volume/ratio metrics 
 ---
 
 ### Step 3 -- Present with goal-appropriate structured blocks
+
+**Output block sequence — always in this exact order:**
+1. Diagnostic statement (🟢/🟡/🚨 + 2–3 sentences) — **mandatory first**
+2. Bold headline (one sentence, primary metric)
+3. `metrics` block (hero KPIs)
+4. `trend` block — only if date range ≥ 7 days; skip for single-day or shorter ranges
+5. Markdown table (per-campaign/adset breakdown, grouped by goal for mixed accounts)
+6. `insights` card (primary metric first, then Spend, then up to 3 supporting metrics)
+7. `steps` block (3–5 prioritized actions, highest impact first)
+8. `quickreplies`
+
+---
 
 **DIAGNOSTIC-FIRST RULE (mandatory — output this before ANY block):**
 
@@ -244,9 +299,9 @@ Contextual follow-up actions.
 
 After every analysis, identify which strategic skill the user should load next based on findings. Present this as quickreplies.
 
-**When routing to `campaign-manager` due to warning or critical findings:**
+**When routing to ANY skill due to warning or critical findings:**
 
-Before transferring, save the alert context so `campaign-manager` can immediately enter Diagnostic Mode with full context:
+Always save the alert context BEFORE any handoff — not just campaign-manager:
 
 ```
 update_workflow_context({ data: {
@@ -263,7 +318,9 @@ update_workflow_context({ data: {
 }})
 ```
 
-Then transfer. `campaign-manager` will read this context and skip the creation flow, going directly to D1 → D2 → D3.
+Then transfer. The receiving skill reads this context to start immediately with the relevant data.
+
+**Priority when multiple findings are present:** critical findings first, then by user-facing consequence: cost > volume > efficiency. Only surface the top 1–2 issues — do not list everything.
 
 ---
 
@@ -272,8 +329,9 @@ Then transfer. `campaign-manager` will read this context and skip the creation f
 ### 1. Weekly Performance Report
 
 **Tool call sequence:**
-1. get_campaigns + get_ad_sets (Step 0: detect optimization_goal per campaign) -> get_account_insights (last_7d) -> get_object_insights for top campaigns (goal-appropriate fields) -> get_account_insights (last_14d for comparison)
-2. Output: metrics (PRIMARY metric per goal) -> trend (daily spend + PRIMARY metric) -> table (grouped by goal type) -> comparison card -> insights -> steps -> quickreplies
+- **Round 1 (parallel):** `get_campaigns` + `get_ad_sets` + `get_account_insights(last_7d)` + `get_account_insights(last_14d)`
+- **Round 2 (parallel):** `get_object_insights(current 7d)` + `get_object_insights(previous 7d)` for each active campaign
+- Output sequence: diagnostic → metrics → trend → table (grouped by goal) → insights → steps → quickreplies
 
 **Strategic Handoff:**
 - Apply thresholds from the Strategic Handoff Summary table matching each campaign's optimization_goal
@@ -287,8 +345,9 @@ Then transfer. `campaign-manager` will read this context and skip the creation f
 ### 2. Monthly Performance Report
 
 **Tool call sequence:**
-1. get_campaigns + get_ad_sets (detect optimization_goal) -> get_account_insights (this_month) -> get_account_insights (last_month) -> get_object_insights for top campaigns (this_month, goal-appropriate fields)
-2. Output: metrics (PRIMARY metric) -> trend (daily spend + PRIMARY metric for the month) -> comparison card (this vs last month) -> table -> insights -> steps -> quickreplies
+- **Round 1 (parallel):** `get_campaigns` + `get_ad_sets` + `get_account_insights(this_month)` + `get_account_insights(last_month)`
+- **Round 2 (parallel):** `get_object_insights(this_month)` + `get_object_insights(last_month)` for each active campaign
+- Output sequence: diagnostic → metrics → trend (daily for the month) → comparison card (this vs last month) → table → insights → steps → quickreplies
 
 **Strategic Handoff:**
 - If primary metric cost trending up month-over-month -> recommend loading `campaign-manager` for budget reallocation
@@ -348,8 +407,9 @@ Then transfer. `campaign-manager` will read this context and skip the creation f
 ### 6. Full Account Health Audit
 
 **Tool call sequence:**
-1. get_campaigns -> get_ad_sets -> get_ads -> get_pixels -> get_account_insights -> get_object_insights for active campaigns
-2. Score: structure (naming, organization), budget efficiency, creative diversity, pixel setup, audience overlap
+- **Round 1 (parallel):** `get_campaigns` + `get_ad_sets` + `get_ads` + `get_pixels` + `get_account_insights(last_30d)`
+- **Round 2 (parallel):** `get_object_insights(last_30d)` for each active campaign
+- Score: structure (naming, organization), budget efficiency, creative diversity, pixel setup, audience overlap
 
 **Strategic Handoff:**
 - If pixel issues found -> recommend loading `tracking-conversions` to fix event setup
