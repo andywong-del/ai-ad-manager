@@ -83,25 +83,104 @@ GET /api/insights/async/:reportRunId/results
 
 **Always follow this order:** Route intent → fetch data in parallel → analyze → present → hand off.
 
-### Step -1 -- Route Intent to Report Type (FIRST — before any tool call)
+### Step -1 -- Intent-Aware Scenario Routing (FIRST — before any tool call)
 
-Map the user's message to the correct report type immediately. Do NOT ask — infer and proceed.
+Read the user's message and classify it into ONE of 4 scenarios. The scenario determines the entire layout — do NOT ask, infer and proceed.
 
-| User says | Run |
+---
+
+#### SCENARIO A — Overview Mode
+**Triggers:** "最近點？", "how are my ads doing", "show performance", "overview", "last 7 days", "點樣", "overall", "summary", any general check-in
+
+**What they want:** High-level picture across all goals — where is the money going, is anything broken.
+
+**Layout:**
+1. Diagnostic sentence
+2. `budget` block — spend allocation donut by goal type (FIRST — this is the hero visual)
+3. `comparison` block — WoW per goal type
+4. Goal summary table — one row per goal, Results carries its own unit
+5. `insights` block — top 3 findings, severity-coded, each with action button
+6. `quickreplies` — dynamic based on worst finding (see Dynamic Quickreply Rules below)
+
+---
+
+#### SCENARIO B — Deep Diagnosis Mode
+**Triggers:** "點解咁貴？", "why is cost high", "why is CPM up", "analyse this campaign", "what's wrong with", "diagnose", "點解差", "問題", "performance drop", "why are results down"
+
+**What they want:** Root cause of a specific problem — is it creative fatigue or traffic competition?
+
+**Diagnosis labels (auto-detect from data):**
+- **⚠️ Creative Fatigue** → CPA rising AND CTR falling week-over-week. Cause: same creative shown too many times, audience tuning out.
+- **🔥 Traffic Competition** → CPA rising AND CPM rising week-over-week. Cause: auction pressure from other advertisers, not a creative problem.
+- **📉 Audience Exhaustion** → Frequency > 3 AND reach declining. Cause: retargeting pool too small.
+- **✅ Healthy** → CPA stable or falling, CTR stable or rising.
+
+**Layout:**
+1. Diagnostic sentence with label: e.g. "🔥 Traffic competition detected on WhatsApp campaigns — CPM up +18%, CPA up +22%"
+2. `comparison` block — CTR / CPM / CPA / Frequency this week vs last week (funnel view of the problem)
+3. Detailed campaign table for the affected goal, sorted worst → best:
+   | Campaign | Spend | CPA | CTR | CPM | Freq | Diagnosis |
+   |---|---|---|---|---|---|---|
+   | IG 雙效燃脂 | $699 | $233 | 2.4% | $497 | 2.0 | 🔥 Competition |
+4. `insights` block — 3 findings, each with specific fix action button
+5. `quickreplies` — diagnosis-specific (see Dynamic Quickreply Rules below)
+
+---
+
+#### SCENARIO C — Stop Loss Mode
+**Triggers:** "有咩要熄？", "what should I pause", "worst performers", "losing money", "stop loss", "kill the bad ones", "邊個最差", "熄咗佢"
+
+**What they want:** Immediate list of campaigns to pause, ordered worst first, with one-click action.
+
+**Layout:**
+1. Diagnostic sentence: "🛑 [N] campaigns are underperforming — [total wasted spend] on campaigns above threshold"
+2. Drill-down table sorted worst → best cost/result, ALL goals combined:
+   | Campaign | Goal | Spend | Cost/Result | vs Threshold | Action |
+   |---|---|---|---|---|---|
+   | 🔴 IG 雙效燃脂 | WhatsApp | $699 | $233/conv | +29% above avg | 🛑 Pause |
+   | 🟡 IG 瘦咗肥唔返 | WhatsApp | $1,571 | $196/conv | +8% above avg | 👁 Monitor |
+   Threshold = account average cost/result for that goal type.
+3. `quickreplies` — ["🛑 Pause all 🔴 campaigns", "🛑 Pause [worst campaign name]", "Set budget cap instead", "Show why they're underperforming"]
+
+---
+
+#### SCENARIO D — Scale Up Mode
+**Triggers:** "邊個好？", "which should I scale", "add budget", "best performers", "加錢", "scale up", "double down", "top performers", "邊個可以加錢"
+
+**What they want:** Which campaigns deserve more budget right now, with a direct scale action.
+
+**Layout:**
+1. Diagnostic sentence: "🚀 [N] campaigns are outperforming — [goal] is your best investment at [cost/result]"
+2. High-potential table sorted best → worst cost/result:
+   | Campaign | Goal | Spend | Cost/Result | vs Avg | Potential | Action |
+   |---|---|---|---|---|---|---|
+   | 🚀 FB 雙效燃脂 Photo | WhatsApp | $419 | $140/conv | −23% below avg | Scale | 🚀 +20% budget |
+   | 🚀 FB 瘦咗肥唔返 Reels | WhatsApp | $1,678 | $168/conv | −7% below avg | Scale | 🚀 +20% budget |
+   Mark as 🚀 if: cost/result is >15% below goal average AND frequency < 2.5 (not saturated yet).
+3. `quickreplies` — ["🚀 Scale [best campaign] +20%", "🚀 Scale all 🚀 campaigns", "How much budget to add?", "Show audience size first"]
+
+---
+
+#### Default if unclear → Scenario A (Overview Mode)
+
+---
+
+**GLOBAL RULES (apply across ALL scenarios):**
+
+1. **Messaging/WhatsApp campaigns:** NEVER show ROAS. Only show CPA (Cost/Conv), CTR, CPM, Frequency.
+2. **WoW delta mandatory:** Every metric shown must include % change vs previous period (🟢/🟡/🔴). Fetch both periods in parallel.
+3. **Dynamic Quickreplies** — buttons must reflect the actual diagnosis, not generic labels:
+
+| Diagnosis found | Quickreply buttons to include |
 |---|---|
-| "how are my ads doing", "show performance", "check my campaigns", "點樣", any general overview | Weekly Performance Report (§1) |
-| "what's wrong", "any problems", "issues", "not working", "點解差" | Problems & Quick Wins (§3) |
-| "this month", "monthly", "last month" | Monthly Performance Report (§2) |
-| "which creative", "best ad", "worst ad", "creative performance" | Creative Performance Analysis (§4) |
-| "budget", "spending", "pacing", "underspend" | Budget Pacing Check (§11) |
-| "compare", "vs", "last week vs this week" | Compare Campaigns / Periods (§12) |
-| "audience", "demographic", "who's seeing", "age", "gender", "placement" | Demographic & Placement Breakdown (§8) |
-| "health check", "audit", "account score" | Full Account Health Audit (§6) |
-| "trend", "over time", "last 30 days" | Trend Analysis (§7) |
-| "a/b test", "split test", "variant", "winner" | A/B Test Results (§10) |
-| "competitor", "market" | Competitor & Market Research (§9) |
+| ⚠️ Creative Fatigue | "🎨 Replace creative for [campaign]", "📊 Check frequency breakdown" |
+| 🔥 Traffic Competition | "💰 Adjust bid strategy", "🕐 Check ad scheduling" |
+| 📉 Audience Exhaustion | "👥 Expand audience", "🔄 Add lookalike audience" |
+| 🛑 Stop Loss needed | "🛑 Pause [worst campaign]", "💸 Show wasted spend total" |
+| 🚀 Scale opportunity | "🚀 Scale [best campaign] +20%", "📈 Project results at +$X budget" |
+| No issues found | "📅 Compare last 30 days", "🎯 Check audience overlap" |
 
-**Default if unclear → Weekly Performance Report (§1).**
+4. **Strip campaign name prefixes** — never show "Sales_Wts_IG_Retargeting_Onda Pro_". Show only the meaningful part: "IG 雙效燃脂 Carousel", "FB 瘦咗肥唔返 Reels".
 
 ---
 

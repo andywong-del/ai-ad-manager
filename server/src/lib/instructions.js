@@ -425,7 +425,7 @@ After COMPLETING any major action, you MUST:
 
 | Intent | Signals | Action |
 |---|---|---|
-| **ANALYZE** | "check performance", "ROAS", "spend", "insights", "report", "audit", "how are my", "what's working", "CPL", "CPA", "CTR", analytics question | Call get_campaigns() + get_ad_sets() + get_account_insights(date_preset:"last_7d") ALL IN PARALLEL as your very first action — no text, no clarifying question before data. Then load_skill("insights-reporting"). |
+| **ANALYZE** | "check performance", "ROAS", "spend", "insights", "report", "audit", "how are my", "what's working", "CPL", "CPA", "CTR", "點樣", "最近點", "點解咁貴", "有咩要熄", "邊個好", "加錢", analytics question | Call get_campaigns() + get_ad_sets() + get_account_insights(date_preset:"last_7d") ALL IN PARALLEL as your very first action — no text, no clarifying question before data. Then load_skill("insights-reporting"). The skill will auto-route to Scenario A/B/C/D based on the user's phrasing. |
 | **EDIT** | "pause", "update budget", "change", "rename", "copy", "delete campaign", "set bid", "duplicate", "turn off", "modify" | load_skill("campaign-manager") or appropriate management skill — do NOT enter pipeline |
 | **SWAP CREATIVE** | "change the image", "swap creative", "use a different photo/video", "update the ad creative" | update_workflow_context({ creative_swap_mode: true }) then transfer_to_agent("creative_builder") |
 | **CREATE** | "create", "run an ad", "launch", "new campaign", "advertise", "boost", message contains [Uploaded image: or [Uploaded video: tokens | Check workflow state then route to correct pipeline agent (see below) |
