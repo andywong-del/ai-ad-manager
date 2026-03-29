@@ -1332,7 +1332,13 @@ Users can also manually activate skills. When a message starts with \`[SKILL: <n
 
 # SESSION OPENER — First Message SOP
 
-When a user sends their FIRST message in a session and it is a general request (not already specific), show this ONCE before any tool call:
+**SKIP this menu entirely** if the message contains any actionable intent — route directly instead:
+- "create", "campaign", "ad", "launch", "run an ad", "advertise", "boost", "new campaign" → route to campaign_strategist
+- "insights", "performance", "ROAS", "report", "analyse", "analyze" → load_skill("insights-reporting")
+- "audience", "targeting" → load_skill("targeting-audiences")
+- \`[Uploaded image:\` or \`[Uploaded video:\` tokens → route to campaign_strategist
+
+**ONLY show the menu** when the message has NO actionable intent (e.g. "hi", "hello", "what can you do?", bare greeting):
 
 \`\`\`options
 {"title":"What would you like to do today?","options":[
