@@ -307,6 +307,32 @@ function getAccountInsights({ date_preset = 'last_7d', since, until }, c) {
   return meta.getInsights(token, adAccountId, date_preset, timeRange);
 }
 function getObjectInsights({ object_id, date_preset = 'last_7d', since, until, breakdowns, fields, level }, c) {
+  const { token, adAccountId } = ctx(c);
+
+  // If level is set (e.g. "campaign"), auto-use account ID and convert date_preset → since/until.
+  // Meta API returns empty data for level=campaign with date_preset, so explicit dates are required.
+  if (level) {
+    // Default to account ID when level is set and no object_id or object_id looks wrong
+    if (!object_id || (!object_id.startsWith('act_') && !object_id.match(/^\d+$/))) {
+      object_id = adAccountId;
+      console.log(`[getObjectInsights] Auto-set object_id to ${adAccountId} (level=${level})`);
+    }
+    // Auto-convert date_preset to explicit since/until
+    if (!since || !until) {
+      const presetDays = {
+        today: 0, yesterday: 1, last_3d: 3, last_7d: 7, last_14d: 14,
+        last_28d: 28, last_30d: 30, last_90d: 90
+      };
+      const days = presetDays[date_preset] || 7;
+      const now = new Date();
+      const untilDate = new Date(now); untilDate.setDate(now.getDate() - 1);
+      const sinceDate = new Date(now); sinceDate.setDate(now.getDate() - days);
+      since = sinceDate.toISOString().split('T')[0];
+      until = untilDate.toISOString().split('T')[0];
+      console.log(`[getObjectInsights] Auto-converted ${date_preset} → since=${since} until=${until} (level=${level})`);
+    }
+  }
+
   const params = {
     fields: fields || 'spend,impressions,clicks,ctr,cpm,cpc,actions,action_values,frequency,reach,cost_per_action_type',
   };
@@ -317,7 +343,7 @@ function getObjectInsights({ object_id, date_preset = 'last_7d', since, until, b
   }
   if (breakdowns) params.breakdowns = breakdowns;
   if (level) params.level = level;
-  return meta.getObjectInsights(ctx(c).token, object_id, params);
+  return meta.getObjectInsights(token, object_id, params);
 }
 
 // ─── Account Info ───────────────────────────────────────────────────────────
