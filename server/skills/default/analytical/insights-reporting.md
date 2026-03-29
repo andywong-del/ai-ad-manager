@@ -165,17 +165,35 @@ Once ad sets return, map `optimization_goal` to the primary metric using table 0
 - Current period: `since = TODAY minus 7 days`, `until = TODAY minus 1 day`
 - Previous period: `since = TODAY minus 14 days`, `until = TODAY minus 8 days`
 
-Call **both periods in parallel** for each campaign:
-- **get_object_insights (current period)** — fields relevant to detected goal:
-  - All goals: `spend,impressions,clicks,ctr,cpm,reach,frequency,actions,cost_per_action_type`
-  - Messaging/conversations: add `onsite_conversion.messaging_conversation_started_7d` — **this is the ONLY correct field for WhatsApp/Messenger conversation count**. Do NOT use `actions` total or any other conversation action type. Meta shows `messaging_conversation_started_7d` in Ads Manager as "Conversations Started".
-  - Sales/ROAS: add `action_values,purchase_roas`
-  - Video/awareness: add `video_p25_watched_actions,video_p75_watched_actions,video_p100_watched_actions,video_avg_time_watched_actions,video_thruplay_watched_actions`
-- **get_object_insights (previous period)** — same fields
+**ALWAYS use account-level + level=campaign — NEVER call get_object_insights per campaign ID.**
 
-**Do NOT use `get_account_insights` to derive primary metrics (leads, conversations, purchases).** The account-level endpoint aggregates all action types together — the numbers will be wrong. Use `get_object_insights` per campaign and sum the specific action type yourself.
+Call **exactly 2 calls in parallel** (replaces all per-campaign loops):
 
-Fetch ALL campaigns with `status = ACTIVE` — do not filter or limit at this stage. An account with 5 active campaigns must show all 5, not 3.
+```
+get_object_insights(
+  object_id: "[act_xxx account ID from workflow context]",
+  level: "campaign",
+  since: "[TODAY minus 7 days]",
+  until: "[TODAY minus 1 day]",
+  fields: "campaign_id,campaign_name,spend,impressions,clicks,ctr,cpm,reach,frequency,actions,cost_per_action_type,action_values,purchase_roas"
+)
+
+get_object_insights(
+  object_id: "[act_xxx account ID]",
+  level: "campaign",
+  since: "[TODAY minus 14 days]",
+  until: "[TODAY minus 8 days]",
+  fields: "campaign_id,campaign_name,spend,impressions,clicks,ctr,cpm,reach,frequency,actions,cost_per_action_type,action_values,purchase_roas"
+)
+```
+
+This returns ALL active campaigns' data in 2 API calls, matching exactly what Meta Ads Manager shows.
+
+**Do NOT loop over campaign IDs and call get_object_insights once per campaign.** That fetches partial data (misses campaigns) and makes unnecessary API calls.
+
+**Do NOT use `get_account_insights` to derive primary metrics.** The account-level endpoint aggregates all action types — numbers will be wrong for goal-specific metrics.
+
+After fetching, join each campaign row with its `optimization_goal` from the ad sets already loaded in Step 0a.
 
 > **Trend requirement:** Dual-period fetch is mandatory for all 7-day+ reports. Compute % delta in Step 2.
 > **No previous data:** If previous period returns $0 spend or no data, skip delta — omit `prev` and `trend` fields in the insights card and set `status` from absolute thresholds (Strategic Handoff Summary).

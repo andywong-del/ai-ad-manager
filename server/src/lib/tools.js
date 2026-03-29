@@ -306,7 +306,7 @@ function getAccountInsights({ date_preset = 'last_7d', since, until }, c) {
   const timeRange = (since && until) ? { since, until } : null;
   return meta.getInsights(token, adAccountId, date_preset, timeRange);
 }
-function getObjectInsights({ object_id, date_preset = 'last_7d', since, until, breakdowns, fields }, c) {
+function getObjectInsights({ object_id, date_preset = 'last_7d', since, until, breakdowns, fields, level }, c) {
   const params = {
     fields: fields || 'spend,impressions,clicks,ctr,cpm,cpc,actions,action_values,frequency,reach,cost_per_action_type',
   };
@@ -316,6 +316,7 @@ function getObjectInsights({ object_id, date_preset = 'last_7d', since, until, b
     params.date_preset = date_preset;
   }
   if (breakdowns) params.breakdowns = breakdowns;
+  if (level) params.level = level;
   return meta.getObjectInsights(ctx(c).token, object_id, params);
 }
 
@@ -838,8 +839,8 @@ const adTools = [
   // ── Insights ────────────────────────────────────────────────────────────
   T('get_account_insights', 'Get account-level performance for a date range. For exact Ads Manager matching, use since+until params (includes today).', getAccountInsights,
     obj({ date_preset: str('today, yesterday, last_3d, last_7d, last_14d, last_28d, last_30d, last_90d, this_month, last_month'), since: str('Start date YYYY-MM-DD for explicit range (overrides date_preset)'), until: str('End date YYYY-MM-DD for explicit range (use today to include partial data)') })),
-  T('get_object_insights', 'Get detailed insights for any campaign/ad set/ad. Use since+until for exact Ads Manager matching.', getObjectInsights,
-    obj({ object_id: str('Campaign, ad set, or ad ID'), date_preset: str('Date range preset'), since: str('Start date YYYY-MM-DD (overrides date_preset)'), until: str('End date YYYY-MM-DD'), breakdowns: str('age, gender, country, placement, device_platform'), fields: str('Custom fields (default: spend,impressions,clicks,ctr,cpm,cpc,actions,action_values,frequency,reach,cost_per_action_type)') }, ['object_id'])),
+  T('get_object_insights', 'Get detailed insights for any campaign/ad set/ad/account. Pass act_xxx as object_id with level=campaign|adset|ad to get all objects at that level in one call (matches Meta Ads Manager totals). Use since+until for exact date matching.', getObjectInsights,
+    obj({ object_id: str('Campaign ID, ad set ID, ad ID, or act_xxx account ID'), date_preset: str('Date range preset'), since: str('Start date YYYY-MM-DD (overrides date_preset)'), until: str('End date YYYY-MM-DD'), level: str('campaign, adset, or ad — use with act_xxx object_id to get all objects at that level in one API call'), breakdowns: str('age, gender, country, placement, device_platform'), fields: str('Custom fields (default: spend,impressions,clicks,ctr,cpm,cpc,actions,action_values,frequency,reach,cost_per_action_type)') }, ['object_id'])),
 
   // ── Account Info ────────────────────────────────────────────────────────
   T('get_ad_account_details', 'Get account details: balance, spend cap, timezone, currency.', getAdAccountDetails),
