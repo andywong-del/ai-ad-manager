@@ -1,5 +1,5 @@
 import { FunctionTool } from '@google/adk';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import axios from 'axios';
 import { promises as fs } from 'fs';
 import path from 'path';
@@ -334,41 +334,45 @@ function deleteAdCreative({ creative_id }, c) {
   return meta.deleteAdCreative(ctx(c).token, creative_id);
 }
 
-// ─── Creative Visual Analysis (Gemini Vision) ──────────────────────────────
-async function analyzeCreativeVisual({ image_urls, context }, _c) {
+// ─── Creative Visual Analysis (Gemini 3 Flash Vision) ───────────────────────
+async function analyzeCreativeVisual({ media_urls, context }, _c) {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY;
   if (!apiKey) return { error: 'GEMINI_API_KEY not configured' };
 
   let urls;
-  try { urls = typeof image_urls === 'string' ? JSON.parse(image_urls) : image_urls; } catch { urls = [image_urls]; }
-  if (!Array.isArray(urls) || urls.length === 0) return { error: 'No image URLs provided' };
+  try { urls = typeof media_urls === 'string' ? JSON.parse(media_urls) : media_urls; } catch { urls = [media_urls]; }
+  if (!Array.isArray(urls) || urls.length === 0) return { error: 'No media URLs provided' };
 
-  // Fetch images as base64 (max 5 to control cost)
-  const imageParts = [];
+  // Fetch media as base64 (max 5 to control cost, 20MB video limit for inline)
+  const mediaParts = [];
   for (const url of urls.slice(0, 5)) {
     try {
-      const resp = await axios.get(url, { responseType: 'arraybuffer', timeout: 10000 });
+      const resp = await axios.get(url, { responseType: 'arraybuffer', timeout: 30000, maxContentLength: 20 * 1024 * 1024 });
       const mime = resp.headers['content-type'] || 'image/jpeg';
-      imageParts.push({ inlineData: { data: Buffer.from(resp.data).toString('base64'), mimeType: mime } });
+      mediaParts.push({ inlineData: { data: Buffer.from(resp.data).toString('base64'), mimeType: mime } });
     } catch (e) {
-      console.warn(`[analyze_visual] Failed to fetch image: ${url} — ${e.message}`);
+      console.warn(`[analyze_visual] Failed to fetch: ${url} — ${e.message}`);
     }
   }
-  if (imageParts.length === 0) return { error: 'Could not fetch any images' };
+  if (mediaParts.length === 0) return { error: 'Could not fetch any media' };
 
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+  const hasVideo = mediaParts.some(p => p.inlineData.mimeType.startsWith('video/'));
+  const ai = new GoogleGenAI({ apiKey });
 
-  const prompt = `You are a senior Meta Ads creative analyst. Analyze these ad creative images and return a JSON object with:
+  const prompt = `You are a senior Meta Ads creative analyst. Analyze these ad creative assets and return a JSON object with:
 
 {
-  "images": [
+  "assets": [
     {
       "index": 1,
-      "visual_elements": "What's in the image — product, person, text overlay, background, colors",
-      "text_overlay": "Any text visible on the image (exact text if readable)",
+      "type": "image|video",
+      "visual_elements": "What's in the asset — product, person, text overlay, background, colors",
+      "text_overlay": "Any text visible (exact text if readable)",
       "hook_quality": "strong/medium/weak — would this stop the scroll in a feed?",
       "hook_reason": "Why the hook is strong/weak",
+      ${hasVideo ? `"video_hook": "First 3 seconds analysis — does it grab attention immediately?",
+      "pacing": "Fast/Medium/Slow — does the pacing match ad format?",
+      "audio_cues": "Any text/captions suggesting audio elements?",` : ''}
       "mood": "Professional/Playful/Urgent/Luxurious/etc",
       "cta_visibility": "Is there a visible call-to-action? How prominent?",
       "format_fit": "Best suited for: feed/story/reels/carousel card",
@@ -377,9 +381,9 @@ async function analyzeCreativeVisual({ image_urls, context }, _c) {
     }
   ],
   "overall": {
-    "brand_consistency": "Are the images consistent in style/color/tone?",
+    "brand_consistency": "Are the assets consistent in style/color/tone?",
     "format_recommendation": "Best ad format for these assets",
-    "strongest_asset": "Which image index is strongest and why"
+    "strongest_asset": "Which asset index is strongest and why"
   }
 }
 
@@ -387,9 +391,11 @@ ${context ? `Ad context: ${context}` : ''}
 Return ONLY valid JSON, no markdown.`;
 
   try {
-    const result = await model.generateContent([prompt, ...imageParts]);
-    const text = result.response.text();
-    // Try to parse as JSON, return raw if fails
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: [{ text: prompt }, ...mediaParts],
+    });
+    const text = response.text;
     try { return JSON.parse(text); } catch { return { analysis: text }; }
   } catch (e) {
     return { error: `Vision analysis failed: ${e.message}` };
@@ -1210,8 +1216,8 @@ const adTools = [
     obj({ creative_id: str('Creative ID') }, ['creative_id'])),
 
   // ── Creative Visual Analysis ────────────────────────────────────────────
-  T('analyze_creative_visual', 'Analyze ad creative images using AI vision. Fetches images by URL, analyzes visual elements, hook quality, text overlays, mood, CTA visibility, and returns structured recommendations. Max 5 images per call.', analyzeCreativeVisual,
-    obj({ image_urls: { type: 'array', items: { type: 'string' }, description: 'Array of image URLs to analyze (max 5)' }, context: str('Optional context about the ad — product, target audience, campaign goal') }, ['image_urls'])),
+  T('analyze_creative_visual', 'Analyze ad creative images AND videos using Gemini 3 Flash vision. Fetches media by URL, analyzes visual elements, hook quality, text overlays, mood, CTA visibility, video pacing, and returns structured recommendations. Supports images (JPG/PNG) and videos (MP4, <20MB). Max 5 assets per call.', analyzeCreativeVisual,
+    obj({ media_urls: { type: 'array', items: { type: 'string' }, description: 'Array of image or video URLs to analyze (max 5, videos must be <20MB)' }, context: str('Optional context about the ad — product, target audience, campaign goal') }, ['media_urls'])),
 
   // ── Assets ──────────────────────────────────────────────────────────────
   T('get_ad_images', 'List all ad images in the account.', getAdImages),
