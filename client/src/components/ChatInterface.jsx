@@ -1781,10 +1781,24 @@ const AccountConnector = ({ token, onLogin, selectedAccount, selectedBusiness, o
   const { accounts, loading: accLoading } = useAdAccounts(token, activeBiz?.id);
 
   useEffect(() => {
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) { setOpen(false); setLevel('platforms'); } };
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) { setOpen(false); } };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  // Auto-navigate: if token exists, skip platforms → go straight to business or accounts
+  const getInitialLevel = () => {
+    if (!token) return 'platforms';
+    if (selectedBusiness) { setActiveBiz(selectedBusiness); return 'accounts'; }
+    return 'business';
+  };
+
+  // After login completes (token changes from null → value), auto-open business picker
+  const prevToken = useRef(token);
+  useEffect(() => {
+    if (!prevToken.current && token) { setOpen(true); setLevel('business'); }
+    prevToken.current = token;
+  }, [token]);
 
   const handleMetaClick = () => {
     if (!token) { onLogin?.(); setOpen(false); return; }
@@ -1804,7 +1818,7 @@ const AccountConnector = ({ token, onLogin, selectedAccount, selectedBusiness, o
 
   return (
     <div ref={ref} className="relative">
-      <button onClick={() => { setOpen(v => !v); setLevel('platforms'); }}
+      <button onClick={() => { setOpen(v => { if (!v) setLevel(getInitialLevel()); return !v; }); }}
         className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[11px] font-medium transition-colors
           ${isConnected ? 'border-emerald-200 text-emerald-600 bg-emerald-50 hover:bg-emerald-100' : 'border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50'}`}>
         <Link2 size={12} />
