@@ -1402,7 +1402,7 @@ const pick = (...names) => names.map(n => _toolByName[n]).filter(Boolean);
 // Analyst — diagnosis, benchmarks, action_queue (read-only + baton write)
 const analystTools = pick(
   'analyze_performance',
-  'get_workflow_context', 'update_workflow_context'
+  'get_workflow_context', 'update_workflow_context', 'load_skill'
 );
 
 // Audience Strategist — targeting gaps, audience recommendations
