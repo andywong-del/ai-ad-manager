@@ -13,12 +13,21 @@ Read the user's message → pick ONE scenario → follow its output structure.
 
 | Scenario | Triggers | Strategic Lens |
 |---|---|---|
-| A — 預算配比效率 | "overview", "how are my ads", "last 7 days", general check-in | Spend efficiency across goal types — is the funnel top-heavy? |
+| A — 預算配比效率 | "overview", "how are my ads", "last 7 days", general check-in | Spend efficiency across funnel stages — is TOFU/MOFU/BOFU balanced? |
 | B — 素材 vs 市場 | "why is cost high", "diagnose", "what's wrong" | Creative Decay vs Auction Pressure — walk through causal evidence |
 | C — 資本損耗 | "what should I pause", "worst performers", "stop loss" | Quantify capital hemorrhage, generate kill list |
 | D — 邊際紅利 | "which should I scale", "best performers", "add budget" | Find low-freq low-CPA winners with scaling room |
 
 Default if unclear → Scenario A.
+
+---
+
+## Funnel Classification
+
+Classify each campaign by optimization_goal:
+- **TOFU 引流**: REACH, LINK_CLICKS, THRUPLAY, LANDING_PAGE_VIEWS, POST_ENGAGEMENT
+- **MOFU 興趣**: CONVERSATIONS, LEAD_GENERATION
+- **BOFU 轉化**: OFFSITE_CONVERSIONS, VALUE, APP_INSTALLS
 
 ---
 
@@ -40,11 +49,7 @@ Default if unclear → Scenario A.
 | APP_INSTALLS | CPI | `mobile_app_install` |
 | VALUE | ROAS | `purchase` + `action_values` |
 
-**OFFSITE_CONVERSIONS detection:** Check `actions` array for `offsite_conversion.fb_pixel_purchase` → purchase; `fb_pixel_lead` → lead; else → landing_page_view fallback.
-
 **ROAS rule:** Only compute when goal = VALUE or OFFSITE_CONVERSIONS+purchase. Never for messaging/leads.
-
-**Mixed accounts:** Never average ROAS across different goal types. Group by goal, show each group's primary metric separately.
 
 ---
 
@@ -55,11 +60,7 @@ Default if unclear → Scenario A.
 { current_7d, previous_7d, baseline_30d, _benchmarks, account_summary }
 ```
 
-Each campaign row includes: campaign_id, campaign_name, spend, impressions, clicks, ctr, cpm, reach, frequency, actions, video_thruplay_watched_actions, action_values, optimization_goal.
-
 `_benchmarks[goal]` = { avg_cost_per_result, total_spend, total_results, campaign_count, primary_action_type }
-
-**Use `_benchmarks` as evaluation baseline — never compute averages yourself.**
 
 Extract primary result: `actions.find(a => a.action_type === PRIMARY_ACTION_TYPE)?.value`
 Extract primary cost: `cost_per_action_type.find(a => a.action_type === PRIMARY_ACTION_TYPE)?.value`
@@ -87,36 +88,43 @@ result_count      = current period primary results (0 vs >0)
 | 🚀 爆發增長模式 | CPA < -20% AND CTR stable/improving |
 | 📊 數據積累中 | < 3 days data or < $10 spend → skip diagnosis |
 
-**Edge cases:** No prev data → use CPA vs baseline only. No CPA (THRUPLAY/REACH) → use cost_per_thruplay or CPM. `_benchmarks[goal]` missing → use WoW as proxy.
-
 **Frequency signal:** ≤3 healthy, 3-5 saturation approaching, >5 audience saturated.
 
 ---
 
 ## Output Format — Two Panels, Zero Redundancy
 
-Text appears in BOTH panels. Canvas blocks (metrics, budget, comparison) + tables appear ONLY in canvas. Write all text first, then canvas blocks at the end.
+Text appears in BOTH panels. Canvas blocks + tables appear ONLY in canvas. Write ALL chat text first, then canvas blocks at the end with NO text between them.
 
-### Chat (left panel) — stream first:
-1. **One-paragraph summary** — 2-3 sentences: dominant status + total spend + key finding with numbers
-2. **Bullet insights** — 3-5 one-line bullets: "• [Campaign]: [status] [metric] ([WoW change])"
-3. `insights` block — top 3 severity-coded findings
-4. `steps` block — 2-4 prioritized actions
-5. `quickreplies` — 4 diagnostic-aware buttons
+### LEFT PANEL — Chat（深度診斷報告）
 
-### Canvas (right panel) — emit AFTER all text, no text between blocks:
-1. `metrics` block (Spend + 3 KPIs)
-2. `budget` block (spend donut by goal)
-3. `comparison` block (WoW bar chart)
-4. Goal summary table (Goal | Spend | Results | Cost/Result | Status | WoW)
-5. Per-campaign table sorted by severity 🚨→🚀
+1. **[Executive Summary]** — 1 句盤面定調（dominant status + total spend + key finding）
+2. **[Full Funnel Strategy]** — TOFU 引流 / MOFU 興趣 / BOFU 轉化 sub-headers, spend share vs result share
+3. **[Five Pillars Analysis]**:
+   - 🎯 漏斗策略 (Funnel Strategy) — TOFU/MOFU/BOFU 預算配比
+   - 🎨 素材疲勞 (Creative Fatigue) — Hook Rate + Frequency 交叉分析
+   - 👥 受眾精準度 (Audience Targeting) — Frequency 飽和度
+   - 💰 預算節奏 (Budget Pacing) — Daily spend 穩定性
+   - 📱 渠道拆解 (Split Channel) — 各 placement 表現差異
+4. **[Action Plan]** — `steps` block: 🚨 即時止血 → 📈 分階段加碼 → 🎨 素材迭代
+5. `insights` block — top 3 severity-coded findings
+6. `quickreplies` — 4 diagnostic-aware buttons
 
-### Rules
-- WhatsApp/Messaging: NEVER show ROAS
-- Every metric includes WoW % (🟢/🟡/🔴)
-- Strip campaign name prefixes
-- Dynamic quickreplies based on diagnostic, not generic
-- Note 48h attribution window at report bottom
+### RIGHT PANEL — Canvas（Meta Ads 視覺儀表板）
+
+Emit blocks back-to-back, NO text between:
+1. `metrics` — KPI Overview (Spend, Results, CPR, CTR with WoW%)
+2. `budget` — Donut chart: 預算分佈 by funnel stage (TOFU/MOFU/BOFU)
+3. `comparison` — Bar chart: 本週 vs 上週 CPA by campaign (a_label="上週", b_label="本週")
+4. `trend` — Line chart: 7日 Daily Spend + Conversions
+5. Campaign table (markdown): 狀態 | 廣告名稱 | 消耗 | 成本 | WoW | 操盤建議
+
+### Constraints
+- Messaging campaigns: 絕對不准出現 ROAS
+- Every metric includes WoW% (🔴 > +15%, 🟡 ±15%, 🟢 < -15%)
+- Strip campaign name prefixes (Sales_Wts_FB_ etc)
+- 註明 48h attribution window at report bottom
+- Chat 內不准重複 Canvas 嘅表格數字
 
 ---
 
