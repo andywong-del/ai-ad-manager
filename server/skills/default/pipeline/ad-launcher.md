@@ -92,7 +92,9 @@ Do NOT call any create tool until user confirms.
 
 ## Step 2 — Create Everything
 
-On user confirmation, execute in sequence:
+**CRITICAL: Execute STRICTLY in sequence — one call at a time. Wait for each response before calling the next. Do NOT call multiple create tools in parallel. Each step depends on the ID from the previous step.**
+
+On user confirmation:
 
 ### 2a — Create Campaign
 

@@ -208,10 +208,13 @@ export const parseMarkdownTable = (text) => {
   let i = 0;
 
   const RICH_BLOCKS = ['adlib', 'metrics', 'options', 'insights', 'score', 'copyvariations', 'steps', 'quickreplies', 'funnel', 'comparison', 'budget', 'trend', 'adpreview', 'setupcard'];
+  // Aliases for common LLM misspellings
+  const BLOCK_ALIASES = { option: 'options', quickreplie: 'quickreplies', quickreply: 'quickreplies', copyvariation: 'copyvariations', metric: 'metrics', step: 'steps', setupcard: 'setupcard' };
 
   while (i < lines.length) {
     const trimmed = lines[i].trim();
-    const blockMatch = trimmed.startsWith('```') && RICH_BLOCKS.find(b => trimmed === '```' + b);
+    const blockTag = trimmed.startsWith('```') ? trimmed.slice(3).trim().toLowerCase() : '';
+    const blockMatch = blockTag && (RICH_BLOCKS.find(b => b === blockTag) || BLOCK_ALIASES[blockTag]);
     if (blockMatch) {
       if (textBuf.length) { segments.push({ type: 'text', content: textBuf.join('\n') }); textBuf = []; }
       i++;
@@ -638,8 +641,15 @@ const ScoreCard = ({ data }) => {
 // ── Copy Variations (A/B selectable ad copy — full-text layout) ──────────────
 const CopyVariations = ({ data, onSend }) => {
   if (!data?.variations) return null;
+  const thumb = data.image_url || data.thumbnail;
   return (
     <MetaCard title={data.label || 'Ad Copy Variations'} subtitle={`${data.variations.length} options`} badge="Creative">
+      {/* Image/video thumbnail preview */}
+      {thumb && (
+        <div className="px-4 pt-3 pb-1">
+          <img src={thumb} alt="Creative preview" className="w-full max-h-[200px] object-cover rounded-lg border border-slate-100" />
+        </div>
+      )}
       <div className="divide-y divide-slate-100">
         {data.variations.map((v, i) => (
           <div key={i} className="px-4 py-4 hover:bg-slate-50/30 transition-colors">

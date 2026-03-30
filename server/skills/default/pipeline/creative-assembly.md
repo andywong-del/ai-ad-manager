@@ -93,8 +93,10 @@ For each asset (or for the carousel), produce a `copyvariations` block.
 
 **Write FULL primary text (50–125 words per variation).** Not a tagline — this is the final ad copy.
 
+**Include `image_url` from `get_ad_images()` so the thumbnail shows next to the copy:**
+
 ```copyvariations
-{"label":"Creative 1 — [filename]","variations":[
+{"label":"Creative 1 — [filename]","image_url":"[URL from get_ad_images permalink_url]","variations":[
   {"id":"A","primary":"Full 50-125 word ad copy referencing visual analysis...","headline":"Headline (max 40 chars)","cta":"[CTA from workflow]"},
   {"id":"B","primary":"Different angle or tone...","headline":"Alt Headline","cta":"[CTA]"},
   {"id":"C","primary":"Third variation...","headline":"Third Headline","cta":"[CTA]"}
