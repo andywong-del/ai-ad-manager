@@ -226,6 +226,12 @@ export const Dashboard = ({
               skills={skills}
               onToggleSkill={toggleSkill}
               onManageSkills={(skill) => skill ? setActiveView({ type: 'skillConfig', skill }) : setActiveView({ type: 'skillsLibrary' })}
+              token={token}
+              onLogin={onLogin}
+              selectedAccount={selectedAccount}
+              selectedBusiness={selectedBusiness}
+              onSwitchAccount={onSwitchAccount}
+              onSwitchBusiness={onSwitchBusiness}
               onNavigate={(view) => {
                 const viewMap = { audiences: 'audiences', skills: 'skillsLibrary' };
                 setActiveView({ type: viewMap[view] || 'chat' });
