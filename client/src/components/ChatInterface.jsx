@@ -1620,16 +1620,7 @@ const MessageBubble = ({ message, isLatest, onSend, isTyping, onSaveItem, folder
                   default: return <div key={i} className="whitespace-pre-wrap">{renderRichText(seg.content)}</div>;
                 }
               })}
-              {/* Canvas trigger button — only when data blocks were split out */}
-              {canvasData && (
-                <button
-                  onClick={() => onOpenCanvas?.(canvasData)}
-                  className="mt-3 flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-blue-50 to-violet-50 border border-blue-200/60 text-blue-600 text-xs font-medium hover:from-blue-100 hover:to-violet-100 hover:border-blue-300 transition-all group/btn"
-                >
-                  <BarChart3 size={14} className="group-hover/btn:scale-110 transition-transform" />
-                  <span>View Dashboard</span>
-                </button>
-              )}
+              {/* Canvas trigger removed — all content renders inline in chat */}
             </div>
             <p className="text-xs text-slate-400 mt-1 ml-1">{fmtTime(message.timestamp)}</p>
           </div>
