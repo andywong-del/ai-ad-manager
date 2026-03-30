@@ -44,6 +44,9 @@ const technicalAgent = new LlmAgent({
   tools: technicalTools,
 });
 
+// ── Debug: log tool counts ───────────────────────────────────────────────────
+console.log(`[adAgent] Tool counts — root: ${rootTools.length} (${rootTools.map(t=>t.name).join(', ')}), analyst: ${analystTools.length}, executor: ${executorTools.length}`);
+
 // ── Root agent + runner ──────────────────────────────────────────────────────
 
 const sessionService = new InMemorySessionService();
