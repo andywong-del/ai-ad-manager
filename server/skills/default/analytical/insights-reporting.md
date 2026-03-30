@@ -26,8 +26,8 @@ Default if unclear → Scenario A.
 
 Classify each campaign by optimization_goal:
 - **TOFU 認知 (Awareness)**: REACH, THRUPLAY, POST_ENGAGEMENT — 純曝光，建立品牌認知
-- **MOFU 考慮 (Consideration)**: LINK_CLICKS, LANDING_PAGE_VIEWS, PROFILE_VISIT, LEAD_GENERATION — 主動探索，表達興趣
-- **BOFU 轉化 (Conversion)**: CONVERSATIONS, OFFSITE_CONVERSIONS, VALUE, APP_INSTALLS — 採取行動，完成轉化
+- **MOFU 考慮 (Consideration)**: LINK_CLICKS, LANDING_PAGE_VIEWS, PROFILE_VISIT — 主動探索，表達興趣
+- **BOFU 轉化 (Conversion)**: CONVERSATIONS, LEAD_GENERATION, OFFSITE_CONVERSIONS, VALUE, APP_INSTALLS — 採取行動，完成轉化
 
 ---
 
