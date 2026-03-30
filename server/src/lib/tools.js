@@ -896,7 +896,17 @@ function getLeadFormLeads({ form_id }, c) {
 }
 
 // ─── Previews ───────────────────────────────────────────────────────────────
-function getAdPreview({ ad_id, ad_format = 'DESKTOP_FEED_STANDARD' }, c) {
+async function getAdPreview({ ad_id, ad_format = 'DESKTOP_FEED_STANDARD' }, c) {
+  // Dev mode fallback: if ad_id is a fake DEV_AD_ id, build a local preview from workflow context
+  if (ad_id?.startsWith('DEV_AD_')) {
+    console.warn(`[tool] getAdPreview: dev mode ad — building local preview`);
+    return {
+      _dev_mode_fallback: true,
+      _message: 'App is in development mode — showing draft preview from creative spec. Switch to Live mode for the real Meta preview.',
+      ad_format,
+      preview_type: 'draft',
+    };
+  }
   return meta.getAdPreview(ctx(c).token, ad_id, ad_format);
 }
 

@@ -79,6 +79,8 @@ preflight_check(campaign_id: [from workflow])
 
 ### Step 4 — Preview (run immediately after clean preflight)
 
+**Normal mode (real ad_id):**
+
 Call both in parallel:
 ```
 get_ad_preview(ad_id: [new ad_id], ad_format: "MOBILE_FEED_STANDARD")
@@ -93,7 +95,31 @@ Output as:
 ]
 ```
 
-Ask: **"✅ Pre-flight passed. Ready to go live?"**
+**Dev mode fallback (ad_id starts with DEV_AD_):**
+
+`get_ad_preview` will return `_dev_mode_fallback: true`. Instead of an iframe preview, build a local preview from the creative spec in workflow context:
+
+1. Get the image URL: call `get_ad_images()`, match by `image_hash` from the creative spec, use the `url` field
+2. Show a draft preview using a `setupcard`:
+
+```setupcard
+{"phase":3,"title":"Ad Preview (Draft)","subtitle":"⚠️ Development Mode — 正式 Preview 需要 Live Mode","items":[
+  {"label":"Image","value":"[filename from uploaded_assets]","icon":"sparkles"},
+  {"label":"Headline","value":"[headline from chosen copy variation]","icon":"target"},
+  {"label":"Primary Text","value":"[full primary text]","icon":"target"},
+  {"label":"CTA","value":"[CTA type, e.g. WHATSAPP_MESSAGE]","icon":"target"},
+  {"label":"Destination","value":"[URL or WhatsApp number]","icon":"target"},
+  {"label":"Page","value":"[Page name]","icon":"shield"}
+]}
+```
+
+If image URL is available, also output the image as markdown: `![Ad Preview](IMAGE_URL)`
+
+Ask: **"⚠️ App 仲係 Development Mode。Campaign 同 Ad Set 已經建立好。轉做 Live Mode 之後，Creative 同 Ad 就可以正式發佈。"**
+
+```quickreplies
+["我知道了", "點樣轉 Live Mode？", "我想改 Ad Copy"]
+```
 
 ---
 
