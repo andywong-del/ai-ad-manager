@@ -25,9 +25,9 @@ Default if unclear → Scenario A.
 ## Funnel Classification
 
 Classify each campaign by optimization_goal:
-- **TOFU 引流（曝光 + 流量）**: REACH, LINK_CLICKS, THRUPLAY, LANDING_PAGE_VIEWS, POST_ENGAGEMENT, PROFILE_VISIT
-- **MOFU 興趣（互動 + 留資）**: LEAD_GENERATION, OFFSITE_CONVERSIONS (lead)
-- **BOFU 轉化（成交 + 對話）**: CONVERSATIONS, OFFSITE_CONVERSIONS (purchase), VALUE, APP_INSTALLS
+- **TOFU 認知 (Awareness)**: REACH, THRUPLAY, POST_ENGAGEMENT — 純曝光，建立品牌認知
+- **MOFU 考慮 (Consideration)**: LINK_CLICKS, LANDING_PAGE_VIEWS, PROFILE_VISIT, LEAD_GENERATION — 主動探索，表達興趣
+- **BOFU 轉化 (Conversion)**: CONVERSATIONS, OFFSITE_CONVERSIONS, VALUE, APP_INSTALLS — 採取行動，完成轉化
 
 ---
 
