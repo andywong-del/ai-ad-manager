@@ -178,49 +178,68 @@ Do NOT show the objective as a separate `options` block — it must be inside th
 
 **After user picks objective** — show COMPLETE Stage 1 with ALL fields inside the card. If the objective needs a destination (Sales/Messages/Leads), include it as an inline select. Do NOT use separate quickreplies or options blocks — everything goes inside the setupcard.
 
+**IMPORTANT: Every editable field MUST include an `options` array.** The frontend uses this to show an inline dropdown when user clicks Edit — no chat roundtrip needed. The user picks a value from the dropdown, it sends the selection, and the agent re-renders the card with the updated value.
+
 **Sales/Messages objective** — includes destination select:
 ```setupcard
 {"phase":1,"status":"active","title":"Stage 1: Strategy","items":[
-  {"label":"Goal","value":"[Objective]","icon":"target","editable":true},
+  {"label":"Goal","value":"[Objective]","icon":"target","editable":true,"options":[
+    {"id":"OUTCOME_SALES","title":"Sales (銷售)"},
+    {"id":"OUTCOME_LEADS","title":"Leads (潛在客戶)"},
+    {"id":"OUTCOME_TRAFFIC","title":"Traffic (流量)"},
+    {"id":"OUTCOME_AWARENESS","title":"Awareness (知名度)"},
+    {"id":"OUTCOME_ENGAGEMENT","title":"Engagement (互動)"}
+  ]},
   {"label":"Destination","value":"Select destination...","icon":"target","type":"select","options":[
     {"id":"whatsapp","title":"WhatsApp","description":"Send customers to WhatsApp chat"},
     {"id":"website","title":"Website (網站)","description":"Drive traffic to your website"},
     {"id":"messenger","title":"Messenger","description":"Start Messenger conversations"},
     {"id":"instagram_dm","title":"Instagram DM","description":"Start Instagram Direct conversations"}
   ]},
-  {"label":"Location","value":"[Account country]","icon":"target","editable":true},
-  {"label":"Budget","value":"[Smart default + currency]/day","icon":"dollar","editable":true},
-  {"label":"Page","value":"[Page Name]","icon":"shield","editable":true},
-  {"label":"CTA","value":"[Auto CTA]","icon":"sparkles","editable":true}
+  {"label":"Location","value":"[Account country]","icon":"target","editable":true,"options":[
+    {"id":"HK","title":"Hong Kong"},{"id":"TW","title":"Taiwan"},{"id":"SG","title":"Singapore"},
+    {"id":"MY","title":"Malaysia"},{"id":"US","title":"United States"},{"id":"UK","title":"United Kingdom"}
+  ]},
+  {"label":"Budget","value":"[Smart default + currency]/day","icon":"dollar","editable":true,"options":[
+    {"id":"10000","title":"HK$100/day"},{"id":"20000","title":"HK$200/day"},
+    {"id":"50000","title":"HK$500/day"},{"id":"100000","title":"HK$1,000/day"}
+  ]},
+  {"label":"Page","value":"[Page Name]","icon":"shield","editable":true,"options":[POPULATE_FROM_get_pages]},
+  {"label":"CTA","value":"[Auto CTA]","icon":"sparkles","editable":true,"options":[
+    {"id":"WHATSAPP_MESSAGE","title":"Send WhatsApp Message"},{"id":"SHOP_NOW","title":"Shop Now"},
+    {"id":"LEARN_MORE","title":"Learn More"},{"id":"SIGN_UP","title":"Sign Up"}
+  ]}
 ]}
 ```
 
 **Leads objective** — different destination options:
 ```setupcard
 {"phase":1,"status":"active","title":"Stage 1: Strategy","items":[
-  {"label":"Goal","value":"Leads (潛在客戶)","icon":"target","editable":true},
+  {"label":"Goal","value":"Leads (潛在客戶)","icon":"target","editable":true,"options":[SAME_AS_ABOVE]},
   {"label":"Destination","value":"Select destination...","icon":"target","type":"select","options":[
     {"id":"whatsapp","title":"WhatsApp","description":"Collect leads via WhatsApp"},
     {"id":"lead_form","title":"Lead Form","description":"Use Facebook lead form"},
     {"id":"website","title":"Website","description":"Send to website landing page"}
   ]},
-  {"label":"Location","value":"[Account country]","icon":"target","editable":true},
-  {"label":"Budget","value":"[Smart default + currency]/day","icon":"dollar","editable":true},
-  {"label":"Page","value":"[Page Name]","icon":"shield","editable":true},
-  {"label":"CTA","value":"[Auto CTA]","icon":"sparkles","editable":true}
+  {"label":"Location","value":"...","icon":"target","editable":true,"options":[SAME_COUNTRIES]},
+  {"label":"Budget","value":"...","icon":"dollar","editable":true,"options":[SAME_BUDGETS]},
+  {"label":"Page","value":"...","icon":"shield","editable":true,"options":[FROM_get_pages]},
+  {"label":"CTA","value":"...","icon":"sparkles","editable":true,"options":[SAME_CTAS]}
 ]}
 ```
 
-**Traffic/Awareness/Engagement** — no destination needed, skip the Destination row:
+**Traffic/Awareness/Engagement** — no destination row:
 ```setupcard
 {"phase":1,"status":"active","title":"Stage 1: Strategy","items":[
-  {"label":"Goal","value":"[Objective]","icon":"target","editable":true},
-  {"label":"Location","value":"[Account country]","icon":"target","editable":true},
-  {"label":"Budget","value":"[Smart default + currency]/day","icon":"dollar","editable":true},
-  {"label":"Page","value":"[Page Name]","icon":"shield","editable":true},
-  {"label":"CTA","value":"[Auto CTA]","icon":"sparkles","editable":true}
+  {"label":"Goal","value":"[Objective]","icon":"target","editable":true,"options":[SAME_OBJECTIVES]},
+  {"label":"Location","value":"...","icon":"target","editable":true,"options":[SAME_COUNTRIES]},
+  {"label":"Budget","value":"...","icon":"dollar","editable":true,"options":[SAME_BUDGETS]},
+  {"label":"Page","value":"...","icon":"shield","editable":true,"options":[FROM_get_pages]},
+  {"label":"CTA","value":"...","icon":"sparkles","editable":true,"options":[SAME_CTAS]}
 ]}
 ```
+
+Use the account's actual currency for budget options. Populate Page options from `get_pages()` results.
 
 All objectives share these pending stages:
 
@@ -233,42 +252,15 @@ All objectives share these pending stages:
 ```
 
 ```quickreplies
-["✅ Confirm Stage 1", "Rebuild"]
+["✅ Confirm Stage 1"]
 ```
 
-**RULE: Every choice lives INSIDE the setupcard as a `type:"select"` item. Never show quickreplies or separate options blocks for choices that belong to a stage.**
+**RULES:**
+1. Every editable field includes `options` array — Edit opens dropdown client-side, no extra chat message.
+2. Only quickreply allowed is the confirm/action button. NO "Change location", "Change budget", etc.
+3. `type:"select"` items (like Destination) show as dropdown immediately. `editable:true` items show as text with a hover Edit button that opens the dropdown.
 
 **SMART PARSING**: If user provides multiple details in one message (e.g. "Sales campaign, WhatsApp, HK, $200/day"), parse ALL values and pre-fill everything. Go straight to the review card.
-
-### Handling Stage 1 Edits
-
-When user clicks the inline Edit button on a field, re-show the Stage 1 setupcard with that field changed to `type:"select"`:
-
-**Location edit** — show as inline select:
-```json
-{"label":"Location","value":"Select location...","icon":"target","type":"select","options":[
-  {"id":"HK","title":"Hong Kong"},
-  {"id":"TW","title":"Taiwan"},
-  {"id":"SG","title":"Singapore"},
-  {"id":"MY","title":"Malaysia"},
-  {"id":"US","title":"United States"},
-  {"id":"UK","title":"United Kingdom"}
-]}
-```
-
-**Budget edit** — show as inline select (use account currency):
-```json
-{"label":"Budget","value":"Select budget...","icon":"dollar","type":"select","options":[
-  {"id":"10000","title":"HK$100/day"},
-  {"id":"20000","title":"HK$200/day"},
-  {"id":"50000","title":"HK$500/day"},
-  {"id":"100000","title":"HK$1,000/day"}
-]}
-```
-
-**RULE: Never use quickreplies for field edits. Always re-show the setupcard with the edited field as `type:"select"`.**
-
-After user picks a value, re-show the full Stage 1 setupcard with the change applied (field reverts to normal text with new value).
 
 ---
 

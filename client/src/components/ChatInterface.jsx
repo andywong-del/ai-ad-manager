@@ -712,6 +712,44 @@ const InlineSelect = ({ item, onSend }) => {
   );
 };
 
+// ── Setup Card Item Row (handles editable + inline select) ───────────────────
+const SetupCardItem = ({ item, status, iconCls, dotColor, onSend }) => {
+  const [editing, setEditing] = useState(false);
+
+  const icon = item.icon === 'target' ? <Target size={13} className={iconCls} /> :
+    item.icon === 'dollar' ? <DollarSign size={13} className={iconCls} /> :
+    item.icon === 'shield' ? <Shield size={13} className={iconCls} /> :
+    item.icon === 'sparkles' ? <Sparkles size={13} className={iconCls} /> :
+    <div className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />;
+
+  // Show inline select: either type:"select" items OR editable items with options when Edit clicked
+  const showSelect = status === 'active' && (
+    (item.type === 'select' && item.options?.length) ||
+    (editing && item.editable && item.options?.length)
+  );
+
+  return (
+    <div className="flex items-start gap-3 px-4 py-2.5 group">
+      <div className="w-5 flex items-center justify-center shrink-0 mt-0.5">{icon}</div>
+      <div className="flex-1 min-w-0">
+        <p className={`text-[10px] font-medium uppercase tracking-wide text-slate-400`}>{item.label}</p>
+        {showSelect ? (
+          <InlineSelect item={item} onSend={(val) => { setEditing(false); onSend?.(val); }} status={status} />
+        ) : (
+          <p className={`text-[13px] font-semibold mt-0.5 ${status === 'done' ? 'text-slate-600' : 'text-slate-800'}`}>{item.value}</p>
+        )}
+        {item.detail && <p className="text-[11px] text-slate-400 mt-0.5">{item.detail}</p>}
+      </div>
+      {item.editable && status === 'active' && !showSelect && item.options?.length > 0 && (
+        <button onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+          className="opacity-0 group-hover:opacity-100 text-[10px] text-blue-500 hover:text-blue-700 font-medium px-2 py-1 rounded-md hover:bg-blue-50 transition-all shrink-0">
+          Edit
+        </button>
+      )}
+    </div>
+  );
+};
+
 // ── Setup Card (campaign/ad set review — collapsible phase card) ─────────────
 const SetupCard = ({ data, onSend }) => {
   const status = data.status || 'active'; // "done" | "active" | "pending"
@@ -765,30 +803,7 @@ const SetupCard = ({ data, onSend }) => {
       {!collapsed && data.items?.length > 0 && (
         <div className="divide-y divide-slate-50">
           {data.items.map((item, i) => (
-            <div key={i} className="flex items-start gap-3 px-4 py-2.5 group">
-              <div className="w-5 flex items-center justify-center shrink-0 mt-0.5">
-                {item.icon === 'target' ? <Target size={13} className={iconCls} /> :
-                 item.icon === 'dollar' ? <DollarSign size={13} className={iconCls} /> :
-                 item.icon === 'shield' ? <Shield size={13} className={iconCls} /> :
-                 item.icon === 'sparkles' ? <Sparkles size={13} className={iconCls} /> :
-                 <div className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className={`text-[10px] font-medium uppercase tracking-wide ${status === 'done' ? 'text-slate-400' : 'text-slate-400'}`}>{item.label}</p>
-                {item.type === 'select' && item.options?.length && status === 'active' ? (
-                  <InlineSelect item={item} onSend={onSend} status={status} />
-                ) : (
-                  <p className={`text-[13px] font-semibold mt-0.5 ${status === 'done' ? 'text-slate-600' : 'text-slate-800'}`}>{item.value}</p>
-                )}
-                {item.detail && <p className="text-[11px] text-slate-400 mt-0.5">{item.detail}</p>}
-              </div>
-              {item.editable && status === 'active' && (
-                <button onClick={(e) => { e.stopPropagation(); onSend?.(`I want to change ${item.label}`); }}
-                  className="opacity-0 group-hover:opacity-100 text-[10px] text-blue-500 hover:text-blue-700 font-medium px-2 py-1 rounded-md hover:bg-blue-50 transition-all shrink-0">
-                  Edit
-                </button>
-              )}
-            </div>
+            <SetupCardItem key={i} item={item} status={status} iconCls={iconCls} dotColor={dotColor} onSend={onSend} />
           ))}
         </div>
       )}
