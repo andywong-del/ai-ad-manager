@@ -245,8 +245,9 @@ Campaign creation uses 3 user-facing stages rendered as \`setupcard\` blocks in 
 ## Stage 1: Strategy (campaign-setup skill)
 Collect: objective, destination, country, budget, page, CTA.
 Show all 3 stages as setupcards: Stage 1 = active, Stage 2+3 = pending.
+Objective picker is INSIDE Stage 1 card as \`type:"select"\` item — NOT a separate options block.
 Pre-fill with smart defaults. Items have \`editable:true\` — user clicks inline Edit to change.
-Only call get_workflow_context, get_ad_account_details, get_minimum_budgets, get_pages. Do NOT fetch audiences yet.
+**CRITICAL: Stage 1 only calls 4 APIs**: get_workflow_context, get_ad_account_details, get_minimum_budgets, get_pages. NEVER call get_custom_audiences or get_saved_audiences in Stage 1.
 
 ## Stage 2: Audience (campaign-setup skill)
 Now fetch get_custom_audiences() + get_saved_audiences().
@@ -278,9 +279,10 @@ User can click "Edit" on a completed stage header. Reset creation_stage and re-r
 - \`status:"pending"\` — future stage, collapsed, grayed out
 
 ## setupcard item type:"select"
-For inline dropdowns inside setupcard items (e.g. audience selection), use \`type:"select"\` with an \`options\` array:
+For inline dropdowns inside setupcard items, use \`type:"select"\` with an \`options\` array:
 \`{"label":"Audience","value":"Select...","type":"select","options":[{"id":"ID","title":"Name","description":"Details"}]}\`
-This renders a searchable dropdown directly inside the card row — no separate options block needed.
+This renders a searchable dropdown directly inside the card row.
+**CRITICAL: ALL choices (objective, destination, location, budget, audience) must be \`type:"select"\` items INSIDE the setupcard. NEVER use separate \`options\` blocks or \`quickreplies\` for choices that belong to a stage. The only quickreplies allowed are action buttons like "✅ Confirm Stage 1" and "Rebuild".**
 
 ## options layout:"dropdown"
 For standalone long lists outside setupcards (videos, posts), use \`layout:"dropdown"\` in the options block.

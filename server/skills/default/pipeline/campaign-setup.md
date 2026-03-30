@@ -53,7 +53,7 @@ get_minimum_budgets()
 get_pages()
 ```
 
-**Do NOT call `get_custom_audiences()` or `get_saved_audiences()` here.** Defer those to Stage 2 when the user actually reaches the audience step. This keeps Stage 1 fast.
+**STOP — only these 4 calls. Do NOT call `get_custom_audiences()`, `get_saved_audiences()`, or any other API here. Audience data is fetched in Stage 2 only.**
 
 Then detect path:
 
@@ -152,10 +152,18 @@ For duration edits:
 
 ### PATH C — Guided (no materials)
 
-**First response** — show 3 stages + objective picker:
+**First response** — show 3 stages with objective picker INSIDE Stage 1 as inline select:
 
 ```setupcard
-{"phase":1,"status":"active","title":"Stage 1: Strategy","subtitle":"Choose your campaign goal","items":[]}
+{"phase":1,"status":"active","title":"Stage 1: Strategy","items":[
+  {"label":"Goal","value":"Select your campaign goal...","icon":"target","type":"select","options":[
+    {"id":"OUTCOME_SALES","title":"Sales (銷售)","description":"Drive purchases, WhatsApp conversations, or website conversions"},
+    {"id":"OUTCOME_LEADS","title":"Leads (潛在客戶)","description":"Collect leads via forms, Messenger, or WhatsApp"},
+    {"id":"OUTCOME_TRAFFIC","title":"Traffic (流量)","description":"Send people to your website or app"},
+    {"id":"OUTCOME_AWARENESS","title":"Awareness (知名度)","description":"Reach people likely to remember your ads"},
+    {"id":"OUTCOME_ENGAGEMENT","title":"Engagement (互動)","description":"More likes, comments, shares, or video views"}
+  ]}
+]}
 ```
 
 ```setupcard
@@ -166,38 +174,55 @@ For duration edits:
 {"phase":3,"status":"pending","title":"Stage 3: Creative","subtitle":"Complete Stage 2 first","items":[]}
 ```
 
-```options
-{"title":"What's your campaign goal?","options":[
-  {"id":"OUTCOME_SALES","title":"Sales","description":"Drive purchases, WhatsApp conversations, or website conversions"},
-  {"id":"OUTCOME_LEADS","title":"Leads","description":"Collect leads via forms, Messenger, or WhatsApp"},
-  {"id":"OUTCOME_TRAFFIC","title":"Traffic","description":"Send people to your website or app"},
-  {"id":"OUTCOME_AWARENESS","title":"Awareness","description":"Reach people likely to remember your ads"},
-  {"id":"OUTCOME_ENGAGEMENT","title":"Engagement","description":"More likes, comments, shares, or video views"}
-]}
-```
+Do NOT show the objective as a separate `options` block — it must be inside the Stage 1 setupcard.
 
-**After user picks objective** — propose COMPLETE Stage 1 with smart defaults.
+**After user picks objective** — show COMPLETE Stage 1 with ALL fields inside the card. If the objective needs a destination (Sales/Messages/Leads), include it as an inline select. Do NOT use separate quickreplies or options blocks — everything goes inside the setupcard.
 
-For Messages/Leads objectives, ask destination first:
-```quickreplies
-["WhatsApp", "Messenger", "Instagram DM"]
-```
-or for Leads:
-```quickreplies
-["WhatsApp", "Lead Form", "Website"]
-```
-
-Then show full Stage 1 with everything pre-filled:
-
+**Sales/Messages objective** — includes destination select:
 ```setupcard
 {"phase":1,"status":"active","title":"Stage 1: Strategy","items":[
-  {"label":"Goal","value":"[Objective] ([Destination])","icon":"target","editable":true},
+  {"label":"Goal","value":"[Objective]","icon":"target","editable":true},
+  {"label":"Destination","value":"Select destination...","icon":"target","type":"select","options":[
+    {"id":"whatsapp","title":"WhatsApp","description":"Send customers to WhatsApp chat"},
+    {"id":"website","title":"Website (網站)","description":"Drive traffic to your website"},
+    {"id":"messenger","title":"Messenger","description":"Start Messenger conversations"},
+    {"id":"instagram_dm","title":"Instagram DM","description":"Start Instagram Direct conversations"}
+  ]},
   {"label":"Location","value":"[Account country]","icon":"target","editable":true},
   {"label":"Budget","value":"[Smart default + currency]/day","icon":"dollar","editable":true},
   {"label":"Page","value":"[Page Name]","icon":"shield","editable":true},
   {"label":"CTA","value":"[Auto CTA]","icon":"sparkles","editable":true}
 ]}
 ```
+
+**Leads objective** — different destination options:
+```setupcard
+{"phase":1,"status":"active","title":"Stage 1: Strategy","items":[
+  {"label":"Goal","value":"Leads (潛在客戶)","icon":"target","editable":true},
+  {"label":"Destination","value":"Select destination...","icon":"target","type":"select","options":[
+    {"id":"whatsapp","title":"WhatsApp","description":"Collect leads via WhatsApp"},
+    {"id":"lead_form","title":"Lead Form","description":"Use Facebook lead form"},
+    {"id":"website","title":"Website","description":"Send to website landing page"}
+  ]},
+  {"label":"Location","value":"[Account country]","icon":"target","editable":true},
+  {"label":"Budget","value":"[Smart default + currency]/day","icon":"dollar","editable":true},
+  {"label":"Page","value":"[Page Name]","icon":"shield","editable":true},
+  {"label":"CTA","value":"[Auto CTA]","icon":"sparkles","editable":true}
+]}
+```
+
+**Traffic/Awareness/Engagement** — no destination needed, skip the Destination row:
+```setupcard
+{"phase":1,"status":"active","title":"Stage 1: Strategy","items":[
+  {"label":"Goal","value":"[Objective]","icon":"target","editable":true},
+  {"label":"Location","value":"[Account country]","icon":"target","editable":true},
+  {"label":"Budget","value":"[Smart default + currency]/day","icon":"dollar","editable":true},
+  {"label":"Page","value":"[Page Name]","icon":"shield","editable":true},
+  {"label":"CTA","value":"[Auto CTA]","icon":"sparkles","editable":true}
+]}
+```
+
+All objectives share these pending stages:
 
 ```setupcard
 {"phase":2,"status":"pending","title":"Stage 2: Audience","subtitle":"Complete Stage 1 first","items":[]}
@@ -211,23 +236,39 @@ Then show full Stage 1 with everything pre-filled:
 ["✅ Confirm Stage 1", "Rebuild"]
 ```
 
+**RULE: Every choice lives INSIDE the setupcard as a `type:"select"` item. Never show quickreplies or separate options blocks for choices that belong to a stage.**
+
 **SMART PARSING**: If user provides multiple details in one message (e.g. "Sales campaign, WhatsApp, HK, $200/day"), parse ALL values and pre-fill everything. Go straight to the review card.
 
 ### Handling Stage 1 Edits
 
-When user clicks the inline Edit button on a field or says "Change location":
-```quickreplies
-["Hong Kong", "Taiwan", "Singapore", "Malaysia", "United States", "United Kingdom", "Other..."]
+When user clicks the inline Edit button on a field, re-show the Stage 1 setupcard with that field changed to `type:"select"`:
+
+**Location edit** — show as inline select:
+```json
+{"label":"Location","value":"Select location...","icon":"target","type":"select","options":[
+  {"id":"HK","title":"Hong Kong"},
+  {"id":"TW","title":"Taiwan"},
+  {"id":"SG","title":"Singapore"},
+  {"id":"MY","title":"Malaysia"},
+  {"id":"US","title":"United States"},
+  {"id":"UK","title":"United Kingdom"}
+]}
 ```
 
-When user says "Change budget":
-```quickreplies
-["HK$100/day", "HK$200/day", "HK$500/day", "HK$1,000/day", "Other..."]
+**Budget edit** — show as inline select (use account currency):
+```json
+{"label":"Budget","value":"Select budget...","icon":"dollar","type":"select","options":[
+  {"id":"10000","title":"HK$100/day"},
+  {"id":"20000","title":"HK$200/day"},
+  {"id":"50000","title":"HK$500/day"},
+  {"id":"100000","title":"HK$1,000/day"}
+]}
 ```
 
-Use the account's currency for budget quickreplies.
+**RULE: Never use quickreplies for field edits. Always re-show the setupcard with the edited field as `type:"select"`.**
 
-After any edit, re-show the updated Stage 1 setupcard with the change applied.
+After user picks a value, re-show the full Stage 1 setupcard with the change applied (field reverts to normal text with new value).
 
 ---
 
