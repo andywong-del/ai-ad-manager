@@ -2004,9 +2004,10 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, creationStep, 
 
     // Detect creation intent → show wizard instead of sending to agent
     const isCreateIntent = /\b(create|launch|new|start)\b.*\b(campaign|ad|ads)\b/i.test(t)
-      || /建立|新增|開|launch|create/.test(t) && /(廣告|campaign|ad)/i.test(t);
+      || (/建立|新增|開/.test(t) && /廣告|campaign|ad/i.test(t));
     if (onStartCreation && !creationStep && isCreateIntent) {
       onStartCreation();
+      setInput('');
       return;
     }
 
@@ -2143,13 +2144,19 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, creationStep, 
 
           <div className="w-full max-w-3xl mx-auto grid grid-cols-2 lg:grid-cols-3 gap-3 mt-8 pb-8">
             {suggestedActions.map((action) => (
-              <ActionCard key={action.label} {...action} onSend={(prompt) => {
-                if (action.label === 'Create Campaign' && onStartCreation) {
-                  onStartCreation();
-                } else {
-                  handleSend(prompt);
-                }
-              }} disabled={isTyping} />
+              action.label === 'Create Campaign' ? (
+                <button key={action.label} onClick={() => onStartCreation?.()}
+                  className="flex flex-col bg-white border border-slate-200/80 rounded-2xl px-5 py-4 text-left hover:border-blue-200 hover:bg-blue-50/20 hover:shadow-md transition-all duration-200 group">
+                  <Zap size={28} className="text-blue-500" />
+                  <p className="text-[14px] font-bold text-slate-900 leading-snug mt-3">{action.label}</p>
+                  <p className="text-[12px] text-slate-400 leading-relaxed mt-1.5 flex-1">{action.desc}</p>
+                  <div className="flex items-center gap-1 mt-3 text-[11px] font-semibold text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                    Start <ArrowUpRight size={11} />
+                  </div>
+                </button>
+              ) : (
+                <ActionCard key={action.label} {...action} onSend={handleSend} disabled={isTyping} />
+              )
             ))}
           </div>
         </div>
