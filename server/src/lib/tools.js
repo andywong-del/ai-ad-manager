@@ -461,11 +461,18 @@ async function getObjectInsights({ object_id, date_preset = 'last_7d', since, un
   return insights;
 }
 
-// ─── Analyze Performance (single API call → 3 periods) ─────────────────────
+// ─── Analyze Performance (single API call → 3 periods, with streaming progress) ──
 async function analyzePerformance(_, c) {
   const { token, adAccountId } = ctx(c);
   if (!token) return { error: 'Not logged in.' };
   if (!adAccountId) return { error: 'No ad account selected.' };
+
+  // SSE emitter for progress events — bypasses LLM, goes directly to client
+  const sessionId = c.session?.id;
+  const sseFn = sessionId ? activeSessions.get(sessionId) : null;
+  const emitProgress = (msg) => {
+    if (sseFn) sseFn({ type: 'tool_result', name: 'analyze_performance', summary: msg });
+  };
 
   const t0 = Date.now();
   const now = new Date();
@@ -474,6 +481,8 @@ async function analyzePerformance(_, c) {
   const since30 = new Date(now); since30.setDate(now.getDate() - 30);
 
   const FIELDS = 'campaign_id,campaign_name,spend,impressions,clicks,ctr,cpm,reach,frequency,actions,cost_per_action_type,video_thruplay_watched_actions,action_values,purchase_roas';
+
+  emitProgress('Fetching 30-day campaign data...');
 
   // Single API call: 30-day daily breakdown at campaign level
   const [dailyRows, adSets] = await Promise.all([
@@ -486,7 +495,9 @@ async function analyzePerformance(_, c) {
     meta.getAdSets(token, adAccountId),
   ]);
 
-  console.log(`[analyzePerformance] API calls took ${Date.now() - t0}ms (${dailyRows?.length || 0} daily rows, ${adSets?.length || 0} ad sets)`);
+  const apiTime = Date.now() - t0;
+  emitProgress(`Data received — ${dailyRows?.length || 0} rows in ${(apiTime / 1000).toFixed(1)}s. Crunching numbers...`);
+  console.log(`[analyzePerformance] API calls took ${apiTime}ms (${dailyRows?.length || 0} daily rows, ${adSets?.length || 0} ad sets)`);
 
   // Build goal map from ad sets
   const goalMap = {};
@@ -598,6 +609,26 @@ async function analyzePerformance(_, c) {
 
   const _benchmarks = computeBenchmarks(baseline30d);
 
+  // Compute account summary and emit to client immediately
+  const totalSpend = current7d.reduce((s, r) => s + r.spend, 0);
+  const totalImpressions = current7d.reduce((s, r) => s + r.impressions, 0);
+  const totalClicks = current7d.reduce((s, r) => s + r.clicks, 0);
+  const accountSummary = {
+    total_spend: +totalSpend.toFixed(2),
+    total_impressions: totalImpressions,
+    total_clicks: totalClicks,
+    campaign_count: current7d.length,
+    period: `${current7dStart} to ${fmt(yesterday)}`,
+  };
+
+  // Emit account summary as SSE text — client shows this BEFORE LLM generates response
+  if (sseFn) {
+    const currency = totalSpend > 0 ? '$' : '';
+    const summaryText = `\n**7-Day Account Summary:** ${currency}${accountSummary.total_spend.toLocaleString()} spent across ${accountSummary.campaign_count} campaigns · ${accountSummary.total_clicks.toLocaleString()} clicks · ${accountSummary.total_impressions.toLocaleString()} impressions\n\n`;
+    sseFn({ type: 'text', content: summaryText });
+    emitProgress(`Analysis ready — ${current7d.length} campaigns, ${Object.keys(_benchmarks).length} goal groups`);
+  }
+
   console.log(`[analyzePerformance] Total time: ${Date.now() - t0}ms — ${current7d.length} campaigns, ${Object.keys(_benchmarks).length} goal groups`);
 
   return {
@@ -605,6 +636,7 @@ async function analyzePerformance(_, c) {
     previous_7d: previous7d,
     baseline_30d: baseline30d,
     _benchmarks,
+    account_summary: accountSummary,
   };
 }
 
