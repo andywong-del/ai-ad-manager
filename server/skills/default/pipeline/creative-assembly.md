@@ -17,11 +17,10 @@ leads_to: [ad-launcher]
 
 ---
 
-## FIRST ACTIONS (parallel, no preamble)
+## FIRST ACTIONS (no preamble)
 
 ```
 get_workflow_context()
-load_skill("ss3-creative")
 ```
 
 Then detect path from workflow state:
@@ -94,7 +93,7 @@ update_workflow_context({ data: {
 }})
 ```
 
-IMMEDIATELY `transfer_to_agent("ad_launcher")` — no text before or after.
+Proceed to Phase 3 — Review & Launch. Load `load_skill("ad-launcher")`.
 
 ---
 
@@ -122,7 +121,7 @@ create_ad_creative(
 update_workflow_context({ data: { creative_id: "[id]", ad_format: "EXISTING_POST" } })
 ```
 
-IMMEDIATELY `transfer_to_agent("ad_launcher")` — no text before or after.
+Proceed to Phase 3 — Review & Launch. Load `load_skill("ad-launcher")`.
 
 ---
 
@@ -283,4 +282,4 @@ create_ad_creative(
 update_workflow_context({ data: { creative_id: "[id]", ad_format: "[format]" } })
 ```
 
-IMMEDIATELY `transfer_to_agent("ad_launcher")` — no text before or after.
+Proceed to Phase 3 — Review & Launch. Load `load_skill("ad-launcher")`.

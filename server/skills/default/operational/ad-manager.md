@@ -13,76 +13,16 @@ safety:
 
 # Ad Manager
 
-## API Endpoints
+## Available Tools
 
-### Read
-
-```
-GET /api/ads?adAccountId=act_XXX
-```
-Returns all ads for the ad account, including performance insights.
-
-```
-GET /api/ads/:id
-```
-Returns full details for a specific ad, including its creative, status, and tracking configuration.
-
-```
-GET /api/ads/:id/leads
-```
-Returns lead form submissions collected by this ad.
-
-```
-GET /api/ads/:id/previews?ad_format=DESKTOP_FEED_STANDARD
-```
-Returns an HTML preview of the ad for the specified placement.
-
-### Create
-
-```
-POST /api/ads
-```
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| adAccountId | string | yes | Format: `act_XXX` |
-| name | string | yes | Ad name |
-| adset_id | string | yes | The ad set this ad belongs to |
-| creative | object | yes | Must contain `creative_id` referencing an existing creative |
-| status | string | no | Default: `PAUSED` |
-| tracking_specs | array | no | Conversion tracking configuration |
-| conversion_domain | string | no | Domain for conversion events |
-
-```
-POST /api/ads/:id/copies
-```
-
-| Field | Type | Notes |
-|---|---|---|
-| deep_copy | boolean | `true` duplicates ad with its creative. Default: `false` |
-| rename_strategy | string | How to name the copy |
-| status_option | string | Status for the new ad (e.g., `PAUSED`) |
-
-### Update
-
-```
-PATCH /api/ads/:id
-```
-
-| Field | Type | Notes |
-|---|---|---|
-| name | string | New ad name |
-| status | string | See statuses below |
-| creative | object | Link a different creative via `creative_id` |
-| tracking_specs | array | Update conversion tracking |
-| conversion_domain | string | Update conversion domain |
-
-### Delete
-
-```
-DELETE /api/ads/:id
-```
-Permanently deletes the ad.
+- `get_ads()` — list all ads with performance
+- `get_ad(ad_id)` — get single ad details
+- `get_ad_leads(ad_id)` — get lead form submissions
+- `get_ad_preview(ad_id, ad_format)` — preview HTML
+- `create_ad(adset_id, name, creative_id, status)` — create ad
+- `copy_ad(ad_id)` — duplicate ad
+- `update_ad(ad_id, name?, status?, creative?)` — update ad
+- `delete_ad(ad_id)` — permanently delete
 
 ## Execution Workflow
 

@@ -1517,12 +1517,14 @@ const executorTools = pick(
   'targeting_search', 'targeting_browse', 'targeting_suggestions', 'targeting_validation',
   'get_reach_estimate', 'get_delivery_estimate',
   // Creative assembly
-  'get_ad_images', 'get_ad_videos', 'get_page_posts', 'get_page_videos',
+  'get_ad_images', 'get_ad_videos', 'get_page_posts', 'get_page_videos', 'get_ig_media',
   'upload_ad_image', 'upload_ad_video', 'get_ad_video_status',
   'create_ad_creative', 'update_ad_creative',
   // Ad CRUD
   'create_ad', 'create_ads_bulk', 'update_ad', 'delete_ad', 'copy_ad',
-  'get_ads', 'get_ad',
+  'get_ads', 'get_ad', 'get_ad_leads',
+  // Lead forms
+  'get_lead_form_leads',
   // Launch & preview
   'preflight_check', 'get_ad_preview',
   // Shared

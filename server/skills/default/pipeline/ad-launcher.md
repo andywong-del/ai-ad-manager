@@ -17,11 +17,10 @@ leads_to: []
 
 ---
 
-## FIRST ACTIONS (parallel, no preamble)
+## FIRST ACTIONS (no preamble)
 
 ```
 get_workflow_context()
-load_skill("ss4-launcher")
 ```
 
 Detect mode from workflow state:
@@ -110,10 +109,10 @@ update_ad(ad_id: "[from workflow]", status: "ACTIVE")
 
 ### Step 6 — Handoff
 
-1. `update_workflow_context({ data: { ad_id: "[id]", activation_status: "ACTIVE" } })`
-2. IMMEDIATELY `transfer_to_agent("ad_manager")` — no text before the transfer.
+1. `update_workflow_context({ data: { ad_id: "[id]", activation_status: "ACTIVE", clear_task: true } })`
+2. Transfer back to root: `transfer_to_agent("ad_manager")`.
 
-`ad_manager` delivers the final success summary and quick replies.
+Root agent delivers the final success summary and quick replies.
 
 ---
 
@@ -188,8 +187,8 @@ update_ad(ad_id: "[id]", status: "ACTIVE")
 
 ### BL-6 — Handoff
 
-1. `update_workflow_context({ data: { ad_ids: [...], activation_status: "ACTIVE" } })`
-2. IMMEDIATELY `transfer_to_agent("ad_manager")` — no text before the transfer.
+1. `update_workflow_context({ data: { ad_ids: [...], activation_status: "ACTIVE", clear_task: true } })`
+2. Transfer back to root: `transfer_to_agent("ad_manager")`.
 
 ---
 

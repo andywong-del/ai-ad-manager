@@ -35,7 +35,6 @@ leads_to: [creative-assembly]
 
 ```
 get_workflow_context()
-load_skill("ss1-strategist")
 get_ad_account_details()
 get_minimum_budgets()
 get_pages()
@@ -94,7 +93,7 @@ Run in sequence:
 If page_id — use the only page, or the first page if multiple (user can change in Ads Manager).
 
 3. `update_workflow_context({ data: { campaign_id, campaign_objective, optimization_goal, conversion_destination, adset_id, page_id, bulk_mode: true, uploaded_assets: [...] } })`
-4. IMMEDIATELY `transfer_to_agent("creative_builder")` — no text before or after.
+4. Proceed to Phase 2 — Creative Assembly. Load `load_skill("creative-assembly")`.
 
 ---
 
@@ -135,7 +134,7 @@ End with: **"Looks right? Reply 'yes' to create & boost."**
 1. `create_campaign(name: "Boost — [Date]", objective: "OUTCOME_ENGAGEMENT", status: "PAUSED", special_ad_categories: [])` → save `campaign_id`
 2. `create_ad_set(...)` with same smart defaults → save `adset_id`
 3. `update_workflow_context({ data: { campaign_id, campaign_objective: "OUTCOME_ENGAGEMENT", optimization_goal: "POST_ENGAGEMENT", adset_id, page_id, boost_mode: true, object_story_id: "[PAGE_ID_POST_ID]" } })`
-4. IMMEDIATELY `transfer_to_agent("creative_builder")` — no text before or after.
+4. Proceed to Phase 2 — Creative Assembly. Load `load_skill("creative-assembly")`.
 
 ---
 
@@ -191,7 +190,7 @@ End with: **"Looks right? Reply 'yes' to create the campaign & ad set."**
 1. `create_campaign(...)` → save `campaign_id`
 2. `create_ad_set(...)` with smart defaults + pixel_id if website destination → save `adset_id`
 3. `update_workflow_context({ data: { campaign_id, campaign_objective, optimization_goal, conversion_destination, adset_id, page_id, whatsapp_phone_number: "[if WhatsApp]", pixel_id: "[if website+pixel]" } })`
-4. IMMEDIATELY `transfer_to_agent("creative_builder")` — no text before or after.
+4. Proceed to Phase 2 — Creative Assembly. Load `load_skill("creative-assembly")`.
 
 ---
 

@@ -14,64 +14,18 @@ safety:
 
 # Ad Set Manager
 
-## API Endpoints
+## Available Tools
 
-### Read
+- `get_ad_sets()` — list all ad sets
+- `get_ad_set(ad_set_id)` — get single ad set details
+- `get_ad_set_ads(ad_set_id)` — list ads in ad set
+- `get_delivery_estimate(ad_set_id)` — estimated daily reach
+- `create_ad_set(campaign_id, name, optimization_goal, billing_event, targeting, status, daily_budget?, ...)` — create ad set
+- `copy_ad_set(ad_set_id)` — duplicate ad set
+- `update_ad_set(ad_set_id, name?, status?, daily_budget?, targeting?, ...)` — update ad set
+- `delete_ad_set(ad_set_id)` — permanently delete
 
-```
-GET /api/adsets?adAccountId=act_XXX
-```
-Returns all ad sets for the given ad account.
-
-```
-GET /api/adsets/:id
-```
-Returns full details for a specific ad set.
-
-```
-GET /api/adsets/:id/ads
-```
-Returns all ads within an ad set.
-
-```
-GET /api/adsets/:id/delivery_estimate
-```
-Returns estimated daily reach and delivery metrics for the ad set's current targeting and budget.
-
-### Create
-
-```
-POST /api/adsets
-```
-
-Required fields: `adAccountId`, `name`, `campaign_id`, `optimization_goal`, `billing_event`, `targeting`, `status`.
-
-Optional fields: `bid_amount`, `daily_budget`, `lifetime_budget`, `start_time`, `end_time`, `promoted_object`, `adset_schedule`.
-
-Provide exactly one of `daily_budget` or `lifetime_budget`. If using `lifetime_budget`, `end_time` is required.
-
-```
-POST /api/adsets/:id/copies
-```
-
-| Field | Notes |
-|---|---|
-| deep_copy | `true` copies ads inside the ad set as well |
-| rename_strategy | `DEEP_COPY_PREFIX` or `NO_RENAME` |
-| status_option | `ACTIVE`, `PAUSED`, or `INHERITED` |
-
-### Update
-
-```
-PATCH /api/adsets/:id
-```
-All fields optional: `name`, `status`, `daily_budget`, `lifetime_budget`, `bid_amount`, `targeting`, `end_time`, `adset_schedule`.
-
-### Delete
-
-```
-DELETE /api/adsets/:id
-```
+Budget must be exactly one of `daily_budget` or `lifetime_budget` (in CENTS). If `lifetime_budget`, `end_time` is required.
 
 ## Execution Workflow
 
