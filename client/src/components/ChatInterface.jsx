@@ -2063,7 +2063,7 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, creationStep, 
     setInput('');
     setAttachments([]);
     inputRef.current?.focus();
-  }, [input, isTyping, onSend, attachments, slashSkills]);
+  }, [input, isTyping, onSend, attachments, slashSkills, onStartCreation, creationStep]);
 
   const handleKeyDown = useCallback((e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
@@ -2103,10 +2103,25 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, creationStep, 
         </div>
       )}
 
-      {/* Subtle inline hint when no account connected */}
+      {/* ── Creation Wizard (renders above everything when active) ── */}
+      {creationStep && (
+        <CreationWizard
+          step={creationStep}
+          summary={creationSummary}
+          onSend={handleSend}
+          preUploadedFiles={attachments.filter(a => a.status === 'done' && (a.result?.image_hash || a.result?.video_id)).map(a => ({
+            name: a.file.name,
+            preview: a.preview,
+            type: a.file.type,
+            image_hash: a.result?.image_hash,
+            video_id: a.result?.video_id,
+          }))}
+          onUploadFiles={addFiles}
+        />
+      )}
 
-      {/* Empty State */}
-      {isEmptyState && (
+      {/* Empty State — hidden when wizard is active */}
+      {isEmptyState && !creationStep && (
         <div className="flex-1 flex flex-col px-8 overflow-y-auto">
           <div className="flex-[0_0_18%]" />
 
@@ -2141,23 +2156,8 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, creationStep, 
       )}
 
       {/* Chat messages */}
-      {!isEmptyState && (
+      {(!isEmptyState || creationStep) && (
         <>
-          {creationStep ? (
-            <CreationWizard
-              step={creationStep}
-              summary={creationSummary}
-              onSend={handleSend}
-              preUploadedFiles={attachments.filter(a => a.status === 'done' && (a.result?.image_hash || a.result?.video_id)).map(a => ({
-                name: a.file.name,
-                preview: a.preview,
-                type: a.file.type,
-                image_hash: a.result?.image_hash,
-                video_id: a.result?.video_id,
-              }))}
-              onUploadFiles={addFiles}
-            />
-          ) : null}
           <div className="flex-1 overflow-y-auto">
             <div className="max-w-3xl mx-auto px-4 pt-6 pb-2">
               {messages.map((msg, idx) => {
