@@ -68,6 +68,10 @@ export const groupSessionsByDate = (sessions) => {
     if (!groups[group]) groups[group] = [];
     groups[group].push(s);
   }
+  // Sort pinned sessions to top within each group
+  for (const group in groups) {
+    groups[group].sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
+  }
   return groups;
 };
 
@@ -190,6 +194,14 @@ export const useChatSessions = ({ token, adAccountId, accountName, language = 'e
     });
   }, []);
 
+  const pinSession = useCallback((sessionId) => {
+    setSessions(prev => {
+      const newList = prev.map(s => s.id === sessionId ? { ...s, pinned: !s.pinned } : s);
+      setSessionList(newList);
+      return newList;
+    });
+  }, []);
+
   // ── Folder management ────────────────────────────────────────────────────
   const createFolder = useCallback((name) => {
     const folder = { id: `folder_${Date.now()}`, name, order: folders.length };
@@ -297,6 +309,7 @@ export const useChatSessions = ({ token, adAccountId, accountName, language = 'e
     switchSession,
     deleteSession,
     renameSession,
+    pinSession,
     // Chat (from agent)
     messages: agent.messages,
     isTyping: agent.isTyping,

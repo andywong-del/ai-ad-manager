@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { MessageSquare } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import { useChatSessions } from '../hooks/useChatSessions.js';
 import { useSkills } from '../hooks/useSkills.js';
 import { ChatInterface } from './ChatInterface.jsx';
@@ -60,7 +60,7 @@ export const Dashboard = ({
   } = useSkills();
 
   const {
-    sessions, activeSessionId, createNewChat, switchSession, deleteSession,
+    sessions, activeSessionId, createNewChat, switchSession, deleteSession, renameSession, pinSession,
     messages, isTyping, thinkingText, activityLog, sendMessage, stopGeneration, notification,
     savedItems, saveItem, deleteSavedItem,
     folders, createFolder, deleteFolder, renameFolder, reorderFolders,
@@ -133,6 +133,12 @@ export const Dashboard = ({
     setCanvasData(null);
   }, []);
 
+  // Close canvas when switching chats
+  const handleSwitchSessionWithCanvas = useCallback((sessionId) => {
+    setCanvasData(null); // close canvas on chat switch
+    handleSwitchSession(sessionId);
+  }, [handleSwitchSession]);
+
   // Find current saved item for viewer
   const currentSavedItem = activeView.type === 'saved'
     ? savedItems.find(i => i.id === activeView.itemId)
@@ -151,8 +157,10 @@ export const Dashboard = ({
         sessions={sessions}
         activeSessionId={activeSessionId}
         onNewChat={handleNewChat}
-        onSwitchSession={handleSwitchSession}
+        onSwitchSession={handleSwitchSessionWithCanvas}
         onDeleteSession={deleteSession}
+        onRenameSession={renameSession}
+        onPinSession={pinSession}
         savedItems={savedItems}
         onViewSavedItem={handleViewSavedItem}
         onDeleteSavedItem={handleDeleteSavedItem}
@@ -186,7 +194,7 @@ export const Dashboard = ({
               onClick={() => setSidebarOpen(true)}
               className="absolute top-4 left-4 z-10 w-8 h-8 rounded-lg bg-white/80 backdrop-blur-sm border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-700 transition-colors shadow-sm"
             >
-              <MessageSquare size={16} />
+              <Menu size={16} />
             </button>
           )}
 

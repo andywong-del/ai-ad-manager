@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Zap, Plus, MessageSquare, Trash2, ChevronDown, ChevronLeft, ChevronRight, LogOut, FileText, Lightbulb, FolderOpen, Building2, Check, Globe, GripVertical, FolderPlus, X, Users, Sparkles } from 'lucide-react';
+import { Zap, Plus, MessageSquare, Trash2, ChevronDown, ChevronLeft, ChevronRight, LogOut, FileText, Lightbulb, FolderOpen, Building2, Check, Globe, GripVertical, FolderPlus, X, Users, Sparkles, MoreVertical, Pin, Pencil } from 'lucide-react';
 import { groupSessionsByDate } from '../hooks/useChatSessions.js';
 import { useAdAccounts } from '../hooks/useAdAccounts.js';
 import { useBusinesses } from '../hooks/useBusinesses.js';
@@ -194,6 +194,8 @@ export const Sidebar = ({
   onNewChat,
   onSwitchSession,
   onDeleteSession,
+  onRenameSession,
+  onPinSession,
   savedItems,
   onViewSavedItem,
   onDeleteSavedItem,
@@ -219,6 +221,10 @@ export const Sidebar = ({
 }) => {
   const [openFolders, setOpenFolders] = useState({});
   const [hoveredSession, setHoveredSession] = useState(null);
+  const [contextMenu, setContextMenu] = useState(null); // { sessionId, x, y }
+  const [renamingSession, setRenamingSession] = useState(null); // sessionId
+  const [renameValue, setRenameValue] = useState('');
+  const contextRef = useRef(null);
   const [addingFolder, setAddingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [dragFolderId, setDragFolderId] = useState(null);
@@ -226,6 +232,14 @@ export const Sidebar = ({
   const [editingFolderId, setEditingFolderId] = useState(null);
   const [editFolderName, setEditFolderName] = useState('');
   const newFolderRef = useRef(null);
+
+  // Close context menu on outside click
+  useEffect(() => {
+    if (!contextMenu) return;
+    const handler = (e) => { if (contextRef.current && !contextRef.current.contains(e.target)) setContextMenu(null); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [contextMenu]);
 
   const grouped = groupSessionsByDate(sessions);
   const sortedFolders = [...folders].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
@@ -438,26 +452,43 @@ export const Sidebar = ({
                   <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-3 py-1.5">{group}</p>
                   {items.map(session => {
                     const isActive = session.id === activeSessionId && activeView?.type === 'chat';
+                    const isPinned = session.pinned;
                     return (
-                      <button
-                        key={session.id}
-                        onClick={() => onSwitchSession(session.id)}
-                        onMouseEnter={() => setHoveredSession(session.id)}
-                        onMouseLeave={() => setHoveredSession(null)}
-                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-[13px] transition-colors group relative
-                          ${isActive ? 'bg-blue-50 text-blue-700 font-medium' : 'text-slate-600 hover:bg-slate-50'}`}
-                      >
-                        <MessageSquare size={14} className={`shrink-0 ${isActive ? 'text-blue-500' : 'text-slate-300'}`} />
-                        <span className="truncate flex-1">{session.title}</span>
-                        {hoveredSession === session.id && (
+                      <div key={session.id} className="relative">
+                        {renamingSession === session.id ? (
+                          <div className="flex items-center gap-2 px-3 py-2">
+                            <MessageSquare size={14} className="text-blue-500 shrink-0" />
+                            <input
+                              value={renameValue}
+                              onChange={(e) => setRenameValue(e.target.value)}
+                              onBlur={() => { onRenameSession?.(session.id, renameValue); setRenamingSession(null); }}
+                              onKeyDown={(e) => { if (e.key === 'Enter') { onRenameSession?.(session.id, renameValue); setRenamingSession(null); } if (e.key === 'Escape') setRenamingSession(null); }}
+                              className="flex-1 text-[13px] font-medium bg-blue-50 border border-blue-200 rounded px-2 py-0.5 focus:outline-none"
+                              autoFocus
+                            />
+                          </div>
+                        ) : (
                           <button
-                            onClick={(e) => { e.stopPropagation(); onDeleteSession(session.id); }}
-                            className="absolute right-2 p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors"
+                            onClick={() => onSwitchSession(session.id)}
+                            onMouseEnter={() => setHoveredSession(session.id)}
+                            onMouseLeave={() => setHoveredSession(null)}
+                            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-[13px] transition-colors group
+                              ${isActive ? 'bg-blue-50 text-blue-700 font-medium' : 'text-slate-600 hover:bg-slate-50'}`}
                           >
-                            <Trash2 size={12} />
+                            <MessageSquare size={14} className={`shrink-0 ${isActive ? 'text-blue-500' : 'text-slate-300'}`} />
+                            <span className="truncate flex-1">{session.title}</span>
+                            {isPinned && <Pin size={10} className="text-blue-400 shrink-0" />}
+                            {hoveredSession === session.id && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setContextMenu({ sessionId: session.id, x: e.clientX, y: e.clientY }); }}
+                                className="p-1 rounded hover:bg-slate-200 text-slate-300 hover:text-slate-600 transition-colors shrink-0"
+                              >
+                                <MoreVertical size={12} />
+                              </button>
+                            )}
                           </button>
                         )}
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -513,6 +544,40 @@ export const Sidebar = ({
           )}
         </div>
       </div>
+      {/* Context Menu for chat sessions */}
+      {contextMenu && (
+        <div ref={contextRef}
+          style={{ position: 'fixed', top: contextMenu.y, left: contextMenu.x, zIndex: 100 }}
+          className="bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden min-w-[140px]">
+          <button onClick={() => {
+            onPinSession?.(contextMenu.sessionId);
+            setContextMenu(null);
+          }}
+            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-[12px] text-slate-600 hover:bg-slate-50 transition-colors">
+            <Pin size={13} className="text-slate-400" />
+            {sessions.find(s => s.id === contextMenu.sessionId)?.pinned ? 'Unpin' : 'Pin'}
+          </button>
+          <button onClick={() => {
+            const session = sessions.find(s => s.id === contextMenu.sessionId);
+            setRenameValue(session?.title || '');
+            setRenamingSession(contextMenu.sessionId);
+            setContextMenu(null);
+          }}
+            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-[12px] text-slate-600 hover:bg-slate-50 transition-colors">
+            <Pencil size={13} className="text-slate-400" />
+            Rename
+          </button>
+          <button onClick={() => {
+            onDeleteSession(contextMenu.sessionId);
+            setContextMenu(null);
+          }}
+            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-[12px] text-red-500 hover:bg-red-50 transition-colors border-t border-slate-100">
+            <Trash2 size={13} />
+            Delete
+          </button>
+        </div>
+      )}
+
     </aside>
   );
 };
