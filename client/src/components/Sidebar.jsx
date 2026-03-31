@@ -299,15 +299,6 @@ export const Sidebar = ({
         </button>
       </div>
 
-      {/* Account Picker */}
-      <SidebarAccountPicker
-        selectedAccount={selectedAccount}
-        selectedBusiness={selectedBusiness}
-        onSelect={onSelectAccount}
-        token={token}
-        onLogin={onLogin}
-      />
-
       {/* Audiences */}
       <div className="px-3 mb-1">
         <button
