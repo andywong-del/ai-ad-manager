@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import { Send, Square, Paperclip, CheckCircle2, XCircle, ArrowUpRight, BarChart3, Target, TrendingDown, Search, FileText, DollarSign, AlertTriangle, Zap, X, Upload, Image, Film, TrendingUp, ChevronRight, Shield, Sparkles, Download, Bookmark, ChevronDown, Link2, Building2, Check, ChevronLeft, Users } from 'lucide-react';
+import VideoAudienceCard from './VideoAudienceCard.jsx';
 import { useAdAccounts } from '../hooks/useAdAccounts.js';
 import { useBusinesses } from '../hooks/useBusinesses.js';
 import {
@@ -209,7 +210,7 @@ export const parseMarkdownTable = (text) => {
   let textBuf = [];
   let i = 0;
 
-  const RICH_BLOCKS = ['adlib', 'metrics', 'options', 'insights', 'score', 'copyvariations', 'steps', 'quickreplies', 'funnel', 'comparison', 'budget', 'trend', 'adpreview', 'setupcard', 'mediagrid'];
+  const RICH_BLOCKS = ['adlib', 'metrics', 'options', 'insights', 'score', 'copyvariations', 'steps', 'quickreplies', 'funnel', 'comparison', 'budget', 'trend', 'adpreview', 'setupcard', 'mediagrid', 'videoaudience'];
   // Aliases for common LLM misspellings
   const BLOCK_ALIASES = { option: 'options', quickreplie: 'quickreplies', quickreply: 'quickreplies', copyvariation: 'copyvariations', metric: 'metrics', step: 'steps', setupcard: 'setupcard', videogrid: 'mediagrid', postgrid: 'mediagrid' };
 
@@ -1732,6 +1733,7 @@ export const RichContent = ({ text, onSend }) => {
           case 'budget': return <BudgetCard key={i} data={seg.data} />;
           case 'trend': return <TrendCard key={i} data={seg.data} />;
           case 'adpreview': return <AdPreviewBlock key={i} data={seg.data} />;
+          case 'videoaudience': return <VideoAudienceCard key={i} data={seg.data} onSend={onSend} />;
           default: return <div key={i} className="whitespace-pre-wrap">{renderRichText(seg.content)}</div>;
         }
       })}
@@ -1839,7 +1841,7 @@ const AutoCanvasOpener = ({ data, onOpen }) => {
 };
 
 // ── Message bubble ────────────────────────────────────────────────────────────
-const MessageBubble = ({ message, isLatest, onSend, isTyping, onSaveItem, folders, isAnswered, answeredWith, onOpenCanvas }) => {
+const MessageBubble = ({ message, isLatest, onSend, isTyping, onSaveItem, folders, isAnswered, answeredWith, onOpenCanvas, adAccountId, token }) => {
   if (message.type === 'report') return (<><ReportMessage message={message} timestamp={message.timestamp} /><div className="mb-2" /></>);
   if (message.type === 'table') return (<><TableMessage message={message} />{isLatest && message.actions?.length > 0 && <QuickReplies actions={message.actions} onSend={onSend} disabled={isTyping} />}<div className="mb-6" /></>);
 
@@ -1880,6 +1882,7 @@ const MessageBubble = ({ message, isLatest, onSend, isTyping, onSaveItem, folder
                   case 'trend': return <TrendCard key={i} data={seg.data} />;
                   case 'adpreview': return <AdPreviewBlock key={i} data={seg.data} />;
                   case 'mediagrid': return <MediaGridCard key={i} data={seg.data} onSend={onSend} isAnswered={isAnswered} selectedTitle={selectedTitle} />;
+                  case 'videoaudience': return <VideoAudienceCard key={i} data={seg.data} onSend={onSend} isAnswered={isAnswered} adAccountId={adAccountId} token={token} />;
                   default: return <div key={i} className="whitespace-pre-wrap">{renderRichText(seg.content)}</div>;
                 }
               })}
@@ -2731,6 +2734,8 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, activityLog = 
                     isAnswered={!!nextUserMsg}
                     answeredWith={nextUserMsg?.text || ''}
                     onOpenCanvas={onOpenCanvas}
+                    adAccountId={adAccountId}
+                    token={token}
                   />
                 );
               })}

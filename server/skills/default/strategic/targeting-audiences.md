@@ -57,47 +57,21 @@ After this ONE selection, go directly to the single-card for that audience type.
 
 ---
 
-## VIDEO Audience — Single-Card
+## VIDEO Audience — Self-Contained Card
 
-**FIRST ACTIONS** (call in parallel, before showing any UI):
+**FIRST ACTIONS** (call in parallel):
 1. `get_pages()`
 2. `get_connected_instagram_accounts()`
-3. `get_page_videos(page_id)` — for the first/primary page
 
-Then show BOTH blocks in ONE response:
+Then output a `videoaudience` block with the pages and IG accounts data. The frontend renders a complete card with dropdowns + video list that fetches and updates instantly. Do NOT call `get_page_videos` — the frontend handles it.
 
-**Block 1 — Config setupcard:**
-
-```setupcard
-{"phase":1,"status":"active","title":"建立影片受眾","icon":"target","items":[
-  {"label":"影片來源","value":"Facebook Page","type":"select","options":[
-    {"id":"fb","title":"Facebook Page"},
-    {"id":"ig","title":"Instagram Account"}
-  ]},
-  {"label":"專頁/帳號","value":"[First page name]","type":"select","options":[
-    mapped from get_pages results — {"id":"PAGE_ID","title":"Page Name"} for each
-  ]},
-  {"label":"互動程度","value":"睇咗至少 3 秒","type":"select","options":[
-    {"id":"3s","title":"睇咗至少 3 秒","description":"最闊嘅受眾"},
-    {"id":"10s","title":"睇咗至少 10 秒"},
-    {"id":"thruplay","title":"ThruPlay (15 秒)","description":"睇完或睇咗 15 秒以上"},
-    {"id":"25pct","title":"睇咗 25%"},
-    {"id":"50pct","title":"睇咗 50%","description":"有明顯興趣"},
-    {"id":"75pct","title":"睇咗 75%","description":"高參與度"},
-    {"id":"95pct","title":"睇咗 95%","description":"幾乎睇晒，最高意向"}
-  ]},
-  {"label":"保留期","value":"365 日","editable":true,"options":[
-    {"id":"30","title":"30 日"},
-    {"id":"90","title":"90 日"},
-    {"id":"180","title":"180 日"},
-    {"id":"365","title":"365 日 (預設)"}
-  ]}
-]}
+```videoaudience
+{"pages":[mapped from get_pages — {"id":"PAGE_ID","name":"Page Name"} for each],"igAccounts":[mapped from get_connected_instagram_accounts — {"id":"IG_ID","username":"username"} for each]}
 ```
 
-**Block 2 — Video selector:** The server already emitted the full video list via SSE mediagrid. Just tell the user: "請喺上面嘅影片列表揀選你想用嘅片（可多選），然後撳「Confirm」。"
+Tell the user: "請喺下面設定影片受眾條件，揀選影片，然後撳「Confirm」。"
 
-If the server mediagrid doesn't appear (e.g. tool returned error), fall back to outputting a mediagrid block yourself with ALL videos from the API response. Do NOT truncate.
+Do NOT call `create_custom_audience` until user sends confirmation with their video selections.
 
 **When user clicks Confirm** with selected videos → call `create_custom_audience` with:
 ```

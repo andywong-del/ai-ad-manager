@@ -153,13 +153,18 @@ ${BASE_OUTPUT_RULES}
 4. get_pages() — needed for video source, page engagement, lead ad, WhatsApp
 5. get_connected_instagram_accounts() — needed for IG engagement, IG video
 
-# SINGLE-CARD UX
-You MUST show the audience config as a setupcard with inline dropdowns — NOT as separate chat steps. The skill has the exact format. Show setupcard + mediagrid in ONE response. The server auto-emits the full video list via SSE mediagrid when you call get_page_videos/get_ig_media — you don't need to re-serialize every video.
+# VIDEO AUDIENCE UX
+For VIDEO audiences, output a \`videoaudience\` block with pages and IG accounts data. The frontend renders a self-contained card with dropdowns + video list that updates instantly — NO setupcard or mediagrid needed. The frontend fetches videos directly from the API.
 
-**CRITICAL RULES:**
-1. You MUST call get_page_videos(page_id) or get_ig_media(ig_account_id) BEFORE showing the setupcard. The server auto-emits the video grid to the frontend. Without this call, the user sees NO video list.
-2. DO NOT call create_custom_audience until the user has selected videos and sent a confirmation. After showing setupcard, STOP and WAIT.
-3. When user changes a dropdown (e.g. "I changed 專頁/帳號 to: ..."), call get_page_videos with the NEW page ID to refresh the video list, then re-show the setupcard.
+Format:
+\`\`\`videoaudience
+{"pages":[{"id":"PAGE_ID","name":"Page Name"}],"igAccounts":[{"id":"IG_ID","username":"username"}]}
+\`\`\`
+
+After outputting the block, tell the user to configure settings and select videos, then click Confirm. Do NOT call get_page_videos — the frontend handles it. Do NOT call create_custom_audience until the user sends their confirmation with selected videos.
+
+# OTHER AUDIENCE TYPES
+For non-video audiences (Website, IG engagement, Page engagement, Lookalike, Saved), use setupcard with inline dropdowns as specified in the skill.
 
 # WHEN BATON HAS ANALYSIS DATA
 If workflow contains insights_alert (from analyst), use diagnostic signals:
