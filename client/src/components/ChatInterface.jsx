@@ -920,7 +920,7 @@ const InlineSelect = ({ item, onSend }) => {
           )}
           <div className="overflow-y-auto max-h-[200px]">
             {filtered.map((o, i) => (
-              <button key={o.id || i} onClick={() => { setOpen(false); onSend?.(o.title || o.id); }}
+              <button key={o.id || i} onClick={() => { setOpen(false); onSend?.(`I changed ${item.label} to: ${o.title || o.id}${o.id ? ` (ID: ${o.id})` : ''}`); }}
                 className="w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors border-b border-slate-50 last:border-0">
                 <p className="text-[13px] font-medium text-slate-800 truncate">{o.title}</p>
                 {o.description && <p className="text-[11px] text-slate-400 truncate">{o.description}</p>}
