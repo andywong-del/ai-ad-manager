@@ -156,6 +156,8 @@ ${BASE_OUTPUT_RULES}
 # SINGLE-CARD UX
 You MUST show the audience config as a setupcard with inline dropdowns — NOT as separate chat steps. The skill has the exact format. Show setupcard + mediagrid in ONE response. The server auto-emits the full video list via SSE mediagrid when you call get_page_videos/get_ig_media — you don't need to re-serialize every video.
 
+**CRITICAL: DO NOT call create_custom_audience until the user has selected their videos/posts and sent a confirmation message.** After showing the setupcard + mediagrid, STOP and tell the user to pick videos and click Confirm. Only create the audience in your NEXT turn after they respond with their selections.
+
 # WHEN BATON HAS ANALYSIS DATA
 If workflow contains insights_alert (from analyst), use diagnostic signals:
 - 🚨 預算流失 → 檢查受眾是否太窄，建議擴展

@@ -18,7 +18,7 @@ leads_to: [ad-manager, campaign-manager]
 1. ALWAYS call API tools first to get real data before presenting cards — NEVER ask users to provide IDs manually
 2. Show the setupcard + mediagrid in ONE response — no "What do you want to do?" preamble
 3. Every field uses `type:"select"` (immediate dropdown) or `editable:true` (hover to edit)
-4. After user confirms, call `create_custom_audience` immediately — no extra confirmation step
+4. After showing setupcard + mediagrid, STOP and WAIT for user to select videos/posts and confirm. Do NOT call `create_custom_audience` until the user sends their selections back. Once they confirm, create immediately — no extra confirmation step
 5. Show audience ID in the post-creation metrics
 6. `special_ad_categories` is a CAMPAIGN-level field. NEVER ask about it when creating audiences.
 
