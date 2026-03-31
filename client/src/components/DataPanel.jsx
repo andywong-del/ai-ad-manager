@@ -180,7 +180,7 @@ export const DataPanel = ({ adAccountId, selectedAccount, campaigns, insights, p
         <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-slate-800 truncate">{selectedAccount?.name || 'Ad Account'}</p>
-          <p className="text-xs text-slate-400 font-mono">{adAccountId} · Meta Graph API v19.0</p>
+          <p className="text-xs text-slate-400 font-mono">{adAccountId} · Meta Graph API v25.0</p>
         </div>
         <div className="hidden sm:flex items-center gap-1 flex-wrap justify-end">
           {['ads_read', 'ads_management', 'business_management', 'instagram_basic', 'instagram_manage_insights', 'pages_read_engagement', 'pages_show_list'].map(p => (

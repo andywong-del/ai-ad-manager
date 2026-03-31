@@ -226,15 +226,14 @@ router.post('/', async (req, res) => {
     // Register SSE emitter for this session so adAgent.js tools can emit tool_result events
     activeSessions.set(adkSessionId, (data) => sse(res, data));
 
-    // Run the agent and stream events (with retry on MALFORMED_FUNCTION_CALL)
-    const MAX_RETRIES = 1;
+    // Run the agent and stream events (with retry on transient errors)
+    const MAX_RETRIES = 2;
     let fullText = '';
     let eventCount = 0;
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       if (attempt > 0) {
-        console.log(`[chat] retry attempt ${attempt} after MALFORMED_FUNCTION_CALL`);
-        // Create a fresh session for retry to avoid corrupted state
+        console.log(`[chat] retry attempt ${attempt} — creating fresh session`);
         const retrySession = await sessionService.createSession({
           appName: 'ai_ad_manager',
           userId,
@@ -245,7 +244,7 @@ router.post('/', async (req, res) => {
         activeSessions.set(adkSessionId, (data) => sse(res, data));
       }
 
-      console.log(`[chat] running agent... (attempt ${attempt + 1})`);
+      console.log(`[chat] running agent... (attempt ${attempt + 1}/${MAX_RETRIES + 1})`);
       const events = runner.runAsync({
         userId,
         sessionId: adkSessionId,
@@ -255,8 +254,7 @@ router.post('/', async (req, res) => {
 
       fullText = '';
       eventCount = 0;
-      let malformedCall = false;
-
+      let shouldRetry = false;
 
       for await (const event of events) {
         eventCount++;
@@ -264,14 +262,20 @@ router.post('/', async (req, res) => {
           console.log(`[chat] event #${eventCount}: author=${event.author}, hasContent=${!!event.content}, errorCode=${event.errorCode || 'none'}`);
         }
 
-        // Detect MALFORMED_FUNCTION_CALL — retry instead of showing error
+        // Detect retryable errors — MALFORMED_FUNCTION_CALL or Gemini 500
         if (event.errorCode === 'MALFORMED_FUNCTION_CALL') {
           console.warn(`[chat] MALFORMED_FUNCTION_CALL detected, will retry`);
-          malformedCall = true;
+          shouldRetry = true;
           continue;
         }
 
-        if (event.errorMessage && event.errorCode !== 'MALFORMED_FUNCTION_CALL') {
+        if (event.errorMessage) {
+          const isGemini500 = String(event.errorCode) === '500' || event.errorMessage === 'Internal error encountered.';
+          if (isGemini500 && attempt < MAX_RETRIES) {
+            console.warn(`[chat] Gemini 500 error, will retry (attempt ${attempt + 1})`);
+            shouldRetry = true;
+            continue;
+          }
           console.error(`[chat] ADK error: ${event.errorCode} ${event.errorMessage}`);
           sse(res, { type: 'text', content: `Error: ${event.errorMessage}` });
           fullText += event.errorMessage;
@@ -291,7 +295,6 @@ router.post('/', async (req, res) => {
               if (name === 'transfer_to_agent') payload.target = args.agentName || args.agent_name;
               sse(res, payload);
               console.log(`[chat] tool call: ${name}`);
-              // Send workflow context updates to client
               if (name === 'update_workflow_context') {
                 const wfData = args.data;
                 if (wfData) sse(res, { type: 'context', data: wfData });
@@ -301,8 +304,8 @@ router.post('/', async (req, res) => {
         }
       }
 
-      // If we got text or no malformed call, stop retrying
-      if (fullText || !malformedCall) break;
+      // If we got text or no retryable error, stop
+      if (fullText || !shouldRetry) break;
     }
 
     console.log(`[chat] done: ${eventCount} events, ${fullText.length} chars of text`);

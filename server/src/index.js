@@ -31,7 +31,7 @@ app.get('/api/ping', (_req, res) => res.json({ ok: true }));
 app.get('/api/debug', async (_req, res) => {
   const { rootTools, analystTools } = await import('./lib/tools.js');
   res.json({
-    version: '2024-03-30-v3',
+    version: '2026-03-31-v4',
     hasGeminiKey: !!process.env.GEMINI_API_KEY,
     hasGenaiKey: !!process.env.GOOGLE_GENAI_API_KEY,
     nodeVersion: process.version,

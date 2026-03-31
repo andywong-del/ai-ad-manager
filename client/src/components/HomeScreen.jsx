@@ -42,7 +42,7 @@ export const HomeScreen = ({ onSend, selectedAccount }) => (
     <div className="w-full max-w-lg mb-5 bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3">
       <div className="flex items-center gap-2.5 mb-2">
         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-        <span className="text-xs font-semibold text-emerald-700">Meta Graph API v19.0 — Development</span>
+        <span className="text-xs font-semibold text-emerald-700">Meta Graph API v25.0 — Development</span>
         <span className="ml-auto text-xs text-emerald-600 font-mono">
           {selectedAccount ? selectedAccount.id : '—'}
         </span>

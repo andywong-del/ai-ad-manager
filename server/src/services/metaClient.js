@@ -2,7 +2,7 @@ import axios from 'axios';
 import { buildAudiencePayload } from '../utils/customerDataNormalizer.js';
 
 const BASE_URL = process.env.META_BASE_URL || 'https://graph.facebook.com';
-const API_VERSION = process.env.FB_API_VERSION || 'v19.0';
+const API_VERSION = process.env.FB_API_VERSION || 'v25.0';
 
 export const metaApi = axios.create({ baseURL: `${BASE_URL}/${API_VERSION}`, timeout: 60000 });
 
@@ -24,7 +24,8 @@ export async function fetchAll(url, token, params = {}, { maxPages = Infinity } 
         break;
       } catch (err) {
         const status = err.response?.status;
-        if (attempt < 2 && (status === 429 || status >= 500 || err.code === 'ECONNABORTED')) {
+        const metaCode = err.response?.data?.error?.code;
+        if (attempt < 2 && (status === 429 || status >= 500 || metaCode === 2 || err.code === 'ECONNABORTED')) {
           const delay = (attempt + 1) * 2000;
           console.warn(`[fetchAll] Retry ${attempt + 1}/2 after ${status || err.code} on ${isFullUrl ? nextUrl : url}`);
           await new Promise(r => setTimeout(r, delay));
@@ -65,7 +66,7 @@ export const getAdAccounts = async (token) => {
       limit: 100
     }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 export const getAdAccountDetails = async (token, adAccountId) => {
@@ -87,7 +88,7 @@ export const getAdAccountActivities = async (token, adAccountId, params = {}) =>
       ...params
     }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 export const getAdAccountUsers = async (token, adAccountId) => {
@@ -97,14 +98,14 @@ export const getAdAccountUsers = async (token, adAccountId) => {
       fields: 'id,name,role,permissions'
     }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 export const getMinimumBudgets = async (token, adAccountId) => {
   const { data } = await metaApi.get(`/${adAccountId}/minimum_budgets`, {
     params: { access_token: token }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 // ─── Campaigns ───────────────────────────────────────────────────────
@@ -118,7 +119,7 @@ export const getCampaignsList = async (token, adAccountId) => {
       fields: 'id,name,status',
     },
   });
-  return data.data;
+  return data?.data || [];
 };
 
 export const getCampaigns = async (token, adAccountId) => {
@@ -131,7 +132,7 @@ export const getCampaigns = async (token, adAccountId) => {
       fields: 'id,name,status,objective,daily_budget,lifetime_budget,insights.date_preset(last_7d){spend,impressions,clicks,ctr,cpm,actions,action_values,cost_per_action_type}',
     },
   });
-  return data.data;
+  return data?.data || [];
 };
 
 export const getCampaign = async (token, campaignId) => {
@@ -265,7 +266,7 @@ export const getAdSetDeliveryEstimate = async (token, adSetId) => {
   const { data } = await metaApi.get(`/${adSetId}/delivery_estimate`, {
     params: { access_token: token }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 // ─── Ads ─────────────────────────────────────────────────────────────
@@ -374,7 +375,7 @@ export const getAdImages = async (token, adAccountId) => {
       fields: 'id,hash,name,url,url_128,width,height,status,created_time'
     }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 export const uploadAdImage = async (token, adAccountId, imageData) => {
@@ -689,7 +690,7 @@ export const getInsights = async (token, adAccountId, datePreset = 'last_7d', ti
     params.date_preset = datePreset;
   }
   const { data } = await metaApi.get(`/${adAccountId}/insights`, { params });
-  return data.data[0] || {};
+  return data?.data?.[0] || {};
 };
 
 export const getObjectInsights = async (token, objectId, params = {}) => {
@@ -699,7 +700,7 @@ export const getObjectInsights = async (token, objectId, params = {}) => {
     queryParams.time_range = JSON.stringify(params.time_range);
   }
   const { data } = await metaApi.get(`/${objectId}/insights`, { params: queryParams });
-  return data.data;
+  return data?.data || [];
 };
 
 export const createAsyncReport = async (token, adAccountId, params = {}) => {
@@ -723,7 +724,7 @@ export const getAsyncReportResults = async (token, reportRunId) => {
   const { data } = await metaApi.get(`/${reportRunId}/insights`, {
     params: { access_token: token }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 // ─── Audiences ───────────────────────────────────────────────────────
@@ -733,7 +734,7 @@ export const getCustomAudiences = async (token, adAccountId) => {
   const { data } = await metaApi.get(`/${adAccountId}/customaudiences`, {
     params: { access_token: token, fields, limit: 50 }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 export const createCustomAudience = async (token, adAccountId, params) => {
@@ -933,7 +934,7 @@ export const getSavedAudiences = async (token, adAccountId) => {
       fields: 'id,name,targeting,run_status,time_created,time_updated'
     }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 export const createSavedAudience = async (token, adAccountId, params) => {
@@ -956,35 +957,35 @@ export const targetingSearch = async (token, adAccountId, query) => {
   const { data } = await metaApi.get(`/${adAccountId}/targetingsearch`, {
     params: { access_token: token, q: query }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 export const targetingBrowse = async (token, adAccountId) => {
   const { data } = await metaApi.get(`/${adAccountId}/targetingbrowse`, {
     params: { access_token: token }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 export const targetingSuggestions = async (token, adAccountId, targetingList) => {
   const { data } = await metaApi.get(`/${adAccountId}/targetingsuggestions`, {
     params: { access_token: token, targeting_list: targetingList }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 export const targetingValidation = async (token, adAccountId, targetingSpec) => {
   const { data } = await metaApi.get(`/${adAccountId}/targetingvalidation`, {
     params: { access_token: token, targeting_spec: JSON.stringify(targetingSpec) }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 export const getReachEstimate = async (token, adAccountId, targetingSpec) => {
   const { data } = await metaApi.get(`/${adAccountId}/reachestimate`, {
     params: { access_token: token, targeting_spec: JSON.stringify(targetingSpec) }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 export const getDeliveryEstimate = async (token, adAccountId, params) => {
@@ -995,14 +996,14 @@ export const getDeliveryEstimate = async (token, adAccountId, params) => {
       optimization_goal: params.optimization_goal
     }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 export const getBroadTargetingCategories = async (token, adAccountId) => {
   const { data } = await metaApi.get(`/${adAccountId}/broadtargetingcategories`, {
     params: { access_token: token }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 // ─── Ad Rules ────────────────────────────────────────────────────────
@@ -1016,7 +1017,7 @@ export const getAdRules = async (token, adAccountId) => {
       fields: AD_RULE_FIELDS
     }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 export const getAdRule = async (token, ruleId) => {
@@ -1054,7 +1055,7 @@ export const getAdRuleHistory = async (token, ruleId) => {
   const { data } = await metaApi.get(`/${ruleId}/history`, {
     params: { access_token: token }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 // ─── Ad Labels ───────────────────────────────────────────────────────
@@ -1066,7 +1067,7 @@ export const getAdLabels = async (token, adAccountId) => {
       fields: 'id,name,created_time,updated_time'
     }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 export const createAdLabel = async (token, adAccountId, name) => {
@@ -1108,7 +1109,7 @@ export const getPixels = async (token, adAccountId) => {
       fields: PIXEL_FIELDS
     }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 export const getPixel = async (token, pixelId) => {
@@ -1139,7 +1140,7 @@ export const getPixelStats = async (token, pixelId) => {
   const { data } = await metaApi.get(`/${pixelId}/stats`, {
     params: { access_token: token }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 export const sendConversionEvent = async (token, pixelId, eventData) => {
@@ -1176,7 +1177,7 @@ export const getCustomConversions = async (token, adAccountId) => {
       fields: 'id,name,rule,event_source_type,default_conversion_value,custom_event_type,pixel'
     }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 export const createCustomConversion = async (token, adAccountId, params) => {
@@ -1209,7 +1210,7 @@ export const getLeadForms = async (token, pageId) => {
       fields: 'id,name,status,locale,created_time,questions,privacy_policy_url'
     }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 export const getLeadFormLeads = async (token, formId) => {
@@ -1231,21 +1232,21 @@ export const getAdPreview = async (token, adId, adFormat) => {
   const { data } = await metaApi.get(`/${adId}/previews`, {
     params: { access_token: token, ad_format: adFormat }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 export const getCreativePreview = async (token, creativeId, adFormat) => {
   const { data } = await metaApi.get(`/${creativeId}/previews`, {
     params: { access_token: token, ad_format: adFormat }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 export const generatePreview = async (token, adAccountId, creativeSpec, adFormat) => {
   const { data } = await metaApi.get(`/${adAccountId}/generatepreviews`, {
     params: { access_token: token, creative: JSON.stringify(creativeSpec), ad_format: adFormat }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 // ─── Product Catalogs ────────────────────────────────────────────────
@@ -1257,7 +1258,7 @@ export const getCatalogs = async (token, businessId) => {
       fields: 'id,name,vertical,product_count,feed_count'
     }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 export const getCatalog = async (token, catalogId) => {
@@ -1300,7 +1301,7 @@ export const getCatalogProducts = async (token, catalogId, params = {}) => {
       ...params
     }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 export const batchCatalogProducts = async (token, catalogId, requests) => {
@@ -1317,7 +1318,7 @@ export const getCatalogProductSets = async (token, catalogId) => {
       fields: 'id,name,filter,product_count'
     }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 export const createProductSet = async (token, catalogId, params) => {
@@ -1348,7 +1349,7 @@ export const getCatalogProductFeeds = async (token, catalogId) => {
       fields: 'id,name,product_count,schedule,latest_upload'
     }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 export const createProductFeed = async (token, catalogId, params) => {
@@ -1376,7 +1377,7 @@ export const getCatalogDiagnostics = async (token, catalogId) => {
   const { data } = await metaApi.get(`/${catalogId}/diagnostics`, {
     params: { access_token: token }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 // ─── Business Manager ────────────────────────────────────────────────
@@ -1385,7 +1386,7 @@ export const getBusinesses = async (token) => {
   const { data } = await metaApi.get('/me/businesses', {
     params: { access_token: token, fields: 'id,name,verification_status' }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 export const getOwnedAdAccounts = async (token, businessId) => {
@@ -1396,7 +1397,7 @@ export const getOwnedAdAccounts = async (token, businessId) => {
       limit: 100
     }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 export const getBusinessDetails = async (token, businessId) => {
@@ -1416,7 +1417,7 @@ export const getBusinessUsers = async (token, businessId) => {
       fields: 'id,name,role,email'
     }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 export const getSystemUsers = async (token, businessId) => {
@@ -1426,7 +1427,7 @@ export const getSystemUsers = async (token, businessId) => {
       fields: 'id,name,role'
     }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 export const getBusinessOwnedPages = async (token, businessId) => {
@@ -1436,7 +1437,7 @@ export const getBusinessOwnedPages = async (token, businessId) => {
       fields: 'id,name,category,fan_count'
     }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 export const getBusinessOwnedPixels = async (token, businessId) => {
@@ -1446,7 +1447,7 @@ export const getBusinessOwnedPixels = async (token, businessId) => {
       fields: 'id,name,last_fired_time'
     }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 export const getBusinessOwnedCatalogs = async (token, businessId) => {
@@ -1456,7 +1457,7 @@ export const getBusinessOwnedCatalogs = async (token, businessId) => {
       fields: 'id,name,vertical,product_count'
     }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 export const getBusinessOwnedIGAccounts = async (token, businessId) => {
@@ -1466,7 +1467,7 @@ export const getBusinessOwnedIGAccounts = async (token, businessId) => {
       fields: 'id,username,profile_picture_url'
     }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 export const getBusinessClientAdAccounts = async (token, businessId) => {
@@ -1476,7 +1477,7 @@ export const getBusinessClientAdAccounts = async (token, businessId) => {
       fields: 'id,name,account_id,account_status,currency'
     }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 export const claimAdAccount = async (token, businessId, adAccountId) => {
@@ -1554,7 +1555,7 @@ export const getPages = async (token) => {
   const { data } = await metaApi.get('/me/accounts', {
     params: { access_token: token, fields: 'id,name,engagement,fan_count,category,access_token,instagram_business_account{id,name,username}' }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 // ─── Auto-resolve the ad account for a page's business ──────────────
@@ -1887,14 +1888,14 @@ export const getPageAds = async (token, pageId) => {
   const { data } = await metaApi.get(`/${pageId}/ads`, {
     params: { access_token: token, fields: 'id,name,status,effective_status', limit: 25 }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 export const getPagePosts = async (token, pageId) => {
   const { data } = await metaApi.get(`/${pageId}/posts`, {
     params: { access_token: token, fields: 'id,message,created_time,full_picture,permalink_url,shares,likes.summary(true),comments.summary(true)', limit: 25 }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 // ─── Batch API ───────────────────────────────────────────────────────
@@ -1926,7 +1927,7 @@ export const searchAdLibrary = async (token, params = {}) => {
       ...params,
     }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 // ─── Publisher Block Lists ───────────────────────────────────────────
@@ -1938,7 +1939,7 @@ export const getPublisherBlockLists = async (token, adAccountId) => {
       fields: 'id,name,app_publishers,web_publishers'
     }
   });
-  return data.data;
+  return data?.data || [];
 };
 
 export const createPublisherBlockList = async (token, adAccountId, name) => {

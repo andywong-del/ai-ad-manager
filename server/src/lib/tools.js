@@ -601,131 +601,69 @@ async function analyzePerformance(_, c) {
 
   const FIELDS = 'campaign_id,campaign_name,spend,impressions,clicks,ctr,cpm,reach,frequency,actions,cost_per_action_type,video_thruplay_watched_actions,action_values,purchase_roas';
 
-  emitProgress('Fetching 30-day campaign data...');
+  const since7 = new Date(now); since7.setDate(now.getDate() - 7);
+  const since14 = new Date(now); since14.setDate(now.getDate() - 14);
+  const since8 = new Date(now); since8.setDate(now.getDate() - 8);
+  const current7dStart = fmt(since7);
+  const prev7dStart = fmt(since14);
+  const prev7dEnd = fmt(since8);
 
-  // Single API call with pagination: 30-day daily breakdown at campaign level
-  const [dailyRows, adSets] = await Promise.all([
-    meta.fetchAll(`/${adAccountId}/insights`, token, {
-      level: 'campaign',
-      fields: FIELDS,
-      time_range: JSON.stringify({ since: fmt(since30), until: fmt(yesterday) }),
-      time_increment: 1,
-      limit: 500,
-    }, { maxPages: 10 }),
-    meta.getAdSets(token, adAccountId),
-  ]);
+  // Fetch ad sets first (can be 2000+ with heavy pagination)
+  emitProgress('Fetching ad set goals...');
+  const adSets = await meta.getAdSets(token, adAccountId);
+
+  // 3 separate aggregated calls — avoids time_increment=1 which causes
+  // Meta API errors (code 2 / 1504044) on large accounts
+  const insightParams = (since, until) => ({
+    level: 'campaign', fields: FIELDS,
+    time_range: JSON.stringify({ since, until }),
+    limit: 500,
+  });
+
+  emitProgress(`Got ${adSets?.length || 0} ad sets. Fetching current 7d...`);
+  const cur7dRows = await meta.fetchAll(`/${adAccountId}/insights`, token,
+    insightParams(current7dStart, fmt(yesterday)), { maxPages: 10 });
+
+  emitProgress('Fetching previous 7d...');
+  const prev7dRows = await meta.fetchAll(`/${adAccountId}/insights`, token,
+    insightParams(prev7dStart, prev7dEnd), { maxPages: 10 });
+
+  emitProgress('Fetching 30d baseline...');
+  const base30dRows = await meta.fetchAll(`/${adAccountId}/insights`, token,
+    insightParams(fmt(since30), fmt(yesterday)), { maxPages: 10 });
 
   const apiTime = Date.now() - t0;
-  emitProgress(`Data received — ${dailyRows?.length || 0} rows in ${(apiTime / 1000).toFixed(1)}s. Crunching numbers...`);
-  console.log(`[analyzePerformance] API calls took ${apiTime}ms (${dailyRows?.length || 0} daily rows, ${adSets?.length || 0} ad sets)`);
+  emitProgress(`Data received — ${(cur7dRows?.length || 0) + (prev7dRows?.length || 0) + (base30dRows?.length || 0)} campaign rows in ${(apiTime / 1000).toFixed(1)}s. Crunching numbers...`);
+  console.log(`[analyzePerformance] API calls took ${apiTime}ms (cur=${cur7dRows?.length || 0}, prev=${prev7dRows?.length || 0}, base=${base30dRows?.length || 0} campaigns, ${adSets?.length || 0} ad sets)`);
 
   // Build goal map from ad sets
   const goalMap = {};
-  for (const adSet of adSets) {
+  for (const adSet of (adSets || [])) {
     if (adSet.campaign_id && adSet.optimization_goal && !goalMap[adSet.campaign_id]) {
       goalMap[adSet.campaign_id] = adSet.optimization_goal;
     }
   }
 
-  // Split daily rows into 3 periods and aggregate per campaign
-  const since7 = new Date(now); since7.setDate(now.getDate() - 7);
-  const since14 = new Date(now); since14.setDate(now.getDate() - 14);
-  const since8 = new Date(now); since8.setDate(now.getDate() - 8);
-
-  const current7dStart = fmt(since7);
-  const prev7dStart = fmt(since14);
-  const prev7dEnd = fmt(since8);
-
-  // Accumulator: { [campaign_id]: { current: {...}, previous: {...}, baseline: {...} } }
-  const campaigns = {};
-
-  const mergeActions = (existing, incoming) => {
-    if (!incoming) return existing || [];
-    if (!existing) return [...incoming];
-    const map = {};
-    for (const a of existing) map[a.action_type] = parseInt(a.value) || 0;
-    for (const a of incoming) map[a.action_type] = (map[a.action_type] || 0) + (parseInt(a.value) || 0);
-    return Object.entries(map).map(([action_type, value]) => ({ action_type, value: String(value) }));
+  // Enrich each row with computed fields and optimization_goal
+  const enrichRow = (row) => {
+    const spend = parseFloat(row.spend) || 0;
+    const impressions = parseInt(row.impressions) || 0;
+    const clicks = parseInt(row.clicks) || 0;
+    const reach = parseInt(row.reach) || 0;
+    return {
+      ...row,
+      spend: +spend.toFixed(2),
+      impressions, clicks, reach,
+      ctr: impressions > 0 ? +((clicks / impressions) * 100).toFixed(2) : 0,
+      cpm: impressions > 0 ? +((spend / impressions) * 1000).toFixed(2) : 0,
+      frequency: reach > 0 ? +(impressions / reach).toFixed(2) : 0,
+      optimization_goal: goalMap[row.campaign_id] || null,
+    };
   };
 
-  const mergeRow = (acc, row) => {
-    if (!acc) {
-      return {
-        campaign_id: row.campaign_id,
-        campaign_name: row.campaign_name,
-        spend: parseFloat(row.spend) || 0,
-        impressions: parseInt(row.impressions) || 0,
-        clicks: parseInt(row.clicks) || 0,
-        reach: parseInt(row.reach) || 0,
-        actions: row.actions ? [...row.actions] : [],
-        cost_per_action_type: row.cost_per_action_type ? [...row.cost_per_action_type] : [],
-        video_thruplay_watched_actions: row.video_thruplay_watched_actions ? [...row.video_thruplay_watched_actions] : [],
-        action_values: row.action_values ? [...row.action_values] : [],
-      };
-    }
-    acc.spend += parseFloat(row.spend) || 0;
-    acc.impressions += parseInt(row.impressions) || 0;
-    acc.clicks += parseInt(row.clicks) || 0;
-    acc.reach += parseInt(row.reach) || 0;
-    acc.actions = mergeActions(acc.actions, row.actions);
-    acc.video_thruplay_watched_actions = mergeActions(acc.video_thruplay_watched_actions, row.video_thruplay_watched_actions);
-    acc.action_values = mergeActions(acc.action_values, row.action_values);
-    return acc;
-  };
-
-  for (const row of (dailyRows || [])) {
-    const cid = row.campaign_id;
-    if (!cid) continue;
-    const dateStart = row.date_start; // YYYY-MM-DD
-    if (!dateStart) continue;
-
-    if (!campaigns[cid]) campaigns[cid] = { current: null, previous: null, baseline: null };
-
-    // Baseline: all 30 days
-    campaigns[cid].baseline = mergeRow(campaigns[cid].baseline, row);
-
-    // Current 7d: dateStart >= since7 (i.e., >= today-7)
-    if (dateStart >= current7dStart) {
-      campaigns[cid].current = mergeRow(campaigns[cid].current, row);
-    }
-    // Previous 7d: prev7dStart <= dateStart <= prev7dEnd
-    if (dateStart >= prev7dStart && dateStart <= prev7dEnd) {
-      campaigns[cid].previous = mergeRow(campaigns[cid].previous, row);
-    }
-  }
-
-  // Compute derived fields and enrich with optimization_goal
-  const computeDerived = (agg) => {
-    if (!agg) return null;
-    agg.spend = +agg.spend.toFixed(2);
-    agg.ctr = agg.impressions > 0 ? +((agg.clicks / agg.impressions) * 100).toFixed(2) : 0;
-    agg.cpm = agg.impressions > 0 ? +((agg.spend / agg.impressions) * 1000).toFixed(2) : 0;
-    agg.frequency = agg.reach > 0 ? +(agg.impressions / agg.reach).toFixed(2) : 0;
-    return agg;
-  };
-
-  const current7d = [];
-  const previous7d = [];
-  const baseline30d = [];
-
-  for (const [cid, periods] of Object.entries(campaigns)) {
-    const goal = goalMap[cid] || null;
-    if (periods.current) {
-      const row = computeDerived(periods.current);
-      row.optimization_goal = goal;
-      current7d.push(row);
-    }
-    if (periods.previous) {
-      const row = computeDerived(periods.previous);
-      row.optimization_goal = goal;
-      previous7d.push(row);
-    }
-    if (periods.baseline) {
-      const row = computeDerived(periods.baseline);
-      row.optimization_goal = goal;
-      baseline30d.push(row);
-    }
-  }
+  const current7d = (cur7dRows || []).map(enrichRow);
+  const previous7d = (prev7dRows || []).map(enrichRow);
+  const baseline30d = (base30dRows || []).map(enrichRow);
 
   const _benchmarks = computeBenchmarks(baseline30d);
 
@@ -1569,6 +1507,7 @@ const pick = (...names) => names.map(n => _toolByName[n]).filter(Boolean);
 // Analyst — diagnosis, benchmarks, action_queue (read-only + baton write)
 const analystTools = pick(
   'analyze_performance',
+  'get_account_insights', 'get_object_insights',
   'get_workflow_context', 'update_workflow_context', 'load_skill'
 );
 
