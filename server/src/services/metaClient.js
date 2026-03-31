@@ -26,7 +26,7 @@ export async function fetchAll(url, token, params = {}, { maxPages = Infinity } 
         const status = err.response?.status;
         const metaCode = err.response?.data?.error?.code;
         if (attempt < 2 && (status === 429 || status >= 500 || metaCode === 2 || err.code === 'ECONNABORTED')) {
-          const delay = (attempt + 1) * 2000;
+          const delay = (attempt + 1) * 1000;
           console.warn(`[fetchAll] Retry ${attempt + 1}/2 after ${status || err.code} on ${isFullUrl ? nextUrl : url}`);
           await new Promise(r => setTimeout(r, delay));
           continue;
@@ -277,7 +277,7 @@ export const getAds = async (token, adAccountId) => {
   return fetchAll(`/${adAccountId}/ads`, token, {
     limit: 200,
     fields: AD_FIELDS,
-  });
+  }, { maxPages: 5 });
 };
 
 export const getAd = async (token, adId) => {
