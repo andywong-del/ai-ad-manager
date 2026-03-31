@@ -129,22 +129,13 @@ export const CanvasPanel = ({ data, onClose, onSend }) => {
 
   if (!data) return null;
 
-  // Parse dashboard data — support both old format (content string) and new format (structured)
+  // Dashboard data only — no legacy fallback
   const dashboard = useMemo(() => {
     if (data.dashboard) return data.dashboard;
-    // Try to extract dashboard block from content
-    if (data.content) {
-      const match = data.content.match(/```dashboard\n([\s\S]*?)```/);
-      if (match) {
-        try { return JSON.parse(match[1]); } catch { /* fall through */ }
-      }
-    }
     return null;
   }, [data]);
 
-  // If no dashboard data, fall back to simple content display
   if (!dashboard) {
-    // Legacy fallback — import RichContent dynamically to avoid circular dependency
     return (
       <div className={`flex flex-col bg-white/95 backdrop-blur-xl border-l border-slate-200 shadow-2xl transition-all duration-300 ${isFullScreen ? 'fixed inset-0 z-50' : 'relative h-full'}`}>
         <div className="shrink-0 flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">

@@ -1762,40 +1762,22 @@ export const hasRichCards = (text) => {
 
 // ── Split message into chat (text-only) vs canvas (full content with charts) ──
 // These block types get stripped from inline chat and rendered in the canvas panel instead
-const CANVAS_BLOCK_NAMES = ['metrics', 'budget', 'comparison', 'trend', 'funnel', 'adpreview', 'dashboard'];
+// Dashboard block is the only canvas trigger — old metrics/budget/trend blocks stay in chat
 
 export const splitChatAndCanvas = (text) => {
   if (!text) return { chatText: '', canvasData: null };
 
-  // Check for new dashboard block (structured JSON for interactive canvas)
+  // Only dashboard JSON block opens canvas — no legacy format
   const dashboardMatch = text.match(/```dashboard\n([\s\S]*?)```/);
   if (dashboardMatch) {
     try {
       const dashboard = JSON.parse(dashboardMatch[1]);
       const chatText = text.replace(/```dashboard\n[\s\S]*?```/g, '').replace(/\n{3,}/g, '\n\n').trim();
       return { chatText, canvasData: { dashboard, title: dashboard.title || 'Performance Dashboard' } };
-    } catch { /* fall through to legacy */ }
+    } catch { /* invalid JSON — keep everything in chat */ }
   }
 
-  // Legacy: check if any canvas-worthy blocks exist
-  const hasCanvas = CANVAS_BLOCK_NAMES.some(b => text.includes('```' + b));
-  const hasTable = /^\|.+\|$/m.test(text) && /^\|[\s\-:|]+\|$/m.test(text);
-
-  if (!hasCanvas && !hasTable) return { chatText: text, canvasData: null };
-
-  // Strip canvas blocks from chat text
-  let chatText = text;
-  for (const block of CANVAS_BLOCK_NAMES) {
-    const re = new RegExp('```' + block + '\\n[\\s\\S]*?```', 'g');
-    chatText = chatText.replace(re, '');
-  }
-  chatText = chatText.replace(/(?:^|\n)(\|.+\|\n\|[\s\-:|]+\|\n(?:\|.+\|\n?)*)/g, '');
-  chatText = chatText.replace(/\n{3,}/g, '\n\n').trim();
-
-  return {
-    chatText,
-    canvasData: { content: text, title: 'Performance Dashboard' },
-  };
+  return { chatText: text, canvasData: null };
 };
 
 // ── Save menu for agent messages ─────────────────────────────────────────────
@@ -1910,8 +1892,14 @@ const MessageBubble = ({ message, isLatest, onSend, isTyping, onSaveItem, folder
                   default: return <div key={i} className="whitespace-pre-wrap">{renderRichText(seg.content)}</div>;
                 }
               })}
-              {/* Auto-open canvas panel when message has chart/dashboard blocks */}
+              {/* Dashboard: auto-open on latest + show button to re-open */}
               {canvasData?.dashboard && isLatest && <AutoCanvasOpener data={canvasData} onOpen={onOpenCanvas} />}
+              {canvasData?.dashboard && (
+                <button onClick={() => onOpenCanvas?.(canvasData)}
+                  className="mt-2 flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-violet-600 text-white text-[13px] font-semibold hover:from-blue-600 hover:to-violet-700 transition-all shadow-sm">
+                  <BarChart3 size={14} /> View Dashboard
+                </button>
+              )}
             </div>
             <p className="text-xs text-slate-400 mt-1 ml-1">{fmtTime(message.timestamp)}</p>
           </div>

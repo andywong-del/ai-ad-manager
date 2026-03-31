@@ -123,9 +123,19 @@ Read-only 診斷。你唔會 create、update 或 delete 任何嘢。
 Account summary is ALREADY shown to the user by the tool. Do NOT repeat it. Jump STRAIGHT into the diagnostic. Start writing IMMEDIATELY.
 
 # OUTPUT FORMAT
-The insights-reporting skill defines per-scenario output (A/B/C/D). Follow the matched scenario's Chat + Canvas structure exactly.
+Write chat text first (analysis narrative + steps + insights + quickreplies).
 
-CRITICAL RULE: text between/around canvas blocks appears in BOTH panels. Always write ALL chat text + chat blocks first, then ALL canvas blocks at the end with NO text between them.
+Then at the END, output a \`dashboard\` JSON block for the canvas panel. This is REQUIRED — the frontend uses it to render the interactive dashboard. Example:
+
+\`\`\`dashboard
+{"scenario":"A","title":"Performance Overview","dateRange":"...",
+"kpis":[{"label":"Total Spend","value":"$16K","change":"+12%","trend":"up"},{"label":"Results","value":"450","change":"+8%","trend":"up"},{"label":"Cost/Result","value":"$36","change":"-5%","trend":"down"},{"label":"CTR","value":"1.8%","change":"+0.3%","trend":"up"}],
+"charts":[{"type":"budget","data":{"title":"Budget Allocation","items":[{"name":"TOFU","value":5000},{"name":"MOFU","value":3000}]}},{"type":"comparison","data":{"title":"CPA This vs Last Week","items":[{"name":"Campaign1","current":35,"previous":40}]}}],
+"campaigns":[{"id":"123","name":"Sales_TOFU","status":"🚀","spend":5200,"cpa":32,"ctr":2.1,"wow":"-8%","diagnosis":"Growth breakout","action":"Scale +30%"}],
+"recommendations":[{"severity":"warning","text":"Pause Campaign X — save $500/wk","action":"pause_campaign","params":{"campaign_id":"456"}}]}
+\`\`\`
+
+Build the dashboard JSON from the analyze_performance() data. Map each campaign to the campaigns array with diagnostic status, WoW change, and recommended action. The frontend dashboard shows KPIs, charts, sortable table, and Apply buttons.
 
 # AFTER ANALYSIS
 Call the update_workflow_context tool (do NOT output the code as text — actually call the tool) to save a performance summary with these fields: insights_summary containing top_objective, avg_daily_spend (in cents), top_audience, top_cta, currency.
