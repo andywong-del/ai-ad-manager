@@ -2647,6 +2647,7 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, activityLog = 
                 activeSkill={activeSkill} onDeactivateSkill={onDeactivateSkill}
                 skills={skills} onSlashSelect={handleSlashSelect} slashSkills={slashSkills} onRemoveSlashSkill={handleRemoveSlashSkill} onClearAllSlash={() => setSlashSkills([])}
                 onToggleSkill={onToggleSkill} onManageSkills={onManageSkills}
+                token={token} onLogin={onLogin} selectedAccount={selectedAccount} selectedBusiness={selectedBusiness} onSelectAccount={onSelectAccount}
               />
             </div>
           </div>
