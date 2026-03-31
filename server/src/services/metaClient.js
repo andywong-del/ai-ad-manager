@@ -1636,7 +1636,6 @@ export const getIgMedia = async (token, igAccountId, { pageId, adAccountId, afte
 
   if (!after) {
     try {
-      // Fast path: fetch IG media + ad views map in parallel (skip slow per-video insights)
       const [{ data }, viewsMap] = await Promise.all([
         metaApi.get(`/${igAccountId}/media`, {
           params: {
@@ -1652,13 +1651,27 @@ export const getIgMedia = async (token, igAccountId, { pageId, adAccountId, afte
       const nextCursor = data.paging?.cursors?.after || null;
       console.log(`[getIgMedia] Direct IG media: ${allMedia.length} total, ${videos.length} videos`);
 
+      // Fetch native IG views for top 15 videos (capped to avoid timeout)
+      const top15 = videos.slice(0, 15);
+      const igViews = {};
+      const insightsApi = axios.create({ baseURL: `${BASE_URL}/${API_VERSION}`, timeout: 8000 });
+      await Promise.all(top15.map(async (v) => {
+        try {
+          const { data: insData } = await insightsApi.get(`/${v.id}/insights`, {
+            params: { access_token: igToken, metric: 'views' }
+          });
+          const val = insData.data?.[0]?.values?.[0]?.value;
+          if (val != null) igViews[v.id] = parseInt(val, 10) || 0;
+        } catch { /* skip — some reels don't support insights */ }
+      }));
+
       const normalized = videos.map(v => ({
         ...v,
         title: v.caption?.slice(0, 80) || 'Untitled',
         picture: v.thumbnail_url,
         created_time: v.timestamp,
         updated_time: v.timestamp,
-        three_second_views: viewsMap[v.id] || 0,
+        three_second_views: igViews[v.id] || viewsMap[v.id] || 0,
         source_instagram_media_id: v.id,
         is_ig: true,
         sources: ['ig']
