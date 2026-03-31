@@ -140,7 +140,25 @@ If **video_id** → Ask for the ID, call `get_video` to confirm it exists and sh
 - Facebook Page: call `get_page_videos` with page_id
 - Instagram: call `get_ig_media` with ig_account_id
 
-If more than 8 videos, offer filter first (All / Top Performers / Recent 90 days), then show filtered list sorted by views descending, cap at 12.
+**IMPORTANT: Always present videos using the ```mediagrid block, NOT plain text or ```options.** Take the returned video array and format as:
+
+```mediagrid
+{"title":"Select Videos","media_type":"video","metric_label":"3s Views","items":[
+  {"id":"VIDEO_ID","title":"Video title from API","thumbnail":"picture URL from API","duration":"0:41","metric_value":135860,"date":"25 Feb 2026","source_icons":["fb"]},
+  {"id":"VIDEO_ID_2","title":"Second video","thumbnail":"picture URL","duration":"0:49","metric_value":88580,"date":"27 Feb 2026","source_icons":["fb","ig"]}
+]}
+```
+
+Map each video from the API response:
+- `id` → video `id`
+- `title` → video `title` (or `caption` for IG)
+- `thumbnail` → video `picture` (or `thumbnail_url` for IG)
+- `duration` → format `length` seconds as "M:SS"
+- `metric_value` → `three_second_views` (or `views` if 0)
+- `date` → format `created_time` as "DD Mon YYYY"
+- `source_icons` → `["fb"]` for page-only, `["fb","ig"]` if `is_ig` is true, `["ig"]` for IG-only
+
+Cap at 15 videos max. Sort by views descending (already sorted from API).
 
 **Step 3 — Engagement level:**
 
