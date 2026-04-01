@@ -2005,7 +2005,7 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack, token, onLo
         )}
 
         {error && (
-          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg">{error}</div>
+          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg">{typeof error === 'string' ? error : error?.message || 'An error occurred'}</div>
         )}
 
         {loading && !audiences.length && (
