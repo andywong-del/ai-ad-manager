@@ -2028,13 +2028,17 @@ const SkillsDropdown = ({ skills, activeSkill, onToggleSkill, onManageSkills, on
     <div ref={ref} className="absolute bottom-full left-0 mb-2 w-[240px] bg-white border border-slate-200 rounded-xl shadow-xl shadow-slate-200/50 z-[100] overflow-hidden">
       {/* Skill list */}
       <div className="max-h-[320px] overflow-y-auto py-1">
-        {skills.map(skill => {
+        {skills.filter(s => !s.isDefault).length === 0 ? (
+          <div className="px-3 py-4 text-center">
+            <p className="text-[12px] text-slate-400">No custom strategies yet</p>
+            <p className="text-[11px] text-slate-400 mt-1">Create one from the Skills Library</p>
+          </div>
+        ) : skills.filter(s => !s.isDefault).map(skill => {
           const isActive = activeSkill?.id === skill.id;
-          const Icon = SKILL_ICONS[skill.id] || Sparkles;
           return (
             <button key={skill.id} onClick={() => { onToggleSkill(skill.id); onClose(); }}
               className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors ${isActive ? 'bg-indigo-50' : 'hover:bg-slate-50'}`}>
-              <Icon size={14} className={isActive ? 'text-indigo-500' : 'text-slate-400'} />
+              <Sparkles size={14} className={isActive ? 'text-indigo-500' : 'text-slate-400'} />
               <span className={`text-[13px] font-medium flex-1 truncate ${isActive ? 'text-indigo-700' : 'text-slate-700'}`}>{skill.name}</span>
               {isActive && <CheckCircle2 size={14} className="text-indigo-500 shrink-0" />}
             </button>
@@ -2237,6 +2241,7 @@ const ChatInput = ({ input, setInput, onKeyDown, onSend, onStop, onFilesAdded, a
   const showSlash = input.startsWith('/');
   const slashFilter = showSlash ? input.slice(1).trim() : '';
   const filteredSkills = showSlash ? skills.filter(s =>
+    !s.isDefault && // only show custom strategies, not built-in skills
     !slashSkills.find(ss => ss.id === s.id) && // hide already-selected
     (!slashFilter || s.name.toLowerCase().includes(slashFilter.toLowerCase()) || s.id.includes(slashFilter.toLowerCase()))
   ) : [];
