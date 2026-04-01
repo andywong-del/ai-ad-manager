@@ -2089,12 +2089,23 @@ const AccountConnector = ({ token, onLogin, selectedAccount, selectedBusiness, o
     return 'business';
   };
 
-  // After login completes (token changes from null → value), auto-open business picker
+  // Auto-open account picker when logged in but no account selected
   const prevToken = useRef(token);
+  const hasAutoOpened = useRef(false);
   useEffect(() => {
-    if (!prevToken.current && token) { setOpen(true); setLevel('business'); }
+    // After fresh login (token changes null → value)
+    if (!prevToken.current && token) { setOpen(true); setLevel('business'); hasAutoOpened.current = true; }
     prevToken.current = token;
   }, [token]);
+
+  // On mount: if token exists but no account selected, nudge user to pick one
+  useEffect(() => {
+    if (token && !selectedAccount && !hasAutoOpened.current) {
+      const timer = setTimeout(() => { setOpen(true); setLevel(selectedBusiness ? 'accounts' : 'business'); }, 500);
+      hasAutoOpened.current = true;
+      return () => clearTimeout(timer);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleMetaClick = () => {
     if (!token) { onLogin?.(); setOpen(false); return; }
