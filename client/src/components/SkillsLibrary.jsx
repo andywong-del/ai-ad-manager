@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Plus, Sparkles, BarChart3, Palette, DollarSign, Users, Zap, Trash2, Save, Target, TrendingUp, FolderOpen, ChevronLeft, ArrowLeft, MoreVertical, MessageSquare, X, Upload, Wand2, FileText, RotateCcw, PenLine, Eye, Lock, RefreshCw } from 'lucide-react';
+import { Plus, Sparkles, BarChart3, Palette, DollarSign, Users, Zap, Trash2, Save, Target, TrendingUp, FolderOpen, ChevronLeft, ArrowLeft, MoreVertical, MessageSquare, X, Upload, Wand2, FileText, RotateCcw, PenLine, Eye, Lock, RefreshCw, Download } from 'lucide-react';
 
 const ICON_MAP = {
   funnel: BarChart3, chart: BarChart3, palette: Palette, dollar: DollarSign,
@@ -621,10 +621,23 @@ const StrategyCard = ({ skill, onOpen, onUseInChat, onDelete }) => {
                 <Sparkles size={12} className="text-indigo-500" /> Configure
               </button>
               {isCustom && (
-                <button onClick={() => { setMenuOpen(false); onDelete(skill); }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-600 hover:bg-red-50">
-                  <Trash2 size={12} /> Delete
-                </button>
+                <>
+                  <button onClick={() => {
+                    setMenuOpen(false);
+                    const md = `---\nname: ${skill.name}\ndescription: ${skill.description || ''}\n${skill.preview ? `preview: ${skill.preview}\n` : ''}type: strategy\n---\n\n${skill.content || ''}`;
+                    const blob = new Blob([md], { type: 'text/markdown' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a'); a.href = url; a.download = `${skill.id || skill.name.toLowerCase().replace(/\s+/g, '-')}.md`; a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50">
+                    <Download size={12} className="text-emerald-500" /> Download .md
+                  </button>
+                  <button onClick={() => { setMenuOpen(false); onDelete(skill); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-600 hover:bg-red-50">
+                    <Trash2 size={12} /> Delete
+                  </button>
+                </>
               )}
             </div>
           </>
@@ -641,8 +654,8 @@ const CreateStrategyCard = ({ onCreateAI, onManualClick }) => (
     <div className="w-12 h-12 rounded-2xl bg-slate-100 group-hover:bg-indigo-100 flex items-center justify-center mb-3 transition-colors">
       <Wand2 size={20} className="text-slate-400 group-hover:text-indigo-500 transition-colors" />
     </div>
-    <h3 className="text-[13px] font-semibold text-slate-500 group-hover:text-indigo-600 transition-colors">Create with AI</h3>
-    <p className="text-[10px] text-slate-400 mt-1">Upload a file or describe your approach</p>
+    <h3 className="text-[13px] font-semibold text-slate-500 group-hover:text-indigo-600 transition-colors">Create Strategy</h3>
+    <p className="text-[10px] text-slate-400 mt-1">Describe your approach or upload a doc — AI structures it for you</p>
     <button
       onClick={(e) => { e.stopPropagation(); onManualClick(); }}
       className="mt-2 flex items-center gap-1 text-[10px] text-slate-400 hover:text-indigo-500 transition-colors"
@@ -676,8 +689,8 @@ const ImportMdCard = ({ onImport }) => {
       <div className={`w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mb-3 transition-colors ${isDragOver ? 'bg-emerald-100' : 'group-hover:bg-emerald-100'}`}>
         <Upload size={20} className={`transition-colors ${isDragOver ? 'text-emerald-500' : 'text-slate-400 group-hover:text-emerald-500'}`} />
       </div>
-      <h3 className={`text-[13px] font-semibold transition-colors ${isDragOver ? 'text-emerald-600' : 'text-slate-500 group-hover:text-emerald-600'}`}>Import .md Files</h3>
-      <p className="text-[10px] text-slate-400 mt-1">Drag & drop or click — bulk upload</p>
+      <h3 className={`text-[13px] font-semibold transition-colors ${isDragOver ? 'text-emerald-600' : 'text-slate-500 group-hover:text-emerald-600'}`}>Upload Strategy Files</h3>
+      <p className="text-[10px] text-slate-400 mt-1">Drop .md files with instructions — supports multiple files</p>
     </div>
   );
 };
