@@ -231,10 +231,46 @@ const SkillBuilderModal = ({ onSave, onCancel, onGenerate, saving, error }) => {
   const [preview, setPreview] = useState('');
   const [content, setContent] = useState('');
 
+  // Parse .md frontmatter: ---\nkey: value\n---\nbody
+  const parseMdFrontmatter = (text) => {
+    const match = text.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+    if (!match) return null;
+    const meta = {};
+    match[1].split('\n').forEach(line => {
+      const [key, ...rest] = line.split(':');
+      if (key && rest.length) meta[key.trim()] = rest.join(':').trim();
+    });
+    if (!meta.name) return null; // must have at least a name
+    return { name: meta.name, description: meta.description || '', preview: meta.preview || '', content: match[2].trim() };
+  };
+
   const processFile = async (file) => {
     if (!file) return;
     setUploadedFileName(file.name);
     setGenError(null);
+
+    // Direct .md import — skip AI if file has valid frontmatter
+    if (file.name.endsWith('.md')) {
+      try {
+        const text = await file.text();
+        const parsed = parseMdFrontmatter(text);
+        if (parsed && parsed.content) {
+          setName(parsed.name);
+          setDescription(parsed.description);
+          setPreview(parsed.preview);
+          setContent(parsed.content);
+          setStep(2); // skip AI, go straight to review
+          return;
+        }
+        // No valid frontmatter — treat as raw text for AI generation
+        setRawText(text);
+      } catch (err) {
+        setGenError('Failed to read .md file: ' + err.message);
+      }
+      return;
+    }
+
+    // Other file types — parse via server then let user send to AI
     try {
       const reader = new FileReader();
       reader.onload = async () => {
