@@ -226,6 +226,9 @@ export const Dashboard = ({
               onBack={() => setActiveView({ type: 'chat' })}
               token={token}
               onLogin={onLogin}
+              selectedAccount={selectedAccount}
+              selectedBusiness={selectedBusiness}
+              onSelectAccount={handleAccountSelect}
             />
           ) : activeView.type === 'saved' && currentSavedItem ? (
             <SavedItemView
