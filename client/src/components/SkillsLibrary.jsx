@@ -497,14 +497,13 @@ const DeleteConfirm = ({ skill, onConfirm, onCancel }) => (
 // ── Built-in Skill Card (read-only) ────────────────────────────────────────
 const BuiltinCard = ({ skill, onOpen }) => {
   const Icon = ICON_MAP[skill.icon] || Sparkles;
-  const gradient = ICON_COLORS[skill.icon] || 'from-indigo-500 to-indigo-600';
 
   return (
     <button
       onClick={() => onOpen(skill)}
       className="flex flex-col items-center p-5 rounded-2xl border border-slate-200 bg-white hover:border-slate-300 hover:shadow-md transition-all text-center cursor-pointer group"
     >
-      <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center mb-3 shadow-sm`}>
+      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center mb-3 shadow-sm">
         <Icon size={20} className="text-white" />
       </div>
       <h3 className="text-[13px] font-semibold text-slate-800 truncate w-full">{skill.name}</h3>
