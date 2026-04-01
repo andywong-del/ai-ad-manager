@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Plus, Sparkles, BarChart3, Palette, DollarSign, Users, Zap, Trash2, Save, Target, TrendingUp, FolderOpen, ChevronLeft, ArrowLeft, MoreVertical, MessageSquare, X, Upload, Wand2, FileText, RotateCcw, PenLine, Eye, Lock } from 'lucide-react';
+import { Plus, Sparkles, BarChart3, Palette, DollarSign, Users, Zap, Trash2, Save, Target, TrendingUp, FolderOpen, ChevronLeft, ArrowLeft, MoreVertical, MessageSquare, X, Upload, Wand2, FileText, RotateCcw, PenLine, Eye, Lock, RefreshCw } from 'lucide-react';
 
 const ICON_MAP = {
   funnel: BarChart3, chart: BarChart3, palette: Palette, dollar: DollarSign,
@@ -635,9 +635,9 @@ const StrategyCard = ({ skill, onOpen, onUseInChat, onDelete }) => {
 };
 
 // ── Create Strategy Card ───────────────────────────────────────────────────
-const CreateStrategyCard = ({ onClick, onManualClick }) => (
+const CreateStrategyCard = ({ onCreateAI, onManualClick }) => (
   <div className="flex flex-col items-center justify-center p-5 rounded-2xl border-2 border-dashed border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/30 transition-all text-center cursor-pointer group min-h-[200px]"
-    onClick={onClick}>
+    onClick={onCreateAI}>
     <div className="w-12 h-12 rounded-2xl bg-slate-100 group-hover:bg-indigo-100 flex items-center justify-center mb-3 transition-colors">
       <Wand2 size={20} className="text-slate-400 group-hover:text-indigo-500 transition-colors" />
     </div>
@@ -652,6 +652,36 @@ const CreateStrategyCard = ({ onClick, onManualClick }) => (
   </div>
 );
 
+// ── Import .md Card ────────────────────────────────────────────────────────
+const ImportMdCard = ({ onImport }) => {
+  const fileRef = useRef(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const handleFiles = (files) => {
+    const mdFiles = Array.from(files).filter(f => f.name.endsWith('.md'));
+    if (mdFiles.length === 0) return;
+    onImport(mdFiles);
+  };
+
+  return (
+    <div
+      onClick={() => fileRef.current?.click()}
+      onDrop={(e) => { e.preventDefault(); setIsDragOver(false); handleFiles(e.dataTransfer.files); }}
+      onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+      onDragLeave={() => setIsDragOver(false)}
+      className={`flex flex-col items-center justify-center p-5 rounded-2xl border-2 border-dashed transition-all text-center cursor-pointer group min-h-[200px]
+        ${isDragOver ? 'border-emerald-400 bg-emerald-50/50' : 'border-slate-200 hover:border-emerald-400 hover:bg-emerald-50/30'}`}
+    >
+      <input ref={fileRef} type="file" accept=".md" multiple onChange={(e) => handleFiles(e.target.files)} className="hidden" />
+      <div className={`w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mb-3 transition-colors ${isDragOver ? 'bg-emerald-100' : 'group-hover:bg-emerald-100'}`}>
+        <Upload size={20} className={`transition-colors ${isDragOver ? 'text-emerald-500' : 'text-slate-400 group-hover:text-emerald-500'}`} />
+      </div>
+      <h3 className={`text-[13px] font-semibold transition-colors ${isDragOver ? 'text-emerald-600' : 'text-slate-500 group-hover:text-emerald-600'}`}>Import .md Files</h3>
+      <p className="text-[10px] text-slate-400 mt-1">Drag & drop or click — bulk upload</p>
+    </div>
+  );
+};
+
 // ── Main Skills Library ─────────────────────────────────────────────────────
 export const SkillsLibrary = ({ skills, onCreate, onUpdate, onDelete, onGenerate, onBack, onActivateSkill }) => {
   const [builderOpen, setBuilderOpen] = useState(false);
@@ -661,6 +691,41 @@ export const SkillsLibrary = ({ skills, onCreate, onUpdate, onDelete, onGenerate
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [importStatus, setImportStatus] = useState(null); // { total, done, errors }
+
+  // Parse .md frontmatter
+  const parseMdFrontmatter = (text) => {
+    const match = text.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+    if (!match) return null;
+    const meta = {};
+    match[1].split('\n').forEach(line => {
+      const [key, ...rest] = line.split(':');
+      if (key && rest.length) meta[key.trim()] = rest.join(':').trim();
+    });
+    if (!meta.name) return null;
+    return { name: meta.name, description: meta.description || '', preview: meta.preview || '', content: match[2].trim(), type: 'strategy' };
+  };
+
+  // Bulk import .md files
+  const handleBulkImport = async (files) => {
+    setImportStatus({ total: files.length, done: 0, errors: [] });
+    for (const file of files) {
+      try {
+        const text = await file.text();
+        const parsed = parseMdFrontmatter(text);
+        if (!parsed || !parsed.content) {
+          setImportStatus(prev => ({ ...prev, done: prev.done + 1, errors: [...prev.errors, `${file.name}: no valid frontmatter`] }));
+          continue;
+        }
+        await onCreate(parsed);
+        setImportStatus(prev => ({ ...prev, done: prev.done + 1 }));
+      } catch (err) {
+        setImportStatus(prev => ({ ...prev, done: prev.done + 1, errors: [...prev.errors, `${file.name}: ${err?.response?.data?.error || err.message}`] }));
+      }
+    }
+    // Clear status after 3s
+    setTimeout(() => setImportStatus(null), 3000);
+  };
 
   // Built-in skills = all default skills, Custom strategies = user-created
   const builtinSkills = skills.filter(s => s.isDefault);
@@ -754,12 +819,22 @@ export const SkillsLibrary = ({ skills, onCreate, onUpdate, onDelete, onGenerate
                 />
               ))}
               <CreateStrategyCard
-                onClick={() => setBuilderOpen(true)}
+                onCreateAI={() => setBuilderOpen(true)}
                 onManualClick={() => setCreatingManual(true)}
               />
+              <ImportMdCard onImport={handleBulkImport} />
             </div>
-            {customSkills.length === 0 && (
-              <p className="text-[11px] text-slate-400 mt-2 ml-5 italic">No custom strategies yet. Create one to customize how the AI analyzes your data.</p>
+            {importStatus && (
+              <div className="mt-3 ml-5 flex items-center gap-2">
+                <p className="text-[11px] font-medium text-indigo-600">
+                  Imported {importStatus.done}/{importStatus.total}
+                  {importStatus.errors.length > 0 && <span className="text-red-500 ml-2">({importStatus.errors.length} failed)</span>}
+                </p>
+                {importStatus.done < importStatus.total && <RefreshCw size={11} className="animate-spin text-indigo-400" />}
+              </div>
+            )}
+            {customSkills.length === 0 && !importStatus && (
+              <p className="text-[11px] text-slate-400 mt-2 ml-5 italic">No custom strategies yet. Create one or import .md files to customize how the AI analyzes your data.</p>
             )}
           </div>
 
