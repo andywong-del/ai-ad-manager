@@ -1001,11 +1001,8 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
                 <div className="flex-1">
                   <label className="block text-xs font-semibold text-slate-600 mb-1">Video Sources</label>
                   <select value={videoSource} onChange={e => setVideoSource(e.target.value)} className={INPUT_CLS}>
-                    <option value="all">All Videos (Aggregated)</option>
                     <option value="fb_page">Facebook Page</option>
                     <option value="ig_account">Instagram professional account</option>
-                    <option value="campaign">Campaign</option>
-                    <option value="video_id">Video ID</option>
                   </select>
                 </div>
                 {videoSource === 'fb_page' && (
