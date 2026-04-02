@@ -2026,12 +2026,18 @@ export const getUniversalVideos = async (token, { adAccountId, pageId, igAccount
   for (const v of adVids) addToFamily(v, 'ad');
 
   // Step 4: Convert to array, clean up internal fields, sort by views desc
+  // Also ensure any video with source_instagram_media_id has 'ig' in sources
   const videos = Object.values(familyMap)
-    .map(({ _ids, ...v }) => ({ ...v, variant_count: _ids.size, sources: v.sources }))
+    .map(({ _ids, ...v }) => {
+      const sources = [...v.sources];
+      if (v.source_instagram_media_id && !sources.includes('ig')) sources.push('ig');
+      return { ...v, variant_count: _ids.size, sources };
+    })
     .filter(v => v.three_second_views > 0) // hide videos with no view data
     .sort((a, b) => new Date(b.created_time || 0) - new Date(a.created_time || 0)); // newest first
 
-  console.log(`[getUniversalVideos] ${videos.length} unique videos (${pageVids.length} page + ${igVids.length} ig + ${adVids.length} ad before dedup)`);
+  const igCount = videos.filter(v => v.sources.includes('ig')).length;
+  console.log(`[getUniversalVideos] ${videos.length} unique videos (${pageVids.length} page + ${igVids.length} ig + ${adVids.length} ad before dedup), ${igCount} with IG source`);
   return { videos };
 };
 
