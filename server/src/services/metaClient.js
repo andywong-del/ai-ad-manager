@@ -1612,9 +1612,7 @@ export const getPageVideos = async (token, pageId, adAccountId, { after } = {}) 
       const isCrosspost = !!v.source_instagram_media_id;
       return {
         ...v,
-        // v.views is FB Page total views, not 3s ad views — keep as fallback only
-        three_second_views: 0,
-        page_views: v.views || 0,
+        three_second_views: v.views || 0,
         is_ig: isCrosspost,
         sources: isCrosspost ? ['page', 'ig'] : ['page']
       };
@@ -1694,10 +1692,9 @@ export const getIgMedia = async (token, igAccountId, { pageId, adAccountId, afte
         picture: v.thumbnail_url,
         created_time: v.timestamp,
         updated_time: v.timestamp,
-        // Prefer ad insights (3s video_view) to match FB Ads Manager UI;
-        // fall back to IG native views only if no ad data exists
-        three_second_views: viewsMap[v.id] || igViews[v.id] || 0,
-        ig_native_views: igViews[v.id] || 0,
+        // IG native views = organic + paid total (matches Meta Custom Audience picker);
+        // ad insights viewsMap = paid only — use as fallback
+        three_second_views: igViews[v.id] || viewsMap[v.id] || 0,
         source_instagram_media_id: v.id,
         is_ig: true,
         sources: ['ig']
@@ -1729,9 +1726,7 @@ export const getIgMedia = async (token, igAccountId, { pageId, adAccountId, afte
       const useVids = crossposted.length > 0 ? crossposted : allPageVids;
       const videos = useVids.map(v => ({
         ...v,
-        // Prefer ad insights (3s video_view); v.views is Page total views, not 3s
-        three_second_views: viewsMap[v.id] || 0,
-        page_views: v.views || 0,
+        three_second_views: viewsMap[v.id] || v.views || 0,
         is_ig: !!v.source_instagram_media_id,
         sources: v.source_instagram_media_id ? ['ig', 'page'] : ['page']
       }));
