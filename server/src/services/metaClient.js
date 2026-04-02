@@ -1921,7 +1921,8 @@ export const getUniversalVideos = async (token, { adAccountId, pageId, igAccount
   // Step 4: Convert to array, clean up internal fields, sort by views desc
   const videos = Object.values(familyMap)
     .map(({ _ids, ...v }) => ({ ...v, variant_count: _ids.size, sources: v.sources }))
-    .sort((a, b) => (b.three_second_views || 0) - (a.three_second_views || 0));
+    .filter(v => v.three_second_views > 0) // hide videos with no view data
+    .sort((a, b) => new Date(b.created_time || 0) - new Date(a.created_time || 0)); // newest first
 
   console.log(`[getUniversalVideos] ${videos.length} unique videos (${pageVids.length} page + ${igVids.length} ig + ${adVids.length} ad before dedup)`);
   return { videos };

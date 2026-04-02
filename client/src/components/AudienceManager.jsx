@@ -525,36 +525,19 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
     return raw.map(v => ({ ...v, is_ig: !!v.source_instagram_media_id }));
   };
 
-  // Build the video fetch endpoint
-  const getVideoEndpoint = (after) => {
-    const sep = (url) => url.includes('?') ? '&' : '?';
-    if (videoSource === 'all') {
-      const pageId = pages[0]?.id || '';
-      const igId = igAccounts[0]?.id || '';
-      const params = [`adAccountId=${adAccountId}`, pageId ? `pageId=${pageId}` : '', igId ? `igAccountId=${igId}` : ''].filter(Boolean).join('&');
-      return `/meta/videos/universal?${params}`;
-    }
-    if (videoSource === 'fb_page') {
-      const base = `/meta/pages/${videoSourcePage}/videos?adAccountId=${adAccountId}`;
-      return after ? `${base}&after=${after}` : base;
-    }
-    if (videoSource === 'ig_account') {
-      const igAcct = igAccounts.find(a => a.id === videoSourceIg);
-      const params = [igAcct?.pageId ? `pageId=${igAcct.pageId}` : '', adAccountId ? `adAccountId=${adAccountId}` : ''].filter(Boolean).join('&');
-      const base = `/meta/instagram/${videoSourceIg}/media${params ? `?${params}` : ''}`;
-      return after ? `${base}${sep(base)}after=${after}` : base;
-    }
-    return `/meta/adaccounts/${adAccountId}/videos`;
+  // Build the video fetch endpoint — always use universal (IG + Page merged)
+  const getVideoEndpoint = () => {
+    const pageId = pages[0]?.id || '';
+    const igId = igAccounts[0]?.id || '';
+    const params = [`adAccountId=${adAccountId}`, pageId ? `pageId=${pageId}` : '', igId ? `igAccountId=${igId}` : ''].filter(Boolean).join('&');
+    return `/meta/videos/universal?${params}`;
   };
 
   // Fetch videos when video source changes — use correct endpoint per source
   const videoFetchRef = useRef(0); // prevent stale responses from overwriting newer data
   const fetchVideos = () => {
     if (tab !== 'video' || !adAccountId) return;
-    if (videoSource === 'video_id') { setVideos([]); setVideosError(null); return; }
-    if (videoSource === 'campaign') { setVideos([]); setVideosLoading(false); setVideosError(null); return; }
-    if (videoSource === 'fb_page' && !videoSourcePage) { setVideos([]); setVideosLoading(false); setVideosError(null); return; }
-    if (videoSource === 'ig_account' && !videoSourceIg) { setVideos([]); setVideosLoading(false); setVideosError(null); return; }
+    if (!pages.length && !igAccounts.length) return; // wait for accounts to load
 
     const fetchId = ++videoFetchRef.current;
     setVideosLoading(true);
@@ -582,7 +565,7 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
       setVideosLoading(false);
     });
   };
-  useEffect(fetchVideos, [tab, videoSource, videoSourcePage, videoSourceIg, adAccountId, pages.length, igAccounts.length]);
+  useEffect(fetchVideos, [tab, adAccountId, pages.length, igAccounts.length]);
 
   // Load more videos when user paginates past current data — advance page AFTER data arrives
   const loadMoreVideos = () => {
@@ -996,67 +979,7 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
           {/* ── Video ── */}
           {tab === 'video' && (
             <>
-              {/* Video source selector */}
-              <div className="flex gap-3">
-                <div className="flex-1">
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Video Sources</label>
-                  <select value={videoSource} onChange={e => setVideoSource(e.target.value)} className={INPUT_CLS}>
-                    <option value="fb_page">Facebook Page</option>
-                    <option value="ig_account">Instagram professional account</option>
-                  </select>
-                </div>
-                {videoSource === 'fb_page' && (
-                  <div className="flex-1">
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">Facebook Page</label>
-                    {pagesLoading ? (
-                      <p className="text-xs text-slate-400 italic py-2">Loading...</p>
-                    ) : pages.length === 0 ? (
-                      <p className="text-xs text-slate-400 italic py-2">No pages found</p>
-                    ) : (
-                      <select value={videoSourcePage} onChange={e => setVideoSourcePage(e.target.value)} className={INPUT_CLS}>
-                        <option value="">Select a page</option>
-                        {pages.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                      </select>
-                    )}
-                  </div>
-                )}
-                {videoSource === 'ig_account' && (
-                  <div className="flex-1">
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">Instagram Account</label>
-                    {igAccountsLoading ? (
-                      <p className="text-xs text-slate-400 italic py-2">Loading...</p>
-                    ) : igAccounts.length === 0 ? (
-                      <p className="text-xs text-slate-400 italic py-2">No IG accounts found</p>
-                    ) : (
-                      <select value={videoSourceIg} onChange={e => setVideoSourceIg(e.target.value)} className={INPUT_CLS}>
-                        <option value="">Select an account</option>
-                        {igAccounts.map(a => <option key={a.id} value={a.id}>{a.username?.includes(' ') || !a.username ? `📄 ${a.username || a.id}` : `@${a.username}`}</option>)}
-                      </select>
-                    )}
-                  </div>
-                )}
-                {videoSource === 'campaign' && (
-                  <div className="flex-1">
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">Campaign</label>
-                    {campaignsLoading ? (
-                      <p className="text-xs text-slate-400 italic py-2">Loading...</p>
-                    ) : (
-                      <>
-                        <input value={campaignSearch} onChange={e => setCampaignSearch(e.target.value)} placeholder="Search campaigns..." className={INPUT_CLS} />
-                        <div className="max-h-[120px] overflow-y-auto mt-1 border border-slate-200 rounded-lg">
-                          {campaigns.filter(c => !campaignSearch || c.name?.toLowerCase().includes(campaignSearch.toLowerCase())).map(c => (
-                            <button key={c.id} onClick={() => setSelectedCampaignId(c.id)}
-                              className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${selectedCampaignId === c.id ? 'bg-blue-50 text-blue-700 font-medium' : 'hover:bg-slate-50 text-slate-600'}`}>
-                              {c.name}
-                            </button>
-                          ))}
-                          {campaigns.length === 0 && <p className="text-xs text-slate-400 italic py-3 text-center">No campaigns found</p>}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
+              {/* Videos auto-loaded from all connected IG + FB Page sources */}
 
               {/* Engagement Type — select before choosing videos */}
               <div>
@@ -1079,25 +1002,7 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
                 <input type="number" value={retentionDays} onChange={e => setRetentionDays(Number(e.target.value))} min={1} max={365} className={INPUT_CLS} />
               </div>
 
-              {/* Empty state prompts */}
-              {videoSource === 'fb_page' && !videoSourcePage && (
-                <p className="text-xs text-slate-400 italic text-center py-4">Select a Facebook Page to see its videos</p>
-              )}
-              {videoSource === 'ig_account' && !videoSourceIg && (
-                <p className="text-xs text-slate-400 italic text-center py-4">Select an Instagram account to see its videos</p>
-              )}
-              {videoSource === 'campaign' && !selectedCampaignId && (
-                <p className="text-xs text-slate-400 italic text-center py-4">Select a campaign to see its video ads</p>
-              )}
-
-              {/* Video ID manual input */}
-              {videoSource === 'video_id' ? (
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Video IDs</label>
-                  <input value={videoIdInput} onChange={e => setVideoIdInput(e.target.value)} placeholder="Paste video IDs, comma separated" className={INPUT_CLS} />
-                  <p className="text-[10px] text-slate-400 mt-1">Enter one or more video IDs separated by commas</p>
-                </div>
-              ) : (videoSource === 'fb_page' && !videoSourcePage) || (videoSource === 'ig_account' && !videoSourceIg) || (videoSource === 'campaign' && !selectedCampaignId) ? null : (
+              {(
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1.5">
                     Select Videos <span className="text-slate-400 font-normal">({selectedVideoIds.length} selected)</span>
@@ -1195,7 +1100,7 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
                     <div className="flex items-center gap-3 px-2 py-1.5 border-b-2 border-blue-600 text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
                       <span className="w-16 shrink-0">Thumbnail</span>
                       <span className="flex-1">Video details</span>
-                      <span className="w-24 text-center shrink-0" title="3-second video views">Views / Source</span>
+                      <span className="w-24 text-center shrink-0">Views</span>
                       <span className="w-20 text-right shrink-0">Last used</span>
                       <span className="w-4 shrink-0"></span>
                     </div>
