@@ -475,7 +475,7 @@ function getPageVideos({ page_id }, c) {
         mediagrid: {
           title: 'Select Videos (Facebook Page)',
           media_type: 'video',
-          metric_label: '3s Views',
+          metric_label: 'Views',
           items: result.videos.map(v => ({
             id: v.id,
             title: v.title || 'Untitled',
@@ -927,7 +927,7 @@ function getIgMedia({ ig_account_id, page_id }, c) {
         mediagrid: {
           title: 'Select Videos (Instagram)',
           media_type: 'video',
-          metric_label: '3s Views',
+          metric_label: 'Views',
           items: result.videos.map(v => ({
             id: v.id || v.source_instagram_media_id,
             title: v.title || v.caption?.slice(0, 80) || 'Untitled',

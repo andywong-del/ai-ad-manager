@@ -1198,7 +1198,7 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
                     <div className="flex items-center gap-3 px-2 py-1.5 border-b-2 border-blue-600 text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
                       <span className="w-16 shrink-0">Thumbnail</span>
                       <span className="flex-1">Video details</span>
-                      <span className="w-24 text-center shrink-0" title="3-second video views">3s views / Source</span>
+                      <span className="w-24 text-center shrink-0" title="3-second video views">Views / Source</span>
                       <span className="w-20 text-right shrink-0">Last used</span>
                       <span className="w-4 shrink-0"></span>
                     </div>

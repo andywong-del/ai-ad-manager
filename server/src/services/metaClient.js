@@ -1621,8 +1621,9 @@ export const getPageVideos = async (token, pageId, adAccountId, { after } = {}) 
     const nextCursor = data.paging?.cursors?.after || null;
     const hasMore = !!data.paging?.next;
 
-    pageVideos.sort((a, b) => (b.three_second_views || 0) - (a.three_second_views || 0));
-    return { videos: pageVideos, nextCursor: hasMore ? nextCursor : null };
+    const withViews = pageVideos.filter(v => v.three_second_views > 0);
+    withViews.sort((a, b) => new Date(b.created_time || 0) - new Date(a.created_time || 0));
+    return { videos: withViews, nextCursor: hasMore ? nextCursor : null };
   } catch (err) {
     console.error('getPageVideos error:', err.response?.data?.error?.message || err.message);
     return { videos: [], nextCursor: null };
@@ -1727,9 +1728,11 @@ export const getIgMedia = async (token, igAccountId, { pageId, adAccountId, afte
         } catch { /* skip — page videos optional */ }
       }
 
+      // Filter out videos with 0 views (no data = not useful for selection)
+      const withViews = normalized.filter(v => v.three_second_views > 0);
       // Sort by date (newest first) to match Meta Custom Audience picker
-      normalized.sort((a, b) => new Date(b.created_time || b.timestamp || 0) - new Date(a.created_time || a.timestamp || 0));
-      return { videos: normalized, nextCursor: data.paging?.next ? nextCursor : null };
+      withViews.sort((a, b) => new Date(b.created_time || b.timestamp || 0) - new Date(a.created_time || a.timestamp || 0));
+      return { videos: withViews, nextCursor: data.paging?.next ? nextCursor : null };
     } catch (err) {
       console.log(`[getIgMedia] IG media endpoint failed (${err.response?.data?.error?.code || err.message}), trying page fallback...`);
     }

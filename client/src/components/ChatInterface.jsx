@@ -658,7 +658,7 @@ const MediaGridCard = ({ data, onSend, isAnswered, selectedTitle }) => {
         <span className="w-5 shrink-0" />
         <span className="w-14 shrink-0">Thumbnail</span>
         <span className="flex-1">Video Details</span>
-        <span className="w-24 text-right">{data.metric_label || '3s Views'}</span>
+        <span className="w-24 text-right">{data.metric_label || 'Views'}</span>
         <span className="w-20 text-right">Date</span>
       </div>
 
