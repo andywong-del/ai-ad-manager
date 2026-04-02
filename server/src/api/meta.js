@@ -259,22 +259,33 @@ router.get('/instagram/:id/insights', async (req, res) => {
     });
 
     // Profile-level insights (instagram_manage_insights)
-    const [reachRes, engagedRes] = await Promise.all([
+    // Valid metrics: reach, follower_count, profile_views, website_clicks,
+    // accounts_engaged, total_interactions, likes, comments, shares, saves, replies
+    const [reachRes, engagedRes, followerRes] = await Promise.all([
       metaClient.metaApi.get(`/${igId}/insights`, {
-        params: { access_token: token, metric: 'reach,impressions', period: 'day', since, until }
+        params: { access_token: token, metric: 'reach,profile_views', period: 'day', since, until }
       }),
       metaClient.metaApi.get(`/${igId}/insights`, {
         params: { access_token: token, metric: 'accounts_engaged,total_interactions', period: 'day', metric_type: 'total_value', since, until }
-      }).catch(() => ({ data: { data: [] } })) // some accounts may not support these
+      }).catch(() => ({ data: { data: [] } })),
+      metaClient.metaApi.get(`/${igId}/insights`, {
+        params: { access_token: token, metric: 'follower_count', period: 'day', since, until }
+      }).catch(() => ({ data: { data: [] } }))
     ]);
 
-    // Sum daily values for reach/impressions
+    // Sum daily values for period-based metrics
     const profileInsights = {};
-    for (const metric of [...(reachRes.data.data || []), ...(engagedRes.data.data || [])]) {
-      if (metric.values) {
-        profileInsights[metric.name] = metric.values.reduce((sum, v) => sum + (v.value || 0), 0);
-      } else if (metric.total_value) {
+    for (const metric of [...(reachRes.data.data || []), ...(engagedRes.data.data || []), ...(followerRes.data.data || [])]) {
+      if (metric.total_value != null) {
         profileInsights[metric.name] = metric.total_value.value || 0;
+      } else if (metric.values) {
+        // For follower_count, take latest value; for others, sum
+        if (metric.name === 'follower_count') {
+          const last = metric.values[metric.values.length - 1];
+          profileInsights[metric.name] = last?.value || 0;
+        } else {
+          profileInsights[metric.name] = metric.values.reduce((sum, v) => sum + (v.value || 0), 0);
+        }
       }
     }
 
@@ -285,14 +296,15 @@ router.get('/instagram/:id/insights', async (req, res) => {
     const mediaItems = mediaRes.data.data || [];
 
     // Fetch insights for each media item
+    // Valid media metrics: reach, likes, comments, shares, saves, total_interactions
     const mediaWithInsights = await Promise.all(mediaItems.map(async (item) => {
       try {
         const insRes = await metaClient.metaApi.get(`/${item.id}/insights`, {
-          params: { access_token: token, metric: 'reach,impressions' }
+          params: { access_token: token, metric: 'reach,shares,saves' }
         });
         const ins = {};
         for (const m of insRes.data.data || []) {
-          ins[m.name] = m.values?.[0]?.value || 0;
+          ins[m.name] = m.values?.[0]?.value || m.total_value?.value || 0;
         }
         return { ...item, insights: ins };
       } catch {

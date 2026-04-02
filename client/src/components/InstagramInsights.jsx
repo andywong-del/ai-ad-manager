@@ -184,7 +184,7 @@ export const InstagramInsights = ({ adAccountId, onBack, token, onLogin, selecte
             <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">2. Profile-Level Insights</h3>
             <div className="flex gap-3 mb-2">
               <MetricCard icon={Eye}        label="Reach"              value={loading ? '' : (pi.reach || 0).toLocaleString()}              color="bg-blue-500"    loading={loading} />
-              <MetricCard icon={TrendingUp} label="Impressions"        value={loading ? '' : (pi.impressions || 0).toLocaleString()}        color="bg-violet-500"  loading={loading} />
+              <MetricCard icon={TrendingUp} label="Profile Views"      value={loading ? '' : (pi.profile_views || 0).toLocaleString()}      color="bg-violet-500"  loading={loading} />
               <MetricCard icon={Users}      label="Accounts Engaged"   value={loading ? '' : (pi.accounts_engaged || 0).toLocaleString()}   color="bg-pink-500"    loading={loading} />
               <MetricCard icon={Heart}      label="Total Interactions"  value={loading ? '' : (pi.total_interactions || 0).toLocaleString()} color="bg-orange-500"  loading={loading} />
             </div>
@@ -212,7 +212,7 @@ export const InstagramInsights = ({ adAccountId, onBack, token, onLogin, selecte
                       <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Post</th>
                       <th className="px-3 py-2.5 text-left font-semibold text-slate-600">Type</th>
                       <th className="px-3 py-2.5 text-right font-semibold text-slate-600">Reach</th>
-                      <th className="px-3 py-2.5 text-right font-semibold text-slate-600">Impressions</th>
+                      <th className="px-3 py-2.5 text-right font-semibold text-slate-600">Saves</th>
                       <th className="px-3 py-2.5 text-right font-semibold text-slate-600">Likes</th>
                       <th className="px-3 py-2.5 text-right font-semibold text-slate-600">Comments</th>
                       <th className="px-3 py-2.5 text-right font-semibold text-slate-600">Date</th>
@@ -238,7 +238,7 @@ export const InstagramInsights = ({ adAccountId, onBack, token, onLogin, selecte
                           </span>
                         </td>
                         <td className="px-3 py-3 text-right font-medium text-slate-700">{(item.insights?.reach || 0).toLocaleString()}</td>
-                        <td className="px-3 py-3 text-right text-slate-600">{(item.insights?.impressions || 0).toLocaleString()}</td>
+                        <td className="px-3 py-3 text-right text-slate-600">{(item.insights?.saves || 0).toLocaleString()}</td>
                         <td className="px-3 py-3 text-right text-slate-600">{(item.like_count || 0).toLocaleString()}</td>
                         <td className="px-3 py-3 text-right text-slate-600">{item.comments_count || 0}</td>
                         <td className="px-3 py-3 text-right text-slate-400">{item.timestamp ? new Date(item.timestamp).toLocaleDateString() : '—'}</td>

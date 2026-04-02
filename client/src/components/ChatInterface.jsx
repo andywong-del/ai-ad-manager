@@ -2143,23 +2143,24 @@ const AccountConnector = ({ token, onLogin, onLogout, isLoginLoading, loginError
               </div>
               <div className="py-1">
                 {/* Meta Ads */}
-                <div className="w-full flex items-center gap-2.5 px-3 py-2.5">
-                  <button onClick={handleMetaClick} className="flex items-center gap-2.5 flex-1 text-left hover:opacity-80 transition-opacity">
-                    <MetaIcon />
-                    <span className="text-[12px] font-medium text-slate-700 flex-1">Meta Ads Manager</span>
-                  </button>
+                <button onClick={handleMetaClick}
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-slate-50 transition-colors">
+                  <MetaIcon />
+                  <span className="text-[12px] font-medium text-slate-700 flex-1">Meta Ads Manager</span>
                   {isConnected ? (
                     <button
-                      onClick={() => { onLogout?.(); setOpen(false); }}
-                      className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors"
-                      title="Disconnect Meta account"
-                    >Connected</button>
+                      onClick={(e) => { e.stopPropagation(); onLogout?.(); setOpen(false); }}
+                      className="relative w-8 h-[18px] rounded-full bg-emerald-500 hover:bg-red-500 transition-colors group"
+                      title="Disconnect"
+                    >
+                      <span className="absolute top-[2px] right-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-all group-hover:right-[14px]" />
+                    </button>
                   ) : isLoggedIn ? (
                     <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-200">Select Account</span>
                   ) : (
                     <span className="text-[10px] font-medium text-blue-600">Connect</span>
                   )}
-                </div>
+                </button>
                 {/* Loading / Error */}
                 {isLoginLoading && (
                   <div className="px-3 py-2 text-center">
