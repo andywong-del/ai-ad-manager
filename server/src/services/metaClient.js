@@ -1888,21 +1888,86 @@ export const getUniversalVideos = async (token, { adAccountId, pageId, igAccount
 
   const cleanTitle = (t) => (t || '').replace(/^Auto_Cropped_AR_.*?(?:DCO_|V\d+_)/i, '').trim() || t || '';
 
-  // Step 2: Fetch all three sources in parallel
-  const [adVids, pageResult, igResult] = await Promise.all([
+  // Step 2: Fetch all sources in parallel
+  // For IG: lightweight fetch of media IDs only (no insights — we use viewsMap instead)
+  const fetchIgMediaIds = async () => {
+    if (!igAccountId) return [];
+    // Resolve IG token from linked page
+    let igToken = token;
+    try {
+      const pages = await getPages(token);
+      const linked = pageId
+        ? pages?.find(p => p.id === pageId)
+        : pages?.find(p => p.instagram_business_account?.id === igAccountId);
+      if (linked?.access_token) igToken = linked.access_token;
+    } catch { /* use user token */ }
+    // Paginate all IG media — lightweight, no insights
+    let allMedia = [];
+    let cursor = null;
+    let more = true;
+    while (more) {
+      const params = {
+        access_token: igToken,
+        fields: 'id,media_type,thumbnail_url,caption,timestamp,permalink',
+        limit: 50
+      };
+      if (cursor) params.after = cursor;
+      const { data } = await metaApi.get(`/${igAccountId}/media`, { params });
+      allMedia = allMedia.concat(data.data || []);
+      cursor = data.paging?.cursors?.after || null;
+      more = !!data.paging?.next;
+    }
+    return allMedia.filter(m => m.media_type === 'VIDEO' || m.media_type === 'REELS');
+  };
+
+  const [adVids, pageResult, igMediaList] = await Promise.all([
     adAccountId
       ? getAdVideos(token, adAccountId, { viewsMap }).catch(() => [])
       : Promise.resolve([]),
     pageId && adAccountId
       ? getPageVideos(token, pageId, adAccountId).catch(() => ({ videos: [] }))
       : Promise.resolve({ videos: [] }),
-    igAccountId
-      ? getIgMedia(token, igAccountId, { pageId, adAccountId }).catch(() => ({ videos: [] }))
-      : Promise.resolve({ videos: [] })
+    fetchIgMediaIds().catch(err => { console.log(`[getUniversalVideos] IG media fetch failed: ${err.message}`); return []; })
   ]);
 
   const pageVids = pageResult.videos || [];
-  const igVids = igResult.videos || [];
+
+  // Build IG media lookup: source_instagram_media_id → IG media info
+  const igMediaById = {};
+  for (const m of igMediaList) igMediaById[m.id] = m;
+
+  // Convert IG media into video entries (use viewsMap for views, Page videos for titles)
+  const pageVidsByIgId = {};
+  for (const pv of pageVids) {
+    if (pv.source_instagram_media_id) pageVidsByIgId[pv.source_instagram_media_id] = pv;
+  }
+  const igVids = igMediaList.map(m => {
+    const pageVid = pageVidsByIgId[m.id];
+    return {
+      id: m.id,
+      title: pageVid?.title || m.caption?.slice(0, 80) || `Video ${m.id}`,
+      description: pageVid?.description || m.caption || '',
+      picture: m.thumbnail_url || pageVid?.picture,
+      length: pageVid?.length,
+      created_time: m.timestamp,
+      updated_time: pageVid?.updated_time || m.timestamp,
+      three_second_views: viewsMap[m.id] || (pageVid ? viewsMap[pageVid.id] || pageVid.three_second_views : 0),
+      source_instagram_media_id: m.id,
+      permalink: m.permalink,
+      is_ig: true,
+      sources: pageVid ? ['ig', 'page'] : ['ig']
+    };
+  });
+
+  // Also tag Page videos that have IG counterparts
+  for (const pv of pageVids) {
+    if (pv.source_instagram_media_id && igMediaById[pv.source_instagram_media_id]) {
+      if (!pv.sources.includes('ig')) pv.sources.push('ig');
+      pv.is_ig = true;
+    }
+  }
+
+  console.log(`[getUniversalVideos] Sources: ${pageVids.length} page, ${igVids.length} ig, ${adVids.length} ad`);
 
   // Step 3: Deduplicate and merge into a single map keyed by normalized title+length
   // This groups all variants (auto-cropped, IG crosspost, ad copy) into one entry
