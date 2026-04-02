@@ -515,7 +515,7 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
       console.log('[normalizeVideos] IG raw data sample:', raw.slice(0, 3).map(m => ({ id: m.id, three_second_views: m.three_second_views, sources: m.sources, is_ig: m.is_ig })));
       return raw.map(m => ({
         ...m,
-        title: m.title || (m.description ? m.description.slice(0, 80) : (m.caption ? m.caption.slice(0, 80) : 'Untitled')),
+        title: m.title || (m.description ? m.description.slice(0, 80) : (m.caption ? m.caption.slice(0, 80) : `Video ${m.id}`)),
         picture: m.picture || m.thumbnail_url || '',
         source: m.source || m.media_url,
         created_time: m.created_time || m.timestamp,
@@ -1043,9 +1043,7 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
                     <p className="text-xs text-slate-400 italic py-4 text-center">No videos found</p>
                   ) : (() => {
                       const fmtVDate = d => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
-                      // Filter out auto-generated videos with no title and no description
                       const filtered = videos
-                        .filter(v => v.title || v.name || v.description || v.source_instagram_media_id)
                         .filter(v => !videoSearchQuery || (v.title || v.name || v.description || v.id || '').toLowerCase().includes(videoSearchQuery.toLowerCase()))
                         .filter(v => {
                           if (!videoDateFrom && !videoDateTo) return true;

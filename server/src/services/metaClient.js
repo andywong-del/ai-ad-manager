@@ -1607,18 +1607,25 @@ export const getPageVideos = async (token, pageId, adAccountId, { after } = {}) 
   } catch { /* use user token as fallback */ }
 
   try {
-    const params = {
-      access_token: pageToken,
-      fields: 'id,title,description,source,picture,length,created_time,updated_time,views,status,source_instagram_media_id',
-      limit: 50
-    };
-    if (after) params.after = after;
+    // Paginate through ALL pages of Page videos
+    let allRaw = [];
+    let cursor = after || null;
+    let hasMore = true;
+    while (hasMore) {
+      const params = {
+        access_token: pageToken,
+        fields: 'id,title,description,source,picture,length,created_time,updated_time,views,status,source_instagram_media_id',
+        limit: 50
+      };
+      if (cursor) params.after = cursor;
+      const { data } = await metaApi.get(`/${pageId}/videos`, { params });
+      const items = (data?.data || []).filter(v => !v.status || v.status.video_status === 'ready');
+      allRaw = allRaw.concat(items);
+      cursor = data.paging?.cursors?.after || null;
+      hasMore = !!data.paging?.next;
+    }
 
-    // Fast path: fetch page videos only — skip ad-level views map (too slow for large accounts)
-    const { data } = await metaApi.get(`/${pageId}/videos`, { params });
-    const rawPageVideos = (data?.data || []).filter(v => !v.status || v.status.video_status === 'ready');
-
-    const pageVideos = rawPageVideos.map(v => {
+    const pageVideos = allRaw.map(v => {
       const isCrosspost = !!v.source_instagram_media_id;
       return {
         ...v,
@@ -1628,12 +1635,11 @@ export const getPageVideos = async (token, pageId, adAccountId, { after } = {}) 
       };
     });
 
-    const nextCursor = data.paging?.cursors?.after || null;
-    const hasMore = !!data.paging?.next;
-
-    const withViews = pageVideos.filter(v => v.three_second_views > 0);
+    const withViews = pageVideos
+      .filter(v => v.three_second_views > 0);
     withViews.sort((a, b) => new Date(b.created_time || 0) - new Date(a.created_time || 0));
-    return { videos: withViews, nextCursor: hasMore ? nextCursor : null };
+    console.log(`[getPageVideos] ${allRaw.length} raw → ${withViews.length} after filters`);
+    return { videos: withViews, nextCursor: null };
   } catch (err) {
     console.error('getPageVideos error:', err.response?.data?.error?.message || err.message);
     return { videos: [], nextCursor: null };
@@ -1668,26 +1674,31 @@ export const getIgMedia = async (token, igAccountId, { pageId, adAccountId, afte
 
   if (!after) {
     try {
-      const [{ data }, viewsMap] = await Promise.all([
-        metaApi.get(`/${igAccountId}/media`, {
-          params: {
-            access_token: igToken,
-            fields: 'id,media_type,media_url,thumbnail_url,caption,timestamp,permalink',
-            limit: 50
-          }
-        }),
-        viewsMapPromise.catch(() => ({}))
-      ]);
-      const allMedia = data.data || [];
+      // Paginate through ALL pages of IG media
+      const viewsMap = await viewsMapPromise.catch(() => ({}));
+      let allMedia = [];
+      let pageCursor = null;
+      let hasMore = true;
+      while (hasMore) {
+        const params = {
+          access_token: igToken,
+          fields: 'id,media_type,media_url,thumbnail_url,caption,timestamp,permalink',
+          limit: 50
+        };
+        if (pageCursor) params.after = pageCursor;
+        const { data } = await metaApi.get(`/${igAccountId}/media`, { params });
+        const items = data.data || [];
+        allMedia = allMedia.concat(items);
+        pageCursor = data.paging?.cursors?.after || null;
+        hasMore = !!data.paging?.next;
+      }
       const videos = allMedia.filter(m => m.media_type === 'VIDEO' || m.media_type === 'REELS');
-      const nextCursor = data.paging?.cursors?.after || null;
       console.log(`[getIgMedia] Direct IG media: ${allMedia.length} total, ${videos.length} videos`);
 
-      // Fetch native IG views for top 15 videos (capped to avoid timeout)
-      const top15 = videos.slice(0, 15);
+      // Fetch native IG views for all videos
       const igViews = {};
       const insightsApi = axios.create({ baseURL: `${BASE_URL}/${API_VERSION}`, timeout: 8000 });
-      await Promise.all(top15.map(async (v) => {
+      await Promise.all(videos.map(async (v) => {
         try {
           const { data: insData } = await insightsApi.get(`/${v.id}/insights`, {
             params: { access_token: igToken, metric: 'views' }
@@ -1697,52 +1708,73 @@ export const getIgMedia = async (token, igAccountId, { pageId, adAccountId, afte
         } catch { /* skip — some reels don't support insights */ }
       }));
 
-      const normalized = videos.map(v => ({
-        ...v,
-        title: v.caption?.slice(0, 80) || 'Untitled',
-        picture: v.thumbnail_url,
-        created_time: v.timestamp,
-        updated_time: v.timestamp,
-        three_second_views: igViews[v.id] || viewsMap[v.id] || 0,
-        source_instagram_media_id: v.id,
-        is_ig: true,
-        sources: ['ig']
-      }));
-
-      // Also fetch cross-posted Page videos and merge (these won't appear in IG media endpoint)
+      // Fetch Page videos — used to resolve real titles and merge cross-posts
+      let allPageVids = [];
       const igMediaIds = new Set(videos.map(v => v.id));
       if (resolvedPageId) {
         try {
           const page = allPages.find(p => p.id === resolvedPageId);
           const pageToken = page?.access_token || token;
-          const { data: pageData } = await metaApi.get(`/${resolvedPageId}/videos`, {
-            params: {
+          let pgCursor = null;
+          let pgMore = true;
+          while (pgMore) {
+            const pgParams = {
               access_token: pageToken,
               fields: 'id,title,description,source,picture,length,created_time,updated_time,views,source_instagram_media_id',
               limit: 50
-            }
-          });
-          const crossposted = (pageData.data || []).filter(v =>
-            v.source_instagram_media_id && !igMediaIds.has(v.source_instagram_media_id)
-          );
-          for (const v of crossposted) {
-            normalized.push({
-              ...v,
-              // For cross-posted: ad views (covers IG+FB placements) + page organic views
-              three_second_views: viewsMap[v.id] || v.views || 0,
-              is_ig: true,
-              sources: ['ig', 'page']
-            });
+            };
+            if (pgCursor) pgParams.after = pgCursor;
+            const { data: pageData } = await metaApi.get(`/${resolvedPageId}/videos`, { params: pgParams });
+            allPageVids = allPageVids.concat(pageData.data || []);
+            pgCursor = pageData.paging?.cursors?.after || null;
+            pgMore = !!pageData.paging?.next;
           }
-          console.log(`[getIgMedia] Merged ${crossposted.length} cross-posted Page videos`);
         } catch { /* skip — page videos optional */ }
       }
 
-      // Filter out videos with 0 views (no data = not useful for selection)
-      const withViews = normalized.filter(v => v.three_second_views > 0);
+      // Build a lookup: IG media ID → Page video (for real titles + metadata)
+      const igToPageMap = {};
+      for (const pv of allPageVids) {
+        if (pv.source_instagram_media_id) igToPageMap[pv.source_instagram_media_id] = pv;
+      }
+
+      const normalized = videos.map(v => {
+        const pageVid = igToPageMap[v.id];
+        return {
+          ...v,
+          title: pageVid?.title || v.caption?.slice(0, 80) || `Video ${v.id}`,
+          description: pageVid?.description || v.caption || '',
+          picture: v.thumbnail_url || pageVid?.picture,
+          length: pageVid?.length || v.length,
+          created_time: v.timestamp,
+          updated_time: pageVid?.updated_time || v.timestamp,
+          three_second_views: igViews[v.id] || viewsMap[v.id] || (pageVid?.views || 0),
+          source_instagram_media_id: v.id,
+          is_ig: true,
+          sources: pageVid ? ['ig', 'page'] : ['ig']
+        };
+      });
+
+      // Add cross-posted Page videos not already in IG media
+      const crossposted = allPageVids.filter(v =>
+        v.source_instagram_media_id && !igMediaIds.has(v.source_instagram_media_id)
+      );
+      for (const v of crossposted) {
+        normalized.push({
+          ...v,
+          three_second_views: viewsMap[v.id] || v.views || 0,
+          is_ig: true,
+          sources: ['ig', 'page']
+        });
+      }
+      console.log(`[getIgMedia] ${videos.length} IG videos, ${Object.keys(igToPageMap).length} matched to Page titles, ${crossposted.length} extra cross-posts`);
+
+      // Filter out videos with 0 views and untitled videos
+      const withViews = normalized
+        .filter(v => v.three_second_views > 0);
       // Sort by date (newest first) to match Meta Custom Audience picker
       withViews.sort((a, b) => new Date(b.created_time || b.timestamp || 0) - new Date(a.created_time || a.timestamp || 0));
-      return { videos: withViews, nextCursor: data.paging?.next ? nextCursor : null };
+      return { videos: withViews, nextCursor: null };
     } catch (err) {
       console.log(`[getIgMedia] IG media endpoint failed (${err.response?.data?.error?.code || err.message}), trying page fallback...`);
     }
@@ -1754,15 +1786,23 @@ export const getIgMedia = async (token, igAccountId, { pageId, adAccountId, afte
     const page = pages?.find(p => p.id === resolvedPageId);
     const pageToken = page?.access_token || token;
     try {
-      const params = {
-        access_token: pageToken,
-        fields: 'id,title,description,source,picture,length,created_time,updated_time,views,source_instagram_media_id',
-        limit: 50
-      };
-      if (after) params.after = after;
-      const { data } = await metaApi.get(`/${resolvedPageId}/videos`, { params });
+      // Paginate through ALL page videos for fallback
+      let allPageVids = [];
+      let fbCursor = after || null;
+      let fbMore = true;
+      while (fbMore) {
+        const params = {
+          access_token: pageToken,
+          fields: 'id,title,description,source,picture,length,created_time,updated_time,views,source_instagram_media_id',
+          limit: 50
+        };
+        if (fbCursor) params.after = fbCursor;
+        const { data } = await metaApi.get(`/${resolvedPageId}/videos`, { params });
+        allPageVids = allPageVids.concat(data.data || []);
+        fbCursor = data.paging?.cursors?.after || null;
+        fbMore = !!data.paging?.next;
+      }
       // Prefer IG-crossposted videos, but if none found, return all page videos as fallback
-      const allPageVids = (data.data || []);
       const crossposted = allPageVids.filter(v => !!v.source_instagram_media_id);
       const useVids = crossposted.length > 0 ? crossposted : allPageVids;
       const videos = useVids.map(v => ({
@@ -1773,7 +1813,7 @@ export const getIgMedia = async (token, igAccountId, { pageId, adAccountId, afte
       }));
       videos.sort((a, b) => (b.three_second_views || 0) - (a.three_second_views || 0));
       console.log(`[getIgMedia] Page fallback: ${crossposted.length} crossposted + ${allPageVids.length} total from page ${resolvedPageId}`);
-      return { videos, nextCursor: data.paging?.next ? nextCursor : null };
+      return { videos, nextCursor: null };
     } catch (err2) {
       console.log(`[getIgMedia] Page fallback failed: ${err2.response?.data?.error?.message || err2.message}`);
     }
@@ -1869,7 +1909,7 @@ export const getUniversalVideos = async (token, { adAccountId, pageId, igAccount
   const familyMap = {}; // family_key → merged video entry
 
   const addToFamily = (v, source) => {
-    const title = cleanTitle(v.title) || 'Untitled';
+    const title = cleanTitle(v.title) || v.description?.slice(0, 80) || `Video ${v.id}`;
     const length = Math.round((v.length || 0) * 10) / 10;
     const fkey = `${title.toLowerCase()}|${Math.round(length)}`;
     const views = v.three_second_views || 0;
@@ -1900,7 +1940,7 @@ export const getUniversalVideos = async (token, { adAccountId, pageId, igAccount
         if (v.picture || v.thumbnail_url) entry.picture = v.picture || v.thumbnail_url;
         if (v.source) entry.source = v.source;
         if (v.permalink) entry.permalink = v.permalink;
-        if (title !== 'Untitled') entry.title = title;
+        if (title && !title.startsWith('Video ')) entry.title = title;
       }
       if (v.source_instagram_media_id) entry.source_instagram_media_id = v.source_instagram_media_id;
       if (v.is_ig) entry.is_ig = true;

@@ -30,7 +30,7 @@ const normalizeVideos = (raw, source) => {
   if (source === 'ig_account') {
     return raw.map(m => ({
       ...m,
-      title: m.title || (m.description ? m.description.slice(0, 80) : (m.caption ? m.caption.slice(0, 80) : 'Untitled')),
+      title: m.title || (m.description ? m.description.slice(0, 80) : (m.caption ? m.caption.slice(0, 80) : `Video ${m.id}`)),
       picture: m.picture || m.thumbnail_url || '',
       source: m.source || m.media_url,
       created_time: m.created_time || m.timestamp,
@@ -191,7 +191,6 @@ export default function VideoAudienceCard({ data, onSend, isAnswered, adAccountI
 
   // Filter + sort
   const filtered = videos
-    .filter(v => v.title || v.name || v.description || v.source_instagram_media_id)
     .filter(v => !search || (v.title || v.name || v.description || v.id || '').toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => {
       const field = sortBy === 'created_time' ? 'created_time' : 'updated_time';
@@ -383,7 +382,7 @@ export default function VideoAudienceCard({ data, onSend, isAnswered, adAccountI
                   </div>
                   {/* Details */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-[11px] font-medium text-slate-700 truncate">{v.title || v.name || v.description?.slice(0, 60) || 'Untitled'}</p>
+                    <p className="text-[11px] font-medium text-slate-700 truncate">{v.title || v.name || v.description?.slice(0, 60) || `Video ${v.id}`}</p>
                     <p className="text-[10px] text-slate-400">{v.length ? `${fmtDuration(v.length)} · ` : ''}Uploaded: {fmtDate(v.created_time)}</p>
                   </div>
                   {/* Views + Source */}
