@@ -466,14 +466,14 @@ function getAdVideoStatus({ video_id }, c) {
 function getPageVideos({ page_id }, c) {
   const { token, adAccountId } = ctx(c);
   if (!page_id) return { error: 'page_id is required.' };
-  return meta.getPageVideos(token, page_id, adAccountId).then(result => {
-    // Emit full video list as mediagrid SSE — ensures frontend gets ALL videos even if agent truncates
+  // Use universal endpoint to merge IG + Page + Ad videos
+  return meta.getUniversalVideos(token, { adAccountId, pageId: page_id }).then(result => {
     const sseFn = c.session?.id ? activeSessions.get(c.session.id) : null;
     if (sseFn && result.videos?.length) {
       sseFn({
         type: 'tool_result', name: 'get_page_videos',
         mediagrid: {
-          title: 'Select Videos (Facebook Page)',
+          title: 'Select Videos',
           media_type: 'video',
           metric_label: 'Views',
           items: result.videos.map(v => ({
@@ -481,9 +481,9 @@ function getPageVideos({ page_id }, c) {
             title: v.title || 'Untitled',
             thumbnail: v.picture,
             duration: v.length ? `${Math.floor(v.length / 60)}:${String(Math.round(v.length % 60)).padStart(2, '0')}` : null,
-            metric_value: v.three_second_views || v.views || 0,
+            metric_value: v.three_second_views || 0,
             date: v.created_time ? new Date(v.created_time).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : null,
-            source_icons: v.is_ig ? ['fb', 'ig'] : ['fb']
+            source_icons: v.sources?.includes('ig') && v.sources?.includes('page') ? ['ig', 'fb'] : v.sources?.includes('ig') ? ['ig'] : ['fb']
           }))
         }
       });
@@ -919,13 +919,14 @@ function getConnectedInstagramAccounts(_, c) {
 
 function getIgMedia({ ig_account_id, page_id }, c) {
   const { token, adAccountId } = ctx(c);
-  return meta.getIgMedia(token, ig_account_id, { pageId: page_id, adAccountId }).then(result => {
+  // Use universal endpoint to merge IG + Page + Ad videos
+  return meta.getUniversalVideos(token, { adAccountId, pageId: page_id, igAccountId: ig_account_id }).then(result => {
     const sseFn = c.session?.id ? activeSessions.get(c.session.id) : null;
     if (sseFn && result.videos?.length) {
       sseFn({
         type: 'tool_result', name: 'get_ig_media',
         mediagrid: {
-          title: 'Select Videos (Instagram)',
+          title: 'Select Videos',
           media_type: 'video',
           metric_label: 'Views',
           items: result.videos.map(v => ({
@@ -935,7 +936,7 @@ function getIgMedia({ ig_account_id, page_id }, c) {
             duration: v.length ? `${Math.floor(v.length / 60)}:${String(Math.round(v.length % 60)).padStart(2, '0')}` : null,
             metric_value: v.three_second_views || 0,
             date: v.created_time ? new Date(v.created_time).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : null,
-            source_icons: ['ig']
+            source_icons: v.sources?.includes('ig') && v.sources?.includes('page') ? ['ig', 'fb'] : v.sources?.includes('ig') ? ['ig'] : ['fb']
           }))
         }
       });
