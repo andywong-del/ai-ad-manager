@@ -525,11 +525,11 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
     return raw.map(v => ({ ...v, is_ig: !!v.source_instagram_media_id }));
   };
 
-  // Build the video fetch endpoint — always use universal (IG + Page merged)
+  // Build the video fetch endpoint — use selected account's IG + linked Page
   const getVideoEndpoint = () => {
-    const pageId = pages[0]?.id || '';
-    const igId = igAccounts[0]?.id || '';
-    const params = [`adAccountId=${adAccountId}`, pageId ? `pageId=${pageId}` : '', igId ? `igAccountId=${igId}` : ''].filter(Boolean).join('&');
+    const igAcct = igAccounts.find(a => a.id === videoSourceIg);
+    const pageId = igAcct?.pageId || '';
+    const params = [`adAccountId=${adAccountId}`, pageId ? `pageId=${pageId}` : '', videoSourceIg ? `igAccountId=${videoSourceIg}` : ''].filter(Boolean).join('&');
     return `/meta/videos/universal?${params}`;
   };
 
@@ -537,7 +537,7 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
   const videoFetchRef = useRef(0); // prevent stale responses from overwriting newer data
   const fetchVideos = () => {
     if (tab !== 'video' || !adAccountId) return;
-    if (!pages.length && !igAccounts.length) return; // wait for accounts to load
+    if (!videoSourceIg) { setVideos([]); setVideosLoading(false); return; } // wait for account selection
 
     const fetchId = ++videoFetchRef.current;
     setVideosLoading(true);
@@ -565,7 +565,7 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
       setVideosLoading(false);
     });
   };
-  useEffect(fetchVideos, [tab, adAccountId, pages.length, igAccounts.length]);
+  useEffect(fetchVideos, [tab, adAccountId, videoSourceIg]);
 
   // Load more videos when user paginates past current data — advance page AFTER data arrives
   const loadMoreVideos = () => {
@@ -979,7 +979,25 @@ const CreateAudienceModal = ({ onClose, onCreateViaChat, adAccountId, defaultTab
           {/* ── Video ── */}
           {tab === 'video' && (
             <>
-              {/* Videos auto-loaded from all connected IG + FB Page sources */}
+              {/* Account selector — each IG professional account is linked to a Page */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Account</label>
+                {igAccountsLoading ? (
+                  <p className="text-xs text-slate-400 italic py-2">Loading accounts...</p>
+                ) : (
+                  <select value={videoSourceIg} onChange={e => setVideoSourceIg(e.target.value)} className={INPUT_CLS}>
+                    <option value="">Select an account</option>
+                    {igAccounts.map(a => {
+                      const page = pages.find(p => p.id === a.pageId);
+                      return <option key={a.id} value={a.id}>@{a.username}{page ? ` · ${page.name}` : ''}</option>;
+                    })}
+                  </select>
+                )}
+              </div>
+
+              {!videoSourceIg && (
+                <p className="text-xs text-slate-400 italic text-center py-4">Select an account to see its videos</p>
+              )}
 
               {/* Engagement Type — select before choosing videos */}
               <div>
