@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import api from '../services/api.js';
 
-const ACTIVE_KEY = 'aam_active_skill';
+const ACTIVE_KEY = 'aam_active_skills';
 
 // Fallback defaults when API hasn't loaded — must match all 18 built-in skills from server/skills/default/
 const DEFAULT_SKILLS = [
@@ -31,10 +31,22 @@ const DEFAULT_SKILLS = [
   { id: 'skill-creator', name: 'Skill Creator', description: 'Guide users through creating a new custom skill via structured conversation', icon: 'sparkles', isDefault: true },
 ];
 
+// Load active skill IDs from localStorage
+const loadActiveIds = () => {
+  try {
+    const stored = localStorage.getItem(ACTIVE_KEY);
+    if (!stored) return new Set();
+    const parsed = JSON.parse(stored);
+    return new Set(Array.isArray(parsed) ? parsed : []);
+  } catch {
+    return new Set();
+  }
+};
+
 export const useSkills = () => {
   const [skills, setSkills] = useState(DEFAULT_SKILLS);
   const [loading, setLoading] = useState(true);
-  const [activeSkillId, setActiveSkillId] = useState(() => localStorage.getItem(ACTIVE_KEY) || null);
+  const [activeSkillIds, setActiveSkillIds] = useState(loadActiveIds);
 
   // Fetch all skills from server (replaces defaults with full data including content)
   const fetchSkills = useCallback(async () => {
@@ -52,15 +64,22 @@ export const useSkills = () => {
 
   useEffect(() => { fetchSkills(); }, [fetchSkills]);
 
-  // Toggle a skill active/inactive (only one active at a time)
+  // Persist active IDs to localStorage
+  const persistIds = useCallback((ids) => {
+    if (ids.size === 0) localStorage.removeItem(ACTIVE_KEY);
+    else localStorage.setItem(ACTIVE_KEY, JSON.stringify([...ids]));
+  }, []);
+
+  // Toggle a skill active/inactive (supports multiple)
   const toggleSkill = useCallback((id) => {
-    setActiveSkillId(prev => {
-      const next = prev === id ? null : id;
-      if (next) localStorage.setItem(ACTIVE_KEY, next);
-      else localStorage.removeItem(ACTIVE_KEY);
+    setActiveSkillIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      persistIds(next);
       return next;
     });
-  }, []);
+  }, [persistIds]);
 
   // Create a new custom skill
   const createSkill = useCallback(async ({ name, description, content, icon }) => {
@@ -80,11 +99,15 @@ export const useSkills = () => {
   const deleteSkill = useCallback(async (id) => {
     await api.delete(`/skills/${id}`);
     setSkills(prev => prev.filter(s => s.id !== id));
-    if (activeSkillId === id) {
-      setActiveSkillId(null);
-      localStorage.removeItem(ACTIVE_KEY);
+    if (activeSkillIds.has(id)) {
+      setActiveSkillIds(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        persistIds(next);
+        return next;
+      });
     }
-  }, [activeSkillId]);
+  }, [activeSkillIds, persistIds]);
 
   // Generate a skill from raw text using AI
   const generateSkill = useCallback(async (rawText) => {
@@ -92,14 +115,21 @@ export const useSkills = () => {
     return data; // { name, description, content, preview }
   }, []);
 
-  // Get the currently active skill
-  const activeSkill = skills.find(s => s.id === activeSkillId) || null;
+  // Get all currently active skills
+  const activeSkills = useMemo(() =>
+    skills.filter(s => activeSkillIds.has(s.id)),
+  [skills, activeSkillIds]);
 
-  // Build context string for active skill (injected before user messages)
+  // Backwards-compatible: first active skill (for UI that still expects single)
+  const activeSkill = activeSkills[0] || null;
+
+  // Build context string for all active skills (injected before user messages)
   const getSkillContext = useCallback(() => {
-    if (!activeSkill) return null;
-    return `[SKILL: ${activeSkill.name}]\n${activeSkill.content}`;
-  }, [activeSkill]);
+    if (activeSkills.length === 0) return null;
+    return activeSkills
+      .map(s => `[SKILL: ${s.name}]\n${s.content}`)
+      .join('\n\n---\n\n');
+  }, [activeSkills]);
 
   // Build context for a specific skill by id (for slash command one-off use)
   const getSkillContextById = useCallback((id) => {
@@ -111,8 +141,10 @@ export const useSkills = () => {
   return {
     skills,
     loading,
-    activeSkill,
-    activeSkillId,
+    activeSkill,       // backwards-compatible: first active skill
+    activeSkills,      // NEW: all active skills
+    activeSkillId: activeSkill?.id || null,  // backwards-compatible
+    activeSkillIds,    // NEW: Set of active IDs
     toggleSkill,
     createSkill,
     updateSkill,

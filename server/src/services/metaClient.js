@@ -1606,23 +1606,32 @@ export const getPageVideos = async (token, pageId, adAccountId, { after } = {}) 
     if (page?.access_token) pageToken = page.access_token;
   } catch { /* use user token as fallback */ }
 
-  try {
-    // Paginate through ALL pages of Page videos
+  const baseFields = 'id,title,description,source,picture,length,created_time,updated_time,views,status';
+
+  const fetchAll = async (fields) => {
     let allRaw = [];
     let cursor = after || null;
     let hasMore = true;
     while (hasMore) {
-      const params = {
-        access_token: pageToken,
-        fields: 'id,title,description,source,picture,length,created_time,updated_time,views,status,source_instagram_media_id',
-        limit: 50
-      };
+      const params = { access_token: pageToken, fields, limit: 50 };
       if (cursor) params.after = cursor;
       const { data } = await metaApi.get(`/${pageId}/videos`, { params });
       const items = (data?.data || []).filter(v => !v.status || v.status.video_status === 'ready');
       allRaw = allRaw.concat(items);
       cursor = data.paging?.cursors?.after || null;
       hasMore = !!data.paging?.next;
+    }
+    return allRaw;
+  };
+
+  try {
+    // Try with source_instagram_media_id first; fall back to base fields if the API rejects it
+    let allRaw;
+    try {
+      allRaw = await fetchAll(`${baseFields},source_instagram_media_id`);
+    } catch (e) {
+      console.log(`[getPageVideos] source_instagram_media_id field rejected, retrying without it: ${e.response?.data?.error?.message || e.message}`);
+      allRaw = await fetchAll(baseFields);
     }
 
     const pageVideos = allRaw.map(v => {
@@ -1901,7 +1910,7 @@ export const getUniversalVideos = async (token, { adAccountId, pageId, igAccount
         : pages?.find(p => p.instagram_business_account?.id === igAccountId);
       if (linked?.access_token) igToken = linked.access_token;
     } catch { /* use user token */ }
-    // Paginate all IG media — lightweight, no insights
+    // Paginate all IG media (lightweight)
     let allMedia = [];
     let cursor = null;
     let more = true;
@@ -1917,7 +1926,27 @@ export const getUniversalVideos = async (token, { adAccountId, pageId, igAccount
       cursor = data.paging?.cursors?.after || null;
       more = !!data.paging?.next;
     }
-    return allMedia.filter(m => m.media_type === 'VIDEO' || m.media_type === 'REELS');
+
+    const videos = allMedia.filter(m => m.media_type === 'VIDEO' || m.media_type === 'REELS');
+
+    // Fetch IG views via insights endpoint (needs instagram_manage_insights)
+    // Batch 10 at a time to avoid rate limits
+    const insightsApi = axios.create({ baseURL: `${BASE_URL}/${API_VERSION}`, timeout: 8000 });
+    for (let i = 0; i < videos.length; i += 10) {
+      await Promise.all(videos.slice(i, i + 10).map(async (v) => {
+        try {
+          const { data } = await insightsApi.get(`/${v.id}/insights`, {
+            params: { access_token: igToken, metric: 'views' }
+          });
+          v.ig_plays = data.data?.[0]?.values?.[0]?.value || 0;
+        } catch {
+          v.ig_plays = 0;
+        }
+      }));
+    }
+    console.log(`[fetchIgMedia] ${videos.length} videos, ${videos.filter(v => v.ig_plays > 0).length} with views`);
+
+    return videos;
   };
 
   const [adVids, pageResult, igMediaList] = await Promise.all([
@@ -1937,12 +1966,46 @@ export const getUniversalVideos = async (token, { adAccountId, pageId, igAccount
   for (const m of igMediaList) igMediaById[m.id] = m;
 
   // Convert IG media into video entries (use viewsMap for views, Page videos for titles)
+  // Match IG media to page videos: first by source_instagram_media_id, then by timestamp proximity
   const pageVidsByIgId = {};
   for (const pv of pageVids) {
     if (pv.source_instagram_media_id) pageVidsByIgId[pv.source_instagram_media_id] = pv;
   }
-  const igVids = igMediaList.map(m => {
-    const pageVid = pageVidsByIgId[m.id];
+
+  // Fallback: match IG media to page videos by close creation time (within 2 hours)
+  const matchByTimestamp = (igMedia) => {
+    if (!igMedia.timestamp) return null;
+    const igTime = new Date(igMedia.timestamp).getTime();
+    let best = null, bestDiff = Infinity;
+    for (const pv of pageVids) {
+      if (!pv.created_time) continue;
+      const diff = Math.abs(new Date(pv.created_time).getTime() - igTime);
+      if (diff < 2 * 60 * 60 * 1000 && diff < bestDiff) { // within 2 hours
+        best = pv;
+        bestDiff = diff;
+      }
+    }
+    return best;
+  };
+
+  const matchedPageIds = new Set(); // track page videos already matched to IG media
+
+  // Pre-match all IG media to page videos
+  const igMatches = igMediaList.map(m => {
+    let pageVid = pageVidsByIgId[m.id];
+    if (!pageVid) pageVid = matchByTimestamp(m);
+    if (pageVid) matchedPageIds.add(pageVid.id);
+    return { m, pageVid };
+  });
+
+  // Build igVids with correct total views:
+  // - FB+IG: FB page views + IG plays
+  // - IG only: IG plays
+  // ig_plays is already inline from the media fetch (no extra API calls)
+  const igVids = igMatches.map(({ m, pageVid }) => {
+    const igPlays = m.ig_plays || 0;
+    const fbViews = pageVid ? (pageVid.three_second_views || pageVid.views || 0) : 0;
+    const hasPage = !!pageVid;
     return {
       id: m.id,
       title: pageVid?.title || m.caption?.slice(0, 80) || `Video ${m.id}`,
@@ -1951,23 +2014,27 @@ export const getUniversalVideos = async (token, { adAccountId, pageId, igAccount
       length: pageVid?.length,
       created_time: m.timestamp,
       updated_time: pageVid?.updated_time || m.timestamp,
-      three_second_views: viewsMap[m.id] || (pageVid ? viewsMap[pageVid.id] || pageVid.three_second_views : 0),
+      three_second_views: hasPage ? fbViews + igPlays : igPlays,
       source_instagram_media_id: m.id,
       permalink: m.permalink,
       is_ig: true,
-      sources: pageVid ? ['ig', 'page'] : ['ig']
+      sources: hasPage ? ['ig', 'page'] : ['ig']
     };
   });
 
-  // Also tag Page videos that have IG counterparts
+  // Tag Page videos that have IG counterparts (by source_instagram_media_id or timestamp match)
   for (const pv of pageVids) {
-    if (pv.source_instagram_media_id && igMediaById[pv.source_instagram_media_id]) {
+    const hasIgById = pv.source_instagram_media_id && igMediaById[pv.source_instagram_media_id];
+    const hasIgByMatch = matchedPageIds.has(pv.id);
+    if (hasIgById || hasIgByMatch) {
       if (!pv.sources.includes('ig')) pv.sources.push('ig');
       pv.is_ig = true;
     }
   }
 
-  console.log(`[getUniversalVideos] Sources: ${pageVids.length} page, ${igVids.length} ig, ${adVids.length} ad`);
+  const igMatchedById = pageVids.filter(pv => pv.source_instagram_media_id).length;
+  const igMatchedByTime = matchedPageIds.size - igMatchedById;
+  console.log(`[getUniversalVideos] Sources: ${pageVids.length} page, ${igVids.length} ig, ${adVids.length} ad | IG matches: ${igMatchedById} by ID, ${igMatchedByTime > 0 ? igMatchedByTime : 0} by timestamp`);
 
   // Step 3: Deduplicate and merge into a single map keyed by normalized title+length
   // This groups all variants (auto-cropped, IG crosspost, ad copy) into one entry
@@ -2033,7 +2100,7 @@ export const getUniversalVideos = async (token, { adAccountId, pageId, igAccount
       if (v.source_instagram_media_id && !sources.includes('ig')) sources.push('ig');
       return { ...v, variant_count: _ids.size, sources };
     })
-    .filter(v => v.three_second_views > 0) // hide videos with no view data
+    .filter(v => v.three_second_views > 0 || v.sources?.includes('ig')) // keep IG-only videos even without view data
     .sort((a, b) => new Date(b.created_time || 0) - new Date(a.created_time || 0)); // newest first
 
   const igCount = videos.filter(v => v.sources.includes('ig')).length;

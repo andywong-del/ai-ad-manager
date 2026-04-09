@@ -10,6 +10,8 @@ import { StrategistConfig } from './StrategistConfig.jsx';
 import { SkillsLibrary } from './SkillsLibrary.jsx';
 import { AudienceManager } from './AudienceManager.jsx';
 import { CampaignManager } from './CampaignManager.jsx';
+import { CreativeLibrary } from './CreativeLibrary.jsx';
+import { AutomationRules } from './AutomationRules.jsx';
 
 const CARD_CATEGORIES = [];
 const QUICK_CHIPS = [];
@@ -35,7 +37,7 @@ export const Dashboard = ({
   const [canvasData, setCanvasData] = useState(null);
 
   const {
-    skills, activeSkill, activeSkillId, toggleSkill,
+    skills, activeSkill, activeSkills, activeSkillId, activeSkillIds, toggleSkill,
     createSkill, updateSkill, deleteSkill, generateSkill, getSkillContext, getSkillContextById, fetchSkills,
   } = useSkills();
 
@@ -67,10 +69,10 @@ export const Dashboard = ({
     }
     if (!skillCtx) skillCtx = getSkillContext();
     const fullText = skillCtx ? `${skillCtx}\n\n---\n\nUser message: ${text}` : text;
-    // Pass custom skill ID so backend load_skill can override default analysis strategy
-    const customSkillId = activeSkill && !activeSkill.isDefault ? activeSkill.id : null;
-    sendMessage(fullText, attachments, { displayText: text, activeCustomSkill: customSkillId });
-  }, [sendMessage, getSkillContext, getSkillContextById, activeSkill]);
+    // Pass active custom skill IDs so backend load_skill can apply them
+    const customSkillIds = activeSkills.filter(s => !s.isDefault).map(s => s.id);
+    sendMessage(fullText, attachments, { displayText: text, activeCustomSkill: customSkillIds[0] || null, activeCustomSkills: customSkillIds });
+  }, [sendMessage, getSkillContext, getSkillContextById, activeSkills]);
 
   const handleSwitchSession = useCallback((sessionId) => {
     setActiveView({ type: 'chat' });
@@ -103,6 +105,14 @@ export const Dashboard = ({
 
   const handleOpenSkillsLibrary = useCallback(() => {
     setActiveView({ type: 'skillsLibrary' });
+  }, []);
+
+  const handleOpenCreativeLibrary = useCallback(() => {
+    setActiveView({ type: 'creativeLibrary' });
+  }, []);
+
+  const handleOpenAutomationRules = useCallback(() => {
+    setActiveView({ type: 'optimization' });
   }, []);
 
 
@@ -211,9 +221,13 @@ export const Dashboard = ({
         onReorderFolders={reorderFolders}
         skills={skills}
         activeSkill={activeSkill}
+        activeSkills={activeSkills}
+        activeSkillIds={activeSkillIds}
         onToggleSkill={toggleSkill}
         onOpenAudiences={handleOpenAudiences}
         onOpenCampaigns={handleOpenCampaigns}
+        onOpenCreativeLibrary={handleOpenCreativeLibrary}
+        onOpenAutomationRules={handleOpenAutomationRules}
         onOpenSkillsLibrary={handleOpenSkillsLibrary}
         token={token}
         onLogin={onLogin}
@@ -267,6 +281,28 @@ export const Dashboard = ({
               selectedBusiness={selectedBusiness}
               onSelectAccount={handleAccountSelect}
             />
+          ) : activeView.type === 'creativeLibrary' ? (
+            <CreativeLibrary
+              adAccountId={adAccountId}
+              onBack={() => setActiveView({ type: 'chat' })}
+              token={token}
+              onLogin={onLogin}
+              onLogout={onLogout}
+              selectedAccount={selectedAccount}
+              selectedBusiness={selectedBusiness}
+              onSelectAccount={handleAccountSelect}
+            />
+          ) : activeView.type === 'optimization' ? (
+            <AutomationRules
+              adAccountId={adAccountId}
+              onBack={() => setActiveView({ type: 'chat' })}
+              token={token}
+              onLogin={onLogin}
+              onLogout={onLogout}
+              selectedAccount={selectedAccount}
+              selectedBusiness={selectedBusiness}
+              onSelectAccount={handleAccountSelect}
+            />
           ) : activeView.type === 'audiences' ? (
             <AudienceManager
               adAccountId={adAccountId}
@@ -299,7 +335,9 @@ export const Dashboard = ({
               onSaveItem={saveItem}
               folders={folders}
               activeSkill={activeSkill}
-              onDeactivateSkill={() => activeSkill && toggleSkill(activeSkill.id)}
+              activeSkills={activeSkills}
+              activeSkillIds={activeSkillIds}
+              onDeactivateSkill={(id) => id ? toggleSkill(id) : activeSkills.forEach(s => toggleSkill(s.id))}
               skills={skills}
               onToggleSkill={toggleSkill}
               onManageSkills={(skill) => skill ? setActiveView({ type: 'skillConfig', skill }) : setActiveView({ type: 'skillsLibrary' })}

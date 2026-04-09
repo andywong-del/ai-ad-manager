@@ -86,7 +86,12 @@ const getTypeDisplay = (aud) => {
   return { main: 'Custom Audience', detail: detailMap[sub] || null };
 };
 
-// Get availability display matching Meta's real UI
+// Get availability display based on Meta's official operation_status codes
+// https://developers.facebook.com/docs/marketing-api/reference/custom-audience/
+// 0=N/A, 100=Expiring, 200=Normal, 300=Expired,
+// 400=Warning, 410=No upload, 411=Low match, 412=High invalid, 414=Replace in progress, 415=Replace failed,
+// 421-423=Pixel issues, 431-434=Lookalike issues, 441=Ready (size increasing),
+// 450=Out of date, 470=Account inactive, 471=Integrity flagged, 500=Error
 const getAvailability = (aud) => {
   const op = aud.operation_status;
   const opCode = op?.code;
@@ -95,29 +100,70 @@ const getAvailability = (aud) => {
     const ms = ts < 1e12 ? ts * 1000 : ts;
     return `Last edited on\n${new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(ms))}`;
   };
-  // Meta operation_status codes: 200=Normal/Ready, 300=Expired, 411/412/415=Populating, 400+=Error
-  if (opCode === 200) {
-    return { label: 'Ready', color: 'text-emerald-600', dot: 'bg-emerald-500', sub: fmtEdited(aud.time_updated), tooltip: null };
+
+  // Ready — normal operation or ready with size increasing
+  if (opCode === 200 || opCode === 441) {
+    return { label: 'Ready', color: 'text-emerald-600', dot: 'bg-emerald-500', sub: fmtEdited(aud.time_updated), tooltip: opCode === 441 ? (op?.description || 'Audience size is still increasing') : null };
   }
-  if (opCode === 411 || opCode === 412 || opCode === 415) {
-    return { label: 'Populating', color: 'text-amber-600', dot: 'bg-amber-400', sub: 'Audience is being built', tooltip: op?.description || 'This audience is still being populated. It may take up to 24 hours.' };
+
+  // Populating / in-progress — replace in progress, low match, high invalid entries
+  if (opCode === 414) {
+    return { label: 'Populating', color: 'text-amber-600', dot: 'bg-amber-400', sub: 'Replace in progress', tooltip: op?.description || null };
   }
-  if (opCode === 300) {
+
+  // Expiring / Expired / Out of date
+  if (opCode === 100) {
+    return { label: 'Expiring', color: 'text-amber-500', dot: 'bg-amber-400', sub: null, tooltip: op?.description || 'Audience will expire if not used in an active ad set' };
+  }
+  if (opCode === 300 || opCode === 450) {
     return { label: 'Expired', color: 'text-slate-400', dot: 'bg-slate-400', sub: null, tooltip: op?.description || null };
   }
-  if (opCode >= 400) {
-    // Check if this is actually still populating rather than a real error
-    const desc = (op?.description || '').toLowerCase();
-    const isPopulating = desc.includes('populating') || desc.includes('not yet ready') || desc.includes('being built')
-      || desc.includes('too few') || desc.includes('too small');
-    // Also treat very recently created audiences (< 24h) as populating, not error
-    const ageHours = aud.time_created ? (Date.now() / 1000 - aud.time_created) / 3600 : Infinity;
-    if (isPopulating || ageHours < 24) {
-      return { label: 'Populating', color: 'text-amber-600', dot: 'bg-amber-400', sub: 'Audience is being built', tooltip: op?.description || 'This audience is still being populated. It may take up to 24 hours.' };
+
+  // Warnings — audience is usable but has issues
+  if (opCode === 400 || opCode === 410 || opCode === 411 || opCode === 412 || opCode === 415) {
+    // If audience has users, it's still usable — show Ready with warning tooltip
+    const hasUsers = (aud.approximate_count_lower_bound || 0) > 0;
+    if (hasUsers) {
+      return { label: 'Ready', color: 'text-emerald-600', dot: 'bg-emerald-500', sub: fmtEdited(aud.time_updated), tooltip: op?.description || null };
     }
+    // No users yet — check if recently created (still building)
+    const ageHours = aud.time_created ? (Date.now() / 1000 - aud.time_created) / 3600 : Infinity;
+    if (ageHours < 48) {
+      return { label: 'Populating', color: 'text-amber-600', dot: 'bg-amber-400', sub: 'Audience is being built', tooltip: op?.description || 'This audience is still being populated.' };
+    }
+    return { label: 'Warning', color: 'text-amber-600', dot: 'bg-amber-400', sub: null, tooltip: op?.description || 'This audience has a warning' };
+  }
+
+  // Pixel issues
+  if (opCode >= 421 && opCode <= 423) {
+    return { label: 'Error', color: 'text-red-500', dot: 'bg-red-500', sub: 'Pixel issue', tooltip: op?.description || 'There is an issue with the pixel for this audience' };
+  }
+
+  // Lookalike issues
+  if (opCode >= 431 && opCode <= 434) {
+    return { label: 'Populating', color: 'text-amber-600', dot: 'bg-amber-400', sub: 'Lookalike building', tooltip: op?.description || 'Lookalike audience is being created' };
+  }
+
+  // Account / integrity issues
+  if (opCode === 470 || opCode === 471) {
+    return { label: 'Error', color: 'text-red-500', dot: 'bg-red-500', sub: null, tooltip: op?.description || 'Account or integrity issue' };
+  }
+
+  // 500 = real error
+  if (opCode === 500) {
     return { label: 'Error', color: 'text-red-500', dot: 'bg-red-500', sub: null, tooltip: op?.description || 'Something went wrong with this audience' };
   }
-  // Fallback — treat as Ready (saved audiences, unknown states, etc.)
+
+  // Any other 400+ code — check if has users
+  if (opCode >= 400) {
+    const hasUsers = (aud.approximate_count_lower_bound || 0) > 0;
+    if (hasUsers) {
+      return { label: 'Ready', color: 'text-emerald-600', dot: 'bg-emerald-500', sub: fmtEdited(aud.time_updated), tooltip: op?.description || null };
+    }
+    return { label: 'Warning', color: 'text-amber-600', dot: 'bg-amber-400', sub: null, tooltip: op?.description || null };
+  }
+
+  // Fallback — treat as Ready (saved audiences, code 0, unknown states)
   return { label: 'Ready', color: 'text-emerald-600', dot: 'bg-emerald-500', sub: fmtEdited(aud.time_updated), tooltip: null };
 };
 
@@ -1766,12 +1812,12 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack, token, onLo
       || (filterType.includes('LOOKALIKE') && sub === 'LOOKALIKE')
       || (filterType.includes('SAVED') && (sub === 'SAVED' || aud._isSaved));
 
-    // Availability filter — uses operation_status.code (200=Normal, 300=Expired, 411/412/415=Populating, 400+=Error)
-    const opCode = aud.operation_status?.code;
+    // Availability filter — use getAvailability() to match what the user sees
+    const availLabel = getAvailability(aud).label;
     const matchesAvail = filterAvailability.length === 0
-      || (filterAvailability.includes('ready') && (opCode === 200 || !opCode))
-      || (filterAvailability.includes('not_ready') && (opCode === 411 || opCode === 412 || opCode === 415 || opCode === 300))
-      || (filterAvailability.includes('error') && (opCode >= 400 && opCode !== 411 && opCode !== 412 && opCode !== 415));
+      || (filterAvailability.includes('ready') && availLabel === 'Ready')
+      || (filterAvailability.includes('not_ready') && (availLabel === 'Populating' || availLabel === 'Expiring' || availLabel === 'Expired' || availLabel === 'Warning'))
+      || (filterAvailability.includes('error') && availLabel === 'Error');
 
     // Status filter — uses delivery_status and timing data
     const deliveryCode = aud.delivery_status?.code;
@@ -1779,7 +1825,7 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack, token, onLo
       || (filterStatus.includes('in_active_ads') && deliveryCode === 200)
       || (filterStatus.includes('recently_used') && aud.time_updated && (Date.now() / 1000 - aud.time_updated) < 30 * 86400)
       || (filterStatus.includes('shared') && aud.is_value_based)
-      || (filterStatus.includes('action_needed') && opCode >= 400 && opCode !== 411 && opCode !== 412 && opCode !== 415);
+      || (filterStatus.includes('action_needed') && (availLabel === 'Error' || availLabel === 'Warning'));
 
     return matchesSearch && matchesType && matchesAvail && matchesStatus;
   });

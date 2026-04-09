@@ -304,6 +304,54 @@ async function createAdsBulk({ ads }, c) {
            failed: results.length - succeeded.length,
            ad_ids: succeeded.map(r => r.ad_id), results };
 }
+async function updateCampaignsBulk({ updates: items }, c) {
+  const { token } = ctx(c);
+  if (!Array.isArray(items) || !items.length) return { error: 'updates array required.' };
+  const results = [];
+  for (const { campaign_id, ...updates } of items) {
+    try {
+      await meta.updateCampaign(token, campaign_id, updates);
+      results.push({ status: 'success', campaign_id, ...updates });
+    } catch (err) {
+      results.push({ status: 'error', campaign_id, error: err.response?.data?.error?.message || err.message });
+    }
+  }
+  const succeeded = results.filter(r => r.status === 'success');
+  return { total: items.length, succeeded: succeeded.length, failed: items.length - succeeded.length, results };
+}
+
+async function updateAdSetsBulk({ updates: items }, c) {
+  const { token } = ctx(c);
+  if (!Array.isArray(items) || !items.length) return { error: 'updates array required.' };
+  const results = [];
+  for (const { ad_set_id, ...updates } of items) {
+    try {
+      await meta.updateAdSet(token, ad_set_id, updates);
+      results.push({ status: 'success', ad_set_id, ...updates });
+    } catch (err) {
+      results.push({ status: 'error', ad_set_id, error: err.response?.data?.error?.message || err.message });
+    }
+  }
+  const succeeded = results.filter(r => r.status === 'success');
+  return { total: items.length, succeeded: succeeded.length, failed: items.length - succeeded.length, results };
+}
+
+async function updateAdsBulk({ updates: items }, c) {
+  const { token } = ctx(c);
+  if (!Array.isArray(items) || !items.length) return { error: 'updates array required.' };
+  const results = [];
+  for (const { ad_id, ...updates } of items) {
+    try {
+      await meta.updateAd(token, ad_id, updates);
+      results.push({ status: 'success', ad_id, ...updates });
+    } catch (err) {
+      results.push({ status: 'error', ad_id, error: err.response?.data?.error?.message || err.message });
+    }
+  }
+  const succeeded = results.filter(r => r.status === 'success');
+  return { total: items.length, succeeded: succeeded.length, failed: items.length - succeeded.length, results };
+}
+
 function updateAd({ ad_id, ...updates }, c) {
   return meta.updateAd(ctx(c).token, ad_id, updates);
 }
@@ -1243,6 +1291,21 @@ const adTools = [
     createAdsBulk,
     obj({ ads: { type: 'array', description: 'Array of ad objects, each: { adset_id, name, creative_id, status }',
       items: obj({ adset_id: str('Ad set ID'), name: str('Ad name'), creative_id: str('Creative ID'), status: str('PAUSED or ACTIVE') }, ['adset_id','name','creative_id']) } }, ['ads'])),
+  T('update_campaigns_bulk',
+    'Update multiple campaigns at once. Pass updates array: [{ campaign_id, status?, daily_budget?, name? }]. Use instead of calling update_campaign N times. CONFIRM with user before executing.',
+    updateCampaignsBulk,
+    obj({ updates: { type: 'array', description: 'Array of update objects',
+      items: obj({ campaign_id: str('Campaign ID'), status: str('ACTIVE or PAUSED'), daily_budget: num('Budget in cents'), name: str('New name') }, ['campaign_id']) } }, ['updates'])),
+  T('update_ad_sets_bulk',
+    'Update multiple ad sets at once. Pass updates array: [{ ad_set_id, status?, daily_budget?, name? }]. Use instead of calling update_ad_set N times. CONFIRM with user before executing.',
+    updateAdSetsBulk,
+    obj({ updates: { type: 'array', description: 'Array of update objects',
+      items: obj({ ad_set_id: str('Ad set ID'), status: str('ACTIVE or PAUSED'), daily_budget: num('Budget in cents'), name: str('New name') }, ['ad_set_id']) } }, ['updates'])),
+  T('update_ads_bulk',
+    'Update multiple ads at once. Pass updates array: [{ ad_id, status?, name?, creative_id? }]. Use instead of calling update_ad N times. CONFIRM with user before executing.',
+    updateAdsBulk,
+    obj({ updates: { type: 'array', description: 'Array of update objects',
+      items: obj({ ad_id: str('Ad ID'), status: str('ACTIVE or PAUSED'), name: str('New name'), creative_id: str('New creative ID') }, ['ad_id']) } }, ['updates'])),
   T('get_ad_leads', 'Get leads from a specific ad.', getAdLeads,
     obj({ ad_id: str('Ad ID') }, ['ad_id'])),
 
@@ -1560,44 +1623,49 @@ const adTools = [
 const _toolByName = Object.fromEntries(adTools.map(t => [t.name, t]));
 const pick = (...names) => names.map(n => _toolByName[n]).filter(Boolean);
 
-// Analyst — diagnosis, benchmarks, action_queue (read-only + baton write)
+// Analyst — all read-only operations (performance, creatives, audiences, tracking)
 const analystTools = pick(
+  // Performance
   'analyze_performance',
   'get_account_insights', 'get_object_insights',
-  'get_workflow_context', 'update_workflow_context', 'load_skill'
-);
-
-// Audience Strategist — targeting gaps, audience recommendations
-const audienceTools = pick(
+  // Account & pages
+  'get_ad_account_details',
+  'get_pages', 'get_connected_instagram_accounts',
+  // Campaigns & ads (read-only)
+  'get_campaigns', 'get_ad_sets', 'get_ads',
+  'get_campaign_ad_sets', 'get_campaign_ads', 'get_ad_set_ads',
+  // Creatives (read-only)
+  'get_ad_creatives', 'get_ad_creative', 'get_ad_preview',
+  'get_ad_images', 'get_ad_videos',
+  'analyze_creative_visual',
+  // Audiences (read-only)
   'get_custom_audiences', 'get_saved_audiences', 'get_custom_audience',
   'get_reach_estimate', 'get_delivery_estimate',
   'targeting_search', 'targeting_browse', 'targeting_suggestions', 'targeting_validation',
-  'create_custom_audience', 'create_lookalike_audience', 'create_saved_audience',
-  'get_ad_account_details',
-  'get_pages', 'get_pixels', 'get_page_videos', 'get_ig_media', 'get_connected_instagram_accounts',
-  // Granular source selection — videos and posts only (get_ads removed: too heavy for large accounts)
-  'get_campaigns', 'get_ad_videos', 'get_page_posts',
-  'get_ig_posts', 'get_video',
+  // Content sources
+  'get_page_posts', 'get_page_videos', 'get_ig_media', 'get_ig_posts', 'get_video',
+  // Tracking (read-only)
+  'get_pixels', 'get_pixel_stats',
+  'get_custom_conversions',
+  // Shared
   'get_workflow_context', 'update_workflow_context', 'load_skill'
 );
 
-// Creative Strategist — hook analysis, copy pivots, format recommendations (read-only audit)
-const creativeTools = pick(
-  'get_ad_creatives', 'get_ad_creative', 'get_ad_preview',
-  'get_ad_images', 'get_ad_videos', 'get_ads',
-  'get_pages', 'get_page_posts', 'get_page_videos',
-  'analyze_creative_visual',
-  'get_workflow_context', 'update_workflow_context', 'load_skill'
-);
-
-// Executor — all creation + management (merges old SS1+SS3+SS4)
+// Executor — all write operations (campaigns, ads, audiences, tracking)
 const executorTools = pick(
   // Account info
   'get_ad_account_details', 'get_minimum_budgets',
   // Pages & connections
   'get_pages', 'get_connected_instagram_accounts',
   // Tracking
-  'get_pixels', 'get_lead_forms', 'get_catalogs',
+  'get_pixels', 'get_pixel_stats', 'create_pixel', 'update_pixel',
+  'send_conversion_event',
+  'get_custom_conversions', 'create_custom_conversion',
+  'get_lead_forms', 'get_catalogs',
+  // Audience CRUD
+  'create_custom_audience', 'create_lookalike_audience', 'create_saved_audience',
+  'get_custom_audiences', 'get_saved_audiences',
+  'get_page_videos', 'get_ig_media', 'get_ig_posts', 'get_video',
   // Campaign CRUD
   'create_campaign', 'update_campaign', 'delete_campaign', 'copy_campaign',
   'get_campaigns', 'get_campaign_ad_sets', 'get_campaign_ads',
@@ -1614,7 +1682,8 @@ const executorTools = pick(
   'create_ad_creative', 'update_ad_creative',
   'analyze_creative_visual',
   // Ad CRUD
-  'create_ad', 'create_ads_bulk', 'update_ad', 'delete_ad', 'copy_ad',
+  'create_ad', 'create_ads_bulk', 'update_ad', 'update_ads_bulk', 'delete_ad', 'copy_ad',
+  'update_campaigns_bulk', 'update_ad_sets_bulk',
   'get_ads', 'get_ad', 'get_ad_leads',
   // Lead forms
   'get_lead_form_leads',
@@ -1624,19 +1693,6 @@ const executorTools = pick(
   'get_workflow_context', 'update_workflow_context', 'load_skill'
 );
 
-// Technical Guard — pixel, CAPI, conversion tracking health
-const technicalTools = pick(
-  // Pixel lifecycle
-  'get_pixels', 'get_pixel_stats', 'create_pixel', 'update_pixel',
-  // CAPI events
-  'send_conversion_event',
-  // Custom conversions
-  'get_custom_conversions', 'create_custom_conversion',
-  // Context
-  'get_ad_account_details', 'get_pages',
-  // Shared
-  'get_workflow_context', 'update_workflow_context', 'load_skill'
-);
 
 // Root orchestrator — ONLY exploration + routing. NO insights/analysis tools.
 const rootTools = pick(
@@ -1650,4 +1706,4 @@ const rootTools = pick(
   'create_skill'
 );
 
-export { adTools, rootTools, analystTools, audienceTools, creativeTools, executorTools, technicalTools };
+export { adTools, rootTools, analystTools, executorTools };

@@ -1,0 +1,415 @@
+import { useState, useCallback, useMemo, useEffect } from 'react';
+import { Search, RefreshCw, Image as ImageIcon, Film, Loader2, Trash2, X, Download, Clock, Maximize2, Grid, List } from 'lucide-react';
+import { AccountSelector } from './AccountSelector.jsx';
+import api from '../services/api.js';
+
+// ── Helpers ──
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+const fmtDuration = (s) => {
+  if (!s) return '';
+  const m = Math.floor(s / 60);
+  const sec = Math.round(s % 60);
+  return m > 0 ? `${m}:${String(sec).padStart(2, '0')}` : `0:${String(sec).padStart(2, '0')}`;
+};
+const fmtSize = (w, h) => w && h ? `${w}×${h}` : '';
+
+// ── Preview modal ──
+const PreviewModal = ({ asset, onClose }) => {
+  if (!asset) return null;
+  const isVideo = !!asset.source;
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40" onClick={onClose} />
+      <div className="fixed inset-8 z-50 flex items-center justify-center">
+        <div className="relative bg-white rounded-2xl shadow-2xl overflow-hidden max-w-4xl w-full max-h-full flex flex-col">
+          <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
+            <div>
+              <h3 className="text-sm font-bold text-slate-800 truncate max-w-md">{asset.name || asset.title || 'Untitled'}</h3>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                {isVideo ? `${fmtDuration(asset.length)} · ` : ''}{fmtSize(asset.width, asset.height)} · {fmtDate(asset.created_time)}
+              </p>
+            </div>
+            <button onClick={onClose} className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600">
+              <X size={16} />
+            </button>
+          </div>
+          <div className="flex-1 flex items-center justify-center p-4 bg-slate-50 overflow-auto">
+            {isVideo ? (
+              <video src={asset.source} controls className="max-w-full max-h-[70vh] rounded-lg" />
+            ) : (
+              <img src={asset.url || asset.url_128} alt={asset.name} className="max-w-full max-h-[70vh] rounded-lg object-contain" />
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
+// ── Asset card ──
+const AssetCard = ({ asset, isVideo, selected, onSelect, onPreview, onDelete, viewMode }) => {
+  const thumbnail = isVideo ? asset.picture : (asset.url || asset.url_128);
+  const name = isVideo ? (asset.title || `Video ${asset.id}`) : (asset.name || `Image ${asset.hash}`);
+  const meta = isVideo
+    ? `${fmtDuration(asset.length)}${asset.three_second_views ? ` · ${Number(asset.three_second_views).toLocaleString()} views` : ''}`
+    : fmtSize(asset.width, asset.height);
+
+  if (viewMode === 'list') {
+    return (
+      <tr className={`border-b border-slate-100 hover:bg-blue-50/30 transition-colors ${selected ? 'bg-blue-50/50' : ''}`}>
+        <td className="py-2.5 px-3" onClick={e => e.stopPropagation()}>
+          <input type="checkbox" checked={selected} onChange={() => onSelect(asset.id || asset.hash)}
+            className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500/30" />
+        </td>
+        <td className="py-2.5 px-3">
+          <div className="flex items-center gap-3">
+            <button onClick={() => onPreview(asset)} className="shrink-0 relative">
+              {thumbnail ? (
+                <img src={thumbnail} alt="" className="w-10 h-10 rounded-lg object-cover border border-slate-200" />
+              ) : (
+                <div className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center">
+                  {isVideo ? <Film size={16} className="text-slate-400" /> : <ImageIcon size={16} className="text-slate-400" />}
+                </div>
+              )}
+              {isVideo && (
+                <span className="absolute bottom-0.5 right-0.5 bg-black/70 text-white text-[8px] px-1 rounded font-medium">
+                  {fmtDuration(asset.length)}
+                </span>
+              )}
+            </button>
+            <div className="min-w-0">
+              <p className="text-[12px] font-medium text-slate-700 truncate max-w-[250px]">{name}</p>
+              <p className="text-[10px] text-slate-400">{meta}</p>
+            </div>
+          </div>
+        </td>
+        <td className="py-2.5 px-3">
+          <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full ${isVideo ? 'bg-purple-50 text-purple-600' : 'bg-blue-50 text-blue-600'}`}>
+            {isVideo ? <Film size={10} /> : <ImageIcon size={10} />}
+            {isVideo ? 'Video' : 'Image'}
+          </span>
+        </td>
+        <td className="py-2.5 px-3 text-[11px] text-slate-400">{fmtDate(asset.created_time)}</td>
+        <td className="py-2.5 px-3">
+          <button onClick={() => onDelete(asset)} className="text-slate-300 hover:text-red-500 transition-colors">
+            <Trash2 size={14} />
+          </button>
+        </td>
+      </tr>
+    );
+  }
+
+  return (
+    <div className={`group relative bg-white rounded-xl border overflow-hidden transition-all hover:shadow-md ${selected ? 'border-blue-400 ring-2 ring-blue-100' : 'border-slate-200'}`}>
+      {/* Checkbox */}
+      <div className="absolute top-2 left-2 z-10" onClick={e => e.stopPropagation()}>
+        <input type="checkbox" checked={selected} onChange={() => onSelect(asset.id || asset.hash)}
+          className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500/30 bg-white/80 shadow-sm" />
+      </div>
+      {/* Thumbnail */}
+      <button onClick={() => onPreview(asset)} className="w-full aspect-square bg-slate-50 flex items-center justify-center relative overflow-hidden">
+        {thumbnail ? (
+          <img src={thumbnail} alt={name} className="w-full h-full object-cover" />
+        ) : (
+          <div className="flex flex-col items-center gap-1 text-slate-300">
+            {isVideo ? <Film size={32} /> : <ImageIcon size={32} />}
+          </div>
+        )}
+        {isVideo && (
+          <span className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded font-medium">
+            {fmtDuration(asset.length)}
+          </span>
+        )}
+        {/* Hover overlay */}
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+          <Maximize2 size={20} className="text-white opacity-0 group-hover:opacity-80 transition-opacity" />
+        </div>
+      </button>
+      {/* Info */}
+      <div className="px-3 py-2.5">
+        <p className="text-[11px] font-medium text-slate-700 truncate">{name}</p>
+        <div className="flex items-center justify-between mt-1">
+          <p className="text-[10px] text-slate-400">{meta}</p>
+          <div className="flex items-center gap-1">
+            <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full ${isVideo ? 'bg-purple-50 text-purple-500' : 'bg-blue-50 text-blue-500'}`}>
+              {isVideo ? 'Video' : 'Image'}
+            </span>
+          </div>
+        </div>
+        <p className="text-[9px] text-slate-300 mt-1 flex items-center gap-1">
+          <Clock size={9} /> {fmtDate(asset.created_time)}
+        </p>
+      </div>
+    </div>
+  );
+};
+
+// ── Main Component ──
+export const CreativeLibrary = ({ adAccountId, token, onLogin, onLogout, selectedAccount, selectedBusiness, onSelectAccount, onBack }) => {
+  const [images, setImages] = useState([]);
+  const [videos, setVideos] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('all'); // 'all' | 'images' | 'videos'
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [previewAsset, setPreviewAsset] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const fetchAssets = useCallback(async () => {
+    if (!adAccountId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const [imgRes, vidRes] = await Promise.all([
+        api.get('/assets/images', { params: { adAccountId } }),
+        api.get('/assets/videos', { params: { adAccountId } }),
+      ]);
+      setImages((imgRes.data || []).map(img => ({ ...img, _type: 'image' })));
+      setVideos((vidRes.data || []).map(vid => ({ ...vid, _type: 'video' })));
+    } catch (err) {
+      setError(err.response?.data?.error || err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [adAccountId]);
+
+  useEffect(() => { fetchAssets(); }, [fetchAssets]);
+
+  // Combined & filtered list
+  const allAssets = useMemo(() => {
+    let list = [];
+    if (filter !== 'videos') list.push(...images);
+    if (filter !== 'images') list.push(...videos);
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter(a => (a.name || a.title || '').toLowerCase().includes(q));
+    }
+    // Sort by created_time descending
+    list.sort((a, b) => new Date(b.created_time || 0) - new Date(a.created_time || 0));
+    return list;
+  }, [images, videos, filter, search]);
+
+  const toggleSelect = useCallback((id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback(() => {
+    if (selectedIds.size === allAssets.length) setSelectedIds(new Set());
+    else setSelectedIds(new Set(allAssets.map(a => a.id || a.hash)));
+  }, [allAssets, selectedIds]);
+
+  const handleDelete = useCallback(async (asset) => {
+    if (!confirm(`Delete "${asset.name || asset.title}"? This cannot be undone.`)) return;
+    setDeleting(true);
+    try {
+      if (asset._type === 'image') {
+        await api.delete('/assets/images', { data: { adAccountId, hash: asset.hash } });
+        setImages(prev => prev.filter(i => i.hash !== asset.hash));
+      } else {
+        await api.delete(`/assets/videos/${asset.id}`, { params: { adAccountId } });
+        setVideos(prev => prev.filter(v => v.id !== asset.id));
+      }
+      setSelectedIds(prev => { const n = new Set(prev); n.delete(asset.id || asset.hash); return n; });
+    } catch (err) {
+      console.error('Delete failed:', err);
+    } finally {
+      setDeleting(false);
+    }
+  }, [adAccountId]);
+
+  const bulkDelete = useCallback(async () => {
+    if (!confirm(`Delete ${selectedIds.size} assets? This cannot be undone.`)) return;
+    setDeleting(true);
+    try {
+      const promises = [...selectedIds].map(id => {
+        const img = images.find(i => i.hash === id);
+        if (img) return api.delete('/assets/images', { data: { adAccountId, hash: id } });
+        return api.delete(`/assets/videos/${id}`, { params: { adAccountId } });
+      });
+      await Promise.all(promises);
+      setImages(prev => prev.filter(i => !selectedIds.has(i.hash)));
+      setVideos(prev => prev.filter(v => !selectedIds.has(v.id)));
+      setSelectedIds(new Set());
+    } catch (err) {
+      console.error('Bulk delete failed:', err);
+    } finally {
+      setDeleting(false);
+    }
+  }, [selectedIds, images, adAccountId]);
+
+  const imageCount = images.length;
+  const videoCount = videos.length;
+
+  return (
+    <div className="flex-1 flex flex-col h-full bg-slate-50/50">
+      {/* Header */}
+      <div className="bg-white border-b border-slate-200 shrink-0">
+        <div className="flex items-center justify-between px-6 py-4">
+          <div className="flex items-center gap-4">
+            <div>
+              <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <ImageIcon size={20} className="text-pink-500" />
+                Creative Library
+              </h1>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {loading ? 'Loading...' : `${imageCount} images · ${videoCount} videos`}
+              </p>
+            </div>
+            <AccountSelector token={token} onLogin={onLogin} onLogout={onLogout}
+              selectedAccount={selectedAccount} selectedBusiness={selectedBusiness} onSelectAccount={onSelectAccount} />
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={fetchAssets} disabled={loading}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-500 hover:bg-slate-100 border border-slate-200 transition-colors disabled:opacity-50">
+              <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 px-6 py-2.5 bg-pink-600 text-white shrink-0">
+          <span className="text-[12px] font-semibold">{selectedIds.size} selected</span>
+          <button onClick={bulkDelete} disabled={deleting}
+            className="flex items-center gap-1 px-3 py-1.5 text-[11px] font-medium bg-white/20 hover:bg-red-500/60 rounded-lg transition-colors ml-4">
+            <Trash2 size={12} /> Delete
+          </button>
+          <button onClick={() => setSelectedIds(new Set())} className="ml-auto text-white/70 hover:text-white transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="px-6 py-3 flex items-center gap-3 shrink-0 bg-white border-b border-slate-100">
+        <div className="relative flex-1 max-w-sm">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search assets..."
+            className="w-full pl-9 pr-3 py-2 text-[12px] rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 placeholder:text-slate-300" />
+        </div>
+        <div className="flex rounded-lg border border-slate-200 bg-white overflow-hidden">
+          {[['all', 'All'], ['images', 'Images'], ['videos', 'Videos']].map(([val, label]) => (
+            <button key={val} onClick={() => setFilter(val)}
+              className={`px-3.5 py-2 text-[11px] font-medium transition-colors ${filter === val ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="flex rounded-lg border border-slate-200 bg-white overflow-hidden">
+          <button onClick={() => setViewMode('grid')}
+            className={`px-2.5 py-2 transition-colors ${viewMode === 'grid' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-50'}`}>
+            <Grid size={14} />
+          </button>
+          <button onClick={() => setViewMode('list')}
+            className={`px-2.5 py-2 transition-colors ${viewMode === 'list' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-50'}`}>
+            <List size={14} />
+          </button>
+        </div>
+      </div>
+
+      {/* Error */}
+      {error && (
+        <div className="mx-6 mt-3 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg">{error}</div>
+      )}
+
+      {/* Content */}
+      <div className="flex-1 overflow-auto px-6 py-4">
+        {!token ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="w-16 h-16 rounded-2xl bg-pink-50 flex items-center justify-center mb-4">
+              <ImageIcon size={28} className="text-pink-300" />
+            </div>
+            <p className="text-sm font-semibold text-slate-700 mb-1">Connect an ad platform to view creatives</p>
+            <p className="text-xs text-slate-400 mb-5 max-w-xs mx-auto text-center">Log in with Meta, Google, or TikTok to access your uploaded images and videos.</p>
+            <div className="flex items-center justify-center gap-3">
+              <button onClick={onLogin} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold bg-blue-600 text-white hover:bg-blue-500 transition-colors shadow-sm">
+                <img src="/meta-icon.svg" alt="Meta" className="w-4 h-4" /> Connect Meta Ads
+              </button>
+              <button disabled className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-medium border border-slate-200 text-slate-400 cursor-not-allowed">
+                Google Ads <span className="text-[9px] bg-slate-100 px-1.5 py-0.5 rounded-full">Soon</span>
+              </button>
+              <button disabled className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-medium border border-slate-200 text-slate-400 cursor-not-allowed">
+                TikTok Ads <span className="text-[9px] bg-slate-100 px-1.5 py-0.5 rounded-full">Soon</span>
+              </button>
+            </div>
+          </div>
+        ) : !adAccountId ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <p className="text-sm font-semibold text-slate-700 mb-1">Select an ad account</p>
+            <p className="text-xs text-slate-400">Choose an ad account from the selector above.</p>
+          </div>
+        ) : loading && allAssets.length === 0 ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 size={24} className="animate-spin text-slate-400" />
+            <span className="ml-2 text-sm text-slate-400">Loading assets...</span>
+          </div>
+        ) : allAssets.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
+              <ImageIcon size={28} className="text-slate-300" />
+            </div>
+            <p className="text-sm font-semibold text-slate-700 mb-1">No assets found</p>
+            <p className="text-xs text-slate-400">Upload images or videos in the chat to see them here.</p>
+          </div>
+        ) : viewMode === 'grid' ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+            {allAssets.map(asset => (
+              <AssetCard
+                key={asset.id || asset.hash}
+                asset={asset}
+                isVideo={asset._type === 'video'}
+                selected={selectedIds.has(asset.id || asset.hash)}
+                onSelect={toggleSelect}
+                onPreview={setPreviewAsset}
+                onDelete={handleDelete}
+                viewMode="grid"
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50/80">
+                  <th className="py-2.5 px-3 w-10">
+                    <input type="checkbox" checked={selectedIds.size === allAssets.length && allAssets.length > 0}
+                      onChange={toggleSelectAll}
+                      className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500/30" />
+                  </th>
+                  <th className="py-2.5 px-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Asset</th>
+                  <th className="py-2.5 px-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Type</th>
+                  <th className="py-2.5 px-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Date</th>
+                  <th className="py-2.5 px-3 w-10"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {allAssets.map(asset => (
+                  <AssetCard
+                    key={asset.id || asset.hash}
+                    asset={asset}
+                    isVideo={asset._type === 'video'}
+                    selected={selectedIds.has(asset.id || asset.hash)}
+                    onSelect={toggleSelect}
+                    onPreview={setPreviewAsset}
+                    onDelete={handleDelete}
+                    viewMode="list"
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Preview modal */}
+      {previewAsset && <PreviewModal asset={previewAsset} onClose={() => setPreviewAsset(null)} />}
+    </div>
+  );
+};

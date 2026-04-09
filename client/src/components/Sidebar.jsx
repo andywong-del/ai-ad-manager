@@ -217,6 +217,8 @@ export const Sidebar = ({
   onReorderFolders,
   onOpenAudiences,
   onOpenCampaigns,
+  onOpenCreativeLibrary,
+  onOpenAutomationRules,
   token,
   onLogin,
 }) => {
@@ -343,21 +345,8 @@ export const Sidebar = ({
               : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700 border border-transparent'}`}
         >
           <BarChart3 size={14} className={activeView?.type === 'campaigns' ? 'text-emerald-500' : 'text-slate-400'} />
-          <span className="flex-1 text-left">Campaigns</span>
+          <span className="flex-1 text-left">Campaign Manager</span>
           <ChevronRight size={12} className="text-slate-300" />
-        </button>
-
-        {/* Creative Library */}
-        <button
-          onClick={() => {}}
-          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12px] font-medium transition-all border
-            ${activeView?.type === 'creativeLibrary'
-              ? 'bg-pink-50 text-pink-700 border-pink-200'
-              : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700 border border-transparent'}`}
-        >
-          <Image size={14} className={activeView?.type === 'creativeLibrary' ? 'text-pink-500' : 'text-slate-400'} />
-          <span className="flex-1 text-left">Creative Library</span>
-          <span className="text-[9px] text-slate-300 font-medium">Soon</span>
         </button>
 
         {/* Audiences */}
@@ -369,13 +358,26 @@ export const Sidebar = ({
               : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700 border border-transparent'}`}
         >
           <Users size={14} className={activeView?.type === 'audiences' ? 'text-blue-500' : 'text-slate-400'} />
-          <span className="flex-1 text-left">Audiences</span>
+          <span className="flex-1 text-left">Audience Manager</span>
+          <ChevronRight size={12} className="text-slate-300" />
+        </button>
+
+        {/* Creative Library */}
+        <button
+          onClick={onOpenCreativeLibrary}
+          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12px] font-medium transition-all border
+            ${activeView?.type === 'creativeLibrary'
+              ? 'bg-pink-50 text-pink-700 border-pink-200'
+              : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700 border border-transparent'}`}
+        >
+          <Image size={14} className={activeView?.type === 'creativeLibrary' ? 'text-pink-500' : 'text-slate-400'} />
+          <span className="flex-1 text-left">Creative Library</span>
           <ChevronRight size={12} className="text-slate-300" />
         </button>
 
         {/* Automation Rules */}
         <button
-          onClick={() => {}}
+          onClick={onOpenAutomationRules}
           className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12px] font-medium transition-all border
             ${activeView?.type === 'optimization'
               ? 'bg-violet-50 text-violet-700 border-violet-200'
@@ -383,7 +385,7 @@ export const Sidebar = ({
         >
           <TrendingUp size={14} className={activeView?.type === 'optimization' ? 'text-violet-500' : 'text-slate-400'} />
           <span className="flex-1 text-left">Automation Rules</span>
-          <span className="text-[9px] text-slate-300 font-medium">Soon</span>
+          <ChevronRight size={12} className="text-slate-300" />
         </button>
 
         {/* Report */}
@@ -558,23 +560,17 @@ export const Sidebar = ({
       {/* User Profile */}
       <div className="px-3 pb-4 pt-2">
         <div className="flex items-center gap-3 px-2">
-          {token ? (
-            <>
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shrink-0 shadow-sm">
-                <span className="text-white text-xs font-bold">A</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-slate-800 truncate">Andy Wong</p>
-                <p className="text-[11px] text-slate-400 truncate">andy.wong@presslogic.com</p>
-              </div>
-              {onLogout && (
-                <button onClick={onLogout} className="text-slate-400 hover:text-slate-600 transition-colors" title="Log out">
-                  <LogOut size={16} />
-                </button>
-              )}
-            </>
-          ) : (
-            <p className="text-xs text-slate-400 text-center w-full">Connect Meta Ads above to get started</p>
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shrink-0 shadow-sm">
+            <span className="text-white text-xs font-bold">A</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-slate-800 truncate">Andy Wong</p>
+            <p className="text-[11px] text-slate-400 truncate">andy.wong@presslogic.com</p>
+          </div>
+          {token && onLogout && (
+            <button onClick={onLogout} className="text-slate-400 hover:text-slate-600 transition-colors" title="Log out">
+              <LogOut size={16} />
+            </button>
           )}
         </div>
       </div>

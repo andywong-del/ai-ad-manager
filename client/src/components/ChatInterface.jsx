@@ -2012,7 +2012,7 @@ const SKILL_ICONS = {
   audience_strategist: Target,
 };
 
-const SkillsDropdown = ({ skills, activeSkill, onToggleSkill, onManageSkills, onClose, enabledSkillIds = [] }) => {
+const SkillsDropdown = ({ skills, activeSkill, activeSkillIds, onToggleSkill, onManageSkills, onClose, enabledSkillIds = [] }) => {
   const ref = useRef(null);
   const [skillSearch, setSkillSearch] = useState('');
 
@@ -2053,10 +2053,10 @@ const SkillsDropdown = ({ skills, activeSkill, onToggleSkill, onManageSkills, on
             <p className="text-[11px] text-slate-400 mt-1">{skillSearch ? 'Try a different search' : 'Enable skills from the Skills Library'}</p>
           </div>
         ) : filtered.map(skill => {
-          const isActive = activeSkill?.id === skill.id;
+          const isActive = activeSkillIds instanceof Set ? activeSkillIds.has(skill.id) : activeSkill?.id === skill.id;
           const isOfficial = skill.isDefault;
           return (
-            <button key={skill.id} onClick={() => { onToggleSkill(skill.id); onClose(); }}
+            <button key={skill.id} onClick={() => { onToggleSkill(skill.id); }}
               className={`w-full flex items-start gap-2.5 px-3 py-2.5 rounded-xl text-left transition-colors ${isActive ? 'bg-indigo-50' : 'hover:bg-slate-50'}`}>
               <Sparkles size={14} className={`mt-0.5 shrink-0 ${isActive ? 'text-indigo-500' : 'text-slate-400'}`} />
               <div className="flex-1 min-w-0">
@@ -2298,7 +2298,7 @@ const useSuggestedSkill = (input, skills, activeSkill, slashSkills) => {
   return null;
 };
 
-const ChatInput = ({ input, setInput, onKeyDown, onSend, onStop, onFilesAdded, attachments, onRemoveAttachment, fileRef, isTyping, handleFileUpload, isOver, activeSkill, onDeactivateSkill, skills = [], onSlashSelect, slashSkills = [], onRemoveSlashSkill, onClearAllSlash, onToggleSkill, onManageSkills, token, onLogin, onLogout, isLoginLoading, loginError, selectedAccount, selectedBusiness, onSelectAccount, enabledSkillIds = [] }) => {
+const ChatInput = ({ input, setInput, onKeyDown, onSend, onStop, onFilesAdded, attachments, onRemoveAttachment, fileRef, isTyping, handleFileUpload, isOver, activeSkill, activeSkills = [], onDeactivateSkill, skills = [], onSlashSelect, slashSkills = [], onRemoveSlashSkill, onClearAllSlash, onToggleSkill, onManageSkills, token, onLogin, onLogout, isLoginLoading, loginError, selectedAccount, selectedBusiness, onSelectAccount, enabledSkillIds = [], activeSkillIds }) => {
   const [skillsOpen, setSkillsOpen] = useState(false);
   const [plusMenuOpen, setPlusMenuOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -2344,7 +2344,8 @@ const ChatInput = ({ input, setInput, onKeyDown, onSend, onStop, onFilesAdded, a
     onKeyDown(e);
   };
 
-  const hasChips = slashSkills.length > 0 || activeSkill;
+  const activeSkillsList = Array.isArray(activeSkills) ? activeSkills : (activeSkill ? [activeSkill] : []);
+  const hasChips = slashSkills.length > 0 || activeSkillsList.length > 0;
 
   return (
     <div className="relative">
@@ -2363,15 +2364,15 @@ const ChatInput = ({ input, setInput, onKeyDown, onSend, onStop, onFilesAdded, a
                 </button>
               </div>
             ))}
-            {activeSkill && (
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-[11px] font-semibold text-indigo-700">
+            {activeSkillsList.map(sk => (
+              <div key={sk.id} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-[11px] font-semibold text-indigo-700">
                 <Sparkles size={11} />
-                {activeSkill.name}
-                <button onClick={onDeactivateSkill} className="ml-0.5 text-indigo-400 hover:text-indigo-600 transition-colors">
+                {sk.name}
+                <button onClick={() => onDeactivateSkill(sk.id)} className="ml-0.5 text-indigo-400 hover:text-indigo-600 transition-colors">
                   <X size={11} />
                 </button>
               </div>
-            )}
+            ))}
           </div>
         )}
         {/* Context-aware skill suggestion */}
@@ -2396,7 +2397,7 @@ const ChatInput = ({ input, setInput, onKeyDown, onSend, onStop, onFilesAdded, a
             value={input}
             onChange={(e) => { handleChange(e); if (dismissedSuggestion) setDismissedSuggestion(null); }}
             onKeyDown={handleSlashKeyDown}
-            placeholder={slashSkills.length ? 'Type your message...' : activeSkill ? `Ask with ${activeSkill.name} active...` : attachments.length ? 'Describe what to do with these files...' : 'Manage ads, create skills, analyze performance... (type / for skills)'}
+            placeholder={slashSkills.length ? 'Type your message...' : activeSkillsList.length ? `${activeSkillsList.length} skill${activeSkillsList.length > 1 ? 's' : ''} active...` : attachments.length ? 'Describe what to do with these files...' : 'Manage ads, create skills, analyze performance... (type / for skills)'}
             rows={1}
             disabled={isTyping}
             className="w-full resize-none text-sm bg-transparent text-slate-800 placeholder:text-slate-400 focus:outline-none disabled:text-slate-400 overflow-y-auto"
@@ -2410,7 +2411,7 @@ const ChatInput = ({ input, setInput, onKeyDown, onSend, onStop, onFilesAdded, a
               className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors relative ${plusMenuOpen || skillsOpen ? 'text-indigo-600 bg-indigo-50' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`}
               title="Add">
               <Plus size={16} />
-              {activeSkill && <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-indigo-500 ring-2 ring-white" />}
+              {activeSkillsList.length > 0 && <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-indigo-500 ring-2 ring-white" />}
             </button>
             <input ref={fileRef} type="file" accept="image/*,video/*,.pdf,.txt,.doc,.docx" multiple className="hidden" onChange={handleFileUpload} />
 
@@ -2438,7 +2439,7 @@ const ChatInput = ({ input, setInput, onKeyDown, onSend, onStop, onFilesAdded, a
 
             {/* Skills dropdown */}
             {skillsOpen && (
-              <SkillsDropdown skills={skills} activeSkill={activeSkill} onToggleSkill={onToggleSkill} onManageSkills={onManageSkills} onClose={() => { setSkillsOpen(false); setPlusMenuOpen(false); }} enabledSkillIds={enabledSkillIds} />
+              <SkillsDropdown skills={skills} activeSkill={activeSkill} activeSkillIds={activeSkillIds} onToggleSkill={onToggleSkill} onManageSkills={onManageSkills} onClose={() => { setSkillsOpen(false); setPlusMenuOpen(false); }} enabledSkillIds={enabledSkillIds} />
             )}
 
             <AccountConnector token={token} onLogin={onLogin} onLogout={onLogout} isLoginLoading={isLoginLoading} loginError={loginError} selectedAccount={selectedAccount} selectedBusiness={selectedBusiness} onSelectAccount={onSelectAccount} />
@@ -2468,7 +2469,7 @@ const ChatInput = ({ input, setInput, onKeyDown, onSend, onStop, onFilesAdded, a
 };
 
 // ── Main component ────────────────────────────────────────────────────────────
-export const ChatInterface = ({ messages, isTyping, thinkingText, activityLog = [], onSend, onStop, suggestedActions = [], cardCategories = [], quickChips = [], adAccountId, onSaveItem, folders = [], activeSkill = null, onDeactivateSkill, skills = [], onToggleSkill, onManageSkills, onNavigate, onOpenCanvas, token, onLogin, onLogout, isLoginLoading, loginError, selectedAccount, selectedBusiness, onSelectAccount, initialInput, initialSlashSkill, enabledSkillIds = [] }) => {
+export const ChatInterface = ({ messages, isTyping, thinkingText, activityLog = [], onSend, onStop, suggestedActions = [], cardCategories = [], quickChips = [], adAccountId, onSaveItem, folders = [], activeSkill = null, activeSkills = [], activeSkillIds, onDeactivateSkill, skills = [], onToggleSkill, onManageSkills, onNavigate, onOpenCanvas, token, onLogin, onLogout, isLoginLoading, loginError, selectedAccount, selectedBusiness, onSelectAccount, initialInput, initialSlashSkill, enabledSkillIds = [] }) => {
   const [input, setInput] = useState('');
 
   // Pre-fill input from parent (e.g. "Build with AI Ad Manager")
@@ -2817,7 +2818,7 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, activityLog = 
               attachments={attachments} onRemoveAttachment={removeAttachment}
               fileRef={fileRef} isTyping={isTyping}
               handleFileUpload={handleFileInput} isOver={isDragOver}
-              activeSkill={activeSkill} onDeactivateSkill={onDeactivateSkill}
+              activeSkill={activeSkill} activeSkills={activeSkills} activeSkillIds={activeSkillIds} onDeactivateSkill={onDeactivateSkill}
               skills={skills} onSlashSelect={handleSlashSelect} slashSkills={slashSkills} onRemoveSlashSkill={handleRemoveSlashSkill} onClearAllSlash={() => setSlashSkills([])} enabledSkillIds={enabledSkillIds}
               onToggleSkill={onToggleSkill} onManageSkills={onManageSkills}
               token={token} onLogin={onLogin} onLogout={onLogout} isLoginLoading={isLoginLoading} loginError={loginError} selectedAccount={selectedAccount} selectedBusiness={selectedBusiness} onSelectAccount={onSelectAccount}
@@ -2890,7 +2891,7 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, activityLog = 
                 attachments={attachments} onRemoveAttachment={removeAttachment}
                 fileRef={fileRef} isTyping={isTyping}
                 handleFileUpload={handleFileInput} isOver={isDragOver}
-                activeSkill={activeSkill} onDeactivateSkill={onDeactivateSkill}
+                activeSkill={activeSkill} activeSkills={activeSkills} activeSkillIds={activeSkillIds} onDeactivateSkill={onDeactivateSkill}
                 skills={skills} onSlashSelect={handleSlashSelect} slashSkills={slashSkills} onRemoveSlashSkill={handleRemoveSlashSkill} onClearAllSlash={() => setSlashSkills([])} enabledSkillIds={enabledSkillIds}
                 onToggleSkill={onToggleSkill} onManageSkills={onManageSkills}
                 token={token} onLogin={onLogin} isLoginLoading={isLoginLoading} loginError={loginError} selectedAccount={selectedAccount} selectedBusiness={selectedBusiness} onSelectAccount={onSelectAccount}
