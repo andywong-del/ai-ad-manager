@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Zap, Plus, MessageSquare, Trash2, ChevronDown, ChevronLeft, ChevronRight, LogOut, FileText, Lightbulb, FolderOpen, Building2, Check, Globe, GripVertical, FolderPlus, X, Users, Sparkles, MoreVertical, Pin, Pencil, Menu, BarChart3, Image, Calendar, TrendingUp, ClipboardList } from 'lucide-react';
+import { Zap, Plus, MessageSquare, Trash2, ChevronDown, ChevronLeft, ChevronRight, LogOut, FileText, Lightbulb, FolderOpen, Building2, Check, Globe, GripVertical, FolderPlus, X, Users, Sparkles, MoreVertical, Pin, Pencil, Menu, BarChart3, Image, Calendar, TrendingUp, ClipboardList, Settings } from 'lucide-react';
 import { groupSessionsByDate } from '../hooks/useChatSessions.js';
 import { useAdAccounts } from '../hooks/useAdAccounts.js';
 import { useBusinesses } from '../hooks/useBusinesses.js';
@@ -219,6 +219,9 @@ export const Sidebar = ({
   onOpenCampaigns,
   onOpenCreativeLibrary,
   onOpenAutomationRules,
+  onOpenInstantForms,
+  onOpenEventsManager,
+  onOpenOptimizations,
   token,
   onLogin,
 }) => {
@@ -375,30 +378,56 @@ export const Sidebar = ({
           <ChevronRight size={12} className="text-slate-300" />
         </button>
 
+        {/* Instant Forms */}
+        <button
+          onClick={onOpenInstantForms}
+          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12px] font-medium transition-all border
+            ${activeView?.type === 'instantForms'
+              ? 'bg-orange-50 text-orange-700 border-orange-200'
+              : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700 border border-transparent'}`}
+        >
+          <ClipboardList size={14} className={activeView?.type === 'instantForms' ? 'text-orange-500' : 'text-slate-400'} />
+          <span className="flex-1 text-left">Instant Forms</span>
+          <ChevronRight size={12} className="text-slate-300" />
+        </button>
+
+        {/* Events Manager */}
+        <button
+          onClick={onOpenEventsManager}
+          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12px] font-medium transition-all border
+            ${activeView?.type === 'eventsManager'
+              ? 'bg-cyan-50 text-cyan-700 border-cyan-200'
+              : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700 border border-transparent'}`}
+        >
+          <TrendingUp size={14} className={activeView?.type === 'eventsManager' ? 'text-cyan-500' : 'text-slate-400'} />
+          <span className="flex-1 text-left">Events Manager</span>
+          <ChevronRight size={12} className="text-slate-300" />
+        </button>
+
         {/* Automation Rules */}
         <button
           onClick={onOpenAutomationRules}
           className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12px] font-medium transition-all border
-            ${activeView?.type === 'optimization'
+            ${activeView?.type === 'automationRules'
               ? 'bg-violet-50 text-violet-700 border-violet-200'
               : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700 border border-transparent'}`}
         >
-          <TrendingUp size={14} className={activeView?.type === 'optimization' ? 'text-violet-500' : 'text-slate-400'} />
+          <Settings size={14} className={activeView?.type === 'automationRules' ? 'text-violet-500' : 'text-slate-400'} />
           <span className="flex-1 text-left">Automation Rules</span>
           <ChevronRight size={12} className="text-slate-300" />
         </button>
 
-        {/* Report */}
+        {/* Optimizations */}
         <button
-          onClick={() => {}}
+          onClick={onOpenOptimizations}
           className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12px] font-medium transition-all border
-            ${activeView?.type === 'report'
-              ? 'bg-cyan-50 text-cyan-700 border-cyan-200'
+            ${activeView?.type === 'optimizations'
+              ? 'bg-amber-50 text-amber-700 border-amber-200'
               : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700 border border-transparent'}`}
         >
-          <ClipboardList size={14} className={activeView?.type === 'report' ? 'text-cyan-500' : 'text-slate-400'} />
-          <span className="flex-1 text-left">Report</span>
-          <span className="text-[9px] text-slate-300 font-medium">Soon</span>
+          <Zap size={14} className={activeView?.type === 'optimizations' ? 'text-amber-500' : 'text-slate-400'} />
+          <span className="flex-1 text-left">Optimizations</span>
+          <ChevronRight size={12} className="text-slate-300" />
         </button>
       </div>
 

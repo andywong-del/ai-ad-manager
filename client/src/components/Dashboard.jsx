@@ -12,6 +12,9 @@ import { AudienceManager } from './AudienceManager.jsx';
 import { CampaignManager } from './CampaignManager.jsx';
 import { CreativeLibrary } from './CreativeLibrary.jsx';
 import { AutomationRules } from './AutomationRules.jsx';
+import { InstantForms } from './InstantForms.jsx';
+import { EventsManager } from './EventsManager.jsx';
+import { Optimizations } from './Optimizations.jsx';
 
 const CARD_CATEGORIES = [];
 const QUICK_CHIPS = [];
@@ -112,7 +115,19 @@ export const Dashboard = ({
   }, []);
 
   const handleOpenAutomationRules = useCallback(() => {
-    setActiveView({ type: 'optimization' });
+    setActiveView({ type: 'automationRules' });
+  }, []);
+
+  const handleOpenInstantForms = useCallback(() => {
+    setActiveView({ type: 'instantForms' });
+  }, []);
+
+  const handleOpenEventsManager = useCallback(() => {
+    setActiveView({ type: 'eventsManager' });
+  }, []);
+
+  const handleOpenOptimizations = useCallback(() => {
+    setActiveView({ type: 'optimizations' });
   }, []);
 
 
@@ -228,6 +243,9 @@ export const Dashboard = ({
         onOpenCampaigns={handleOpenCampaigns}
         onOpenCreativeLibrary={handleOpenCreativeLibrary}
         onOpenAutomationRules={handleOpenAutomationRules}
+        onOpenInstantForms={handleOpenInstantForms}
+        onOpenEventsManager={handleOpenEventsManager}
+        onOpenOptimizations={handleOpenOptimizations}
         onOpenSkillsLibrary={handleOpenSkillsLibrary}
         token={token}
         onLogin={onLogin}
@@ -292,7 +310,7 @@ export const Dashboard = ({
               selectedBusiness={selectedBusiness}
               onSelectAccount={handleAccountSelect}
             />
-          ) : activeView.type === 'optimization' ? (
+          ) : activeView.type === 'automationRules' ? (
             <AutomationRules
               adAccountId={adAccountId}
               onBack={() => setActiveView({ type: 'chat' })}
@@ -302,6 +320,38 @@ export const Dashboard = ({
               selectedAccount={selectedAccount}
               selectedBusiness={selectedBusiness}
               onSelectAccount={handleAccountSelect}
+            />
+          ) : activeView.type === 'instantForms' ? (
+            <InstantForms
+              adAccountId={adAccountId}
+              token={token}
+              onLogin={onLogin}
+              onLogout={onLogout}
+              selectedAccount={selectedAccount}
+              selectedBusiness={selectedBusiness}
+              onSelectAccount={handleAccountSelect}
+            />
+          ) : activeView.type === 'eventsManager' ? (
+            <EventsManager
+              adAccountId={adAccountId}
+              token={token}
+              onLogin={onLogin}
+              onLogout={onLogout}
+              selectedAccount={selectedAccount}
+              selectedBusiness={selectedBusiness}
+              onSelectAccount={handleAccountSelect}
+            />
+          ) : activeView.type === 'optimizations' ? (
+            <Optimizations
+              adAccountId={adAccountId}
+              token={token}
+              onLogin={onLogin}
+              onLogout={onLogout}
+              selectedAccount={selectedAccount}
+              selectedBusiness={selectedBusiness}
+              onSelectAccount={handleAccountSelect}
+              onSendToChat={handleAudienceToChat}
+              activeSkills={activeSkills}
             />
           ) : activeView.type === 'audiences' ? (
             <AudienceManager
