@@ -429,6 +429,19 @@ export const Sidebar = ({
           <span className="flex-1 text-left">Optimizations</span>
           <ChevronRight size={12} className="text-slate-300" />
         </button>
+
+        {/* Report */}
+        <button
+          onClick={() => {}}
+          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12px] font-medium transition-all border
+            ${activeView?.type === 'report'
+              ? 'bg-slate-100 text-slate-700 border-slate-300'
+              : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700 border border-transparent'}`}
+        >
+          <ClipboardList size={14} className={activeView?.type === 'report' ? 'text-slate-500' : 'text-slate-400'} />
+          <span className="flex-1 text-left">Report</span>
+          <span className="text-[9px] text-slate-300 font-medium">Soon</span>
+        </button>
       </div>
 
       {/* Scrollable area: Folders first, then Chat History */}
