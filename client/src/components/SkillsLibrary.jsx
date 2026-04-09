@@ -265,10 +265,12 @@ export const SkillsLibrary = ({ skills, onCreate, onDelete, onBack, onBuildWithA
 
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
+    console.log('[SkillUpload] file selected:', file?.name, file?.size);
     if (!file) return;
     setUploadError(null);
     try {
       const text = await file.text();
+      console.log('[SkillUpload] file content length:', text.length, 'first 100 chars:', text.slice(0, 100));
       if (!text.trim()) { setUploadError('File is empty'); e.target.value = ''; return; }
       const match = text.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
       if (match) {
@@ -278,13 +280,17 @@ export const SkillsLibrary = ({ skills, onCreate, onDelete, onBack, onBuildWithA
           if (key && rest.length) meta[key.trim()] = rest.join(':').trim();
         });
         if (meta.name && match[2].trim()) {
-          await onCreate({ name: meta.name, description: meta.description || '', content: match[2].trim(), type: 'strategy' });
+          console.log('[SkillUpload] Creating with frontmatter:', meta.name);
+          const result = await onCreate({ name: meta.name, description: meta.description || '', content: match[2].trim(), type: 'strategy' });
+          console.log('[SkillUpload] Created:', result);
           e.target.value = '';
           return;
         }
       }
       // No frontmatter — use filename as name, full content as body
-      await onCreate({ name: file.name.replace(/\.(skill|md|zip|txt)$/, ''), description: '', content: text, type: 'strategy' });
+      console.log('[SkillUpload] Creating without frontmatter:', file.name);
+      const result = await onCreate({ name: file.name.replace(/\.(skill|md|zip|txt)$/, ''), description: '', content: text, type: 'strategy' });
+      console.log('[SkillUpload] Created:', result);
     } catch (err) {
       console.error('Failed to import skill file:', err);
       setUploadError(err.response?.data?.error || err.message || 'Upload failed');
