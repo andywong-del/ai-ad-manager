@@ -406,7 +406,7 @@ export const Sidebar = ({
 
         {/* Optimizations */}
         <button
-          onClick={onOpenOptimizations}
+          onClick={() => {}}
           className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12px] font-medium transition-all border
             ${activeView?.type === 'optimizations'
               ? 'bg-amber-50 text-amber-700 border-amber-200'
@@ -414,7 +414,7 @@ export const Sidebar = ({
         >
           <Zap size={14} className={activeView?.type === 'optimizations' ? 'text-amber-500' : 'text-slate-400'} />
           <span className="flex-1 text-left">Optimizations</span>
-          <ChevronRight size={12} className="text-slate-300" />
+          <span className="text-[9px] text-slate-300 font-medium">Soon</span>
         </button>
 
         {/* Report */}
