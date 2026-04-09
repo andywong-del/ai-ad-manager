@@ -272,65 +272,77 @@ export const CampaignManager = ({ adAccountId, onBack, onSendToChat, token, onLo
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Pagination cursors
+  const [campaignsPaging, setCampaignsPaging] = useState(null);
+  const [adSetsPaging, setAdSetsPaging] = useState(null);
+  const [adsPaging, setAdsPaging] = useState(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+
   // Normalize
   const normCampaign = (c) => ({ ...c, _active: c.status === 'ACTIVE', _status: mapStatus(c.status, c.effective_status), _budget: fmtBudget(c.daily_budget, c.lifetime_budget), _metrics: extractMetrics(c), _level: 'campaign' });
   const normAdSet = (as) => ({ ...as, _active: as.status === 'ACTIVE', _status: mapStatus(as.status, as.effective_status), _budget: fmtBudget(as.daily_budget, as.lifetime_budget), _metrics: extractMetrics(as), _level: 'adset', _campaignName: as._campaignName });
   const normAd = (ad) => ({ ...ad, _active: ad.status === 'ACTIVE', _status: mapStatus(ad.status, ad.effective_status), _budget: '—', _metrics: extractMetrics(ad), _level: 'ad', thumbnail: ad.creative?.thumbnail_url || ad.creative?.image_url || null });
 
-  // Fetch campaigns
-  const fetchCampaigns = useCallback(async () => {
+  // Fetch campaigns (paginated)
+  const fetchCampaigns = useCallback(async (after) => {
     if (!adAccountId) return;
-    setLoading(true);
-    setError(null);
+    if (after) setLoadingMore(true); else { setLoading(true); setError(null); }
     try {
-      const { data } = await api.get(`/meta/adaccounts/${adAccountId}/campaigns-tree`);
-      setCampaigns((data || []).map(normCampaign));
+      const params = { limit: 20 };
+      if (after) params.after = after;
+      const { data } = await api.get(`/meta/adaccounts/${adAccountId}/campaigns-tree`, { params });
+      const items = (data.data || []).map(normCampaign);
+      if (after) setCampaigns(prev => [...prev, ...items]);
+      else setCampaigns(items);
+      setCampaignsPaging(data.paging || null);
     } catch (err) {
       setError(err.response?.data?.error || err.message);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }, [adAccountId]);
 
-  // Fetch ad sets (for a campaign or all)
-  const fetchAdSets = useCallback(async (campaignId) => {
-    if (!adAccountId) return;
-    setLoading(true);
+  // Fetch ad sets for a campaign (paginated)
+  const fetchAdSets = useCallback(async (campaignId, after) => {
+    if (!campaignId) return;
+    if (after) setLoadingMore(true); else { setLoading(true); setError(null); }
     try {
-      if (campaignId) {
-        const { data } = await api.get(`/meta/campaigns/${campaignId}/adsets`);
-        const campaign = campaigns.find(c => c.id === campaignId);
-        setAdSets((data || []).map(as => normAdSet({ ...as, _campaignName: campaign?.name })));
-      } else {
-        // Fetch all ad sets for the account
-        const { data } = await api.get(`/meta/adaccounts/${adAccountId}/adsets`);
-        setAdSets((data || []).map(as => normAdSet(as)));
-      }
+      const params = { limit: 20 };
+      if (after) params.after = after;
+      const { data } = await api.get(`/meta/campaigns/${campaignId}/adsets`, { params });
+      const campaign = campaigns.find(c => c.id === campaignId);
+      const items = (data.data || []).map(as => normAdSet({ ...as, _campaignName: campaign?.name }));
+      if (after) setAdSets(prev => [...prev, ...items]);
+      else setAdSets(items);
+      setAdSetsPaging(data.paging || null);
     } catch (err) {
       setError(err.response?.data?.error || err.message);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
-  }, [adAccountId, campaigns]);
+  }, [campaigns]);
 
-  // Fetch ads (for an ad set or all)
-  const fetchAds = useCallback(async (adSetId) => {
-    if (!adAccountId) return;
-    setLoading(true);
+  // Fetch ads for an ad set (paginated)
+  const fetchAds = useCallback(async (adSetId, after) => {
+    if (!adSetId) return;
+    if (after) setLoadingMore(true); else { setLoading(true); setError(null); }
     try {
-      if (adSetId) {
-        const { data } = await api.get(`/meta/adsets/${adSetId}/ads`);
-        setAds((data || []).map(normAd));
-      } else {
-        const { data } = await api.get(`/meta/adaccounts/${adAccountId}/ads`);
-        setAds((data || []).map(normAd));
-      }
+      const params = { limit: 20 };
+      if (after) params.after = after;
+      const { data } = await api.get(`/meta/adsets/${adSetId}/ads`, { params });
+      const items = (data.data || []).map(normAd);
+      if (after) setAds(prev => [...prev, ...items]);
+      else setAds(items);
+      setAdsPaging(data.paging || null);
     } catch (err) {
       setError(err.response?.data?.error || err.message);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
-  }, [adAccountId]);
+  }, []);
 
   useEffect(() => { fetchCampaigns(); }, [fetchCampaigns]);
 
@@ -353,7 +365,7 @@ export const CampaignManager = ({ adAccountId, onBack, onSendToChat, token, onLo
     fetchAds(adSet.id);
   }, [fetchAds]);
 
-  // Tab click handler
+  // Tab click handler — drill-down only like Meta Ads Manager
   const handleTabClick = useCallback((tab) => {
     setActiveTab(tab);
     setSelectedIds(new Set());
@@ -361,18 +373,31 @@ export const CampaignManager = ({ adAccountId, onBack, onSendToChat, token, onLo
     if (tab === 'campaigns') {
       setSelectedCampaign(null);
       setSelectedAdSet(null);
+      fetchCampaigns();
     } else if (tab === 'adsets') {
       setSelectedAdSet(null);
+      // Only fetch if a campaign is selected
       if (selectedCampaign) fetchAdSets(selectedCampaign.id);
-      else fetchAdSets();
     } else if (tab === 'ads') {
+      // Only fetch if an ad set is selected
       if (selectedAdSet) fetchAds(selectedAdSet.id);
-      else fetchAds();
     }
-  }, [selectedCampaign, selectedAdSet, fetchAdSets, fetchAds]);
+  }, [selectedCampaign, selectedAdSet, fetchAdSets, fetchAds, fetchCampaigns]);
+
+  // Load more for current tab
+  const handleLoadMore = useCallback(() => {
+    const paging = activeTab === 'campaigns' ? campaignsPaging : activeTab === 'adsets' ? adSetsPaging : adsPaging;
+    const after = paging?.cursors?.after;
+    if (!after) return;
+    if (activeTab === 'campaigns') fetchCampaigns(after);
+    else if (activeTab === 'adsets' && selectedCampaign) fetchAdSets(selectedCampaign.id, after);
+    else if (activeTab === 'ads' && selectedAdSet) fetchAds(selectedAdSet.id, after);
+  }, [activeTab, campaignsPaging, adSetsPaging, adsPaging, selectedCampaign, selectedAdSet, fetchCampaigns, fetchAdSets, fetchAds]);
 
   // Current data based on active tab
   const currentData = activeTab === 'campaigns' ? campaigns : activeTab === 'adsets' ? adSets : ads;
+  const currentPaging = activeTab === 'campaigns' ? campaignsPaging : activeTab === 'adsets' ? adSetsPaging : adsPaging;
+  const hasMore = !!currentPaging?.next;
 
   // ── API calls for status toggle ──
   const toggleActive = useCallback(async (id, val) => {
@@ -659,6 +684,16 @@ export const CampaignManager = ({ adAccountId, onBack, onSendToChat, token, onLo
             <p className="text-sm font-semibold text-slate-700 mb-1">{!token ? 'Connect an ad platform' : 'Select an ad account'}</p>
             <p className="text-xs text-slate-400">Use the account selector above to get started.</p>
           </div>
+        ) : (activeTab === 'adsets' && !selectedCampaign) ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <p className="text-sm font-semibold text-slate-700 mb-1">Select a campaign first</p>
+            <p className="text-xs text-slate-400">Click on a campaign name to view its ad sets.</p>
+          </div>
+        ) : (activeTab === 'ads' && !selectedAdSet) ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <p className="text-sm font-semibold text-slate-700 mb-1">Select an ad set first</p>
+            <p className="text-xs text-slate-400">Click on an ad set name to view its ads.</p>
+          </div>
         ) : loading && currentData.length === 0 ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 size={24} className="animate-spin text-slate-400" />
@@ -768,6 +803,15 @@ export const CampaignManager = ({ adAccountId, onBack, onSendToChat, token, onLo
                 )}
               </tbody>
             </table>
+          </div>
+        )}
+        {/* Load More */}
+        {hasMore && currentData.length > 0 && (
+          <div className="flex justify-center py-4">
+            <button onClick={handleLoadMore} disabled={loadingMore}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium text-slate-500 hover:bg-slate-100 border border-slate-200 transition-colors disabled:opacity-50">
+              {loadingMore ? <><Loader2 size={13} className="animate-spin" /> Loading...</> : 'Load More'}
+            </button>
           </div>
         )}
       </div>

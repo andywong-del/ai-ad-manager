@@ -157,8 +157,12 @@ router.get('/adaccounts/:id/campaigns-list', async (req, res, next) => {
 // Campaign tree: campaigns with insights for Campaign Manager module
 router.get('/adaccounts/:id/campaigns-tree', async (req, res, next) => {
   try {
-    const data = await metaClient.getCampaigns(req.token, req.params.id);
-    res.json(data);
+    const { limit, after } = req.query;
+    const result = await metaClient.getCampaigns(req.token, req.params.id, {
+      limit: limit ? parseInt(limit) : 20,
+      after: after || undefined,
+    });
+    res.json(result);
   } catch (err) {
     const metaErr = err.response?.data?.error;
     res.status(err.response?.status || 500).json({ error: metaErr?.message || err.message, code: metaErr?.code });
@@ -168,14 +172,15 @@ router.get('/adaccounts/:id/campaigns-tree', async (req, res, next) => {
 // Ad sets for a campaign (lazy-loaded when user expands)
 router.get('/campaigns/:id/adsets', async (req, res, next) => {
   try {
-    const { data } = await metaClient.metaApi.get(`/${req.params.id}/adsets`, {
-      params: {
-        access_token: req.token,
-        limit: 200,
-        fields: 'id,name,status,effective_status,daily_budget,lifetime_budget,optimization_goal,insights.date_preset(last_7d){spend,impressions,clicks,ctr,cpm,reach,frequency,actions,action_values,cost_per_action_type}',
-      }
-    });
-    res.json(data?.data || []);
+    const { limit, after } = req.query;
+    const params = {
+      access_token: req.token,
+      limit: limit ? parseInt(limit) : 20,
+      fields: 'id,name,status,effective_status,daily_budget,lifetime_budget,optimization_goal,insights.date_preset(last_7d){spend,impressions,clicks,ctr,cpm,reach,frequency,actions,action_values,cost_per_action_type}',
+    };
+    if (after) params.after = after;
+    const { data } = await metaClient.metaApi.get(`/${req.params.id}/adsets`, { params });
+    res.json({ data: data?.data || [], paging: data?.paging || null });
   } catch (err) {
     const metaErr = err.response?.data?.error;
     res.status(err.response?.status || 500).json({ error: metaErr?.message || err.message, code: metaErr?.code });
@@ -185,14 +190,15 @@ router.get('/campaigns/:id/adsets', async (req, res, next) => {
 // Ads for an ad set (lazy-loaded when user expands)
 router.get('/adsets/:id/ads', async (req, res, next) => {
   try {
-    const { data } = await metaClient.metaApi.get(`/${req.params.id}/ads`, {
-      params: {
-        access_token: req.token,
-        limit: 200,
-        fields: 'id,name,status,effective_status,creative{id,thumbnail_url,image_url,video_id},insights.date_preset(last_7d){spend,impressions,clicks,ctr,cpm,reach,frequency,actions,action_values,cost_per_action_type}',
-      }
-    });
-    res.json(data?.data || []);
+    const { limit, after } = req.query;
+    const params = {
+      access_token: req.token,
+      limit: limit ? parseInt(limit) : 20,
+      fields: 'id,name,status,effective_status,creative{id,thumbnail_url,image_url,video_id},insights.date_preset(last_7d){spend,impressions,clicks,ctr,cpm,reach,frequency,actions,action_values,cost_per_action_type}',
+    };
+    if (after) params.after = after;
+    const { data } = await metaClient.metaApi.get(`/${req.params.id}/ads`, { params });
+    res.json({ data: data?.data || [], paging: data?.paging || null });
   } catch (err) {
     const metaErr = err.response?.data?.error;
     res.status(err.response?.status || 500).json({ error: metaErr?.message || err.message, code: metaErr?.code });

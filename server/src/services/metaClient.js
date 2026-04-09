@@ -122,17 +122,18 @@ export const getCampaignsList = async (token, adAccountId) => {
   return data?.data || [];
 };
 
-export const getCampaigns = async (token, adAccountId) => {
-  // Get campaigns with inline insights — limit to 100 to avoid timeout
-  // For full account totals, agent should use get_account_insights separately
-  const { data } = await metaApi.get(`/${adAccountId}/campaigns`, {
-    params: {
-      access_token: token,
-      limit: 100,
-      fields: 'id,name,status,objective,daily_budget,lifetime_budget,insights.date_preset(last_7d){spend,impressions,clicks,ctr,cpm,actions,action_values,cost_per_action_type}',
-    },
-  });
-  return data?.data || [];
+export const getCampaigns = async (token, adAccountId, { limit = 20, after } = {}) => {
+  const params = {
+    access_token: token,
+    limit,
+    fields: 'id,name,status,objective,daily_budget,lifetime_budget,insights.date_preset(last_7d){spend,impressions,clicks,ctr,cpm,actions,action_values,cost_per_action_type}',
+  };
+  if (after) params.after = after;
+  const { data } = await metaApi.get(`/${adAccountId}/campaigns`, { params });
+  return {
+    data: data?.data || [],
+    paging: data?.paging || null,
+  };
 };
 
 export const getCampaign = async (token, campaignId) => {
