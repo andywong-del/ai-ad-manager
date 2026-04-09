@@ -1443,7 +1443,7 @@ const adTools = [
     obj({ campaign_id: str('Campaign ID to validate') }, ['campaign_id'])),
 
   // ── Skill Loader ──────────────────────────────────────────────────────
-  T('load_skill', 'Load a skill\'s detailed workflow guidance. Call this BEFORE executing complex flows. Available skills: campaign-creation, campaign-manager, data-analysis, creative-manager, targeting-audiences, skill-creator, ad-manager, adset-manager, automation-rules, business-manager, tracking-conversions, lead-ads, product-catalogs, bulk-campaign-setup.',
+  T('load_skill', 'Load a skill\'s detailed workflow guidance. System skills (API/tools layer): campaign-operations, audience-operations, analytics-engine, account-infrastructure. Official skills (strategy layer): data-analysis, campaign-manager, creative-manager, targeting-audiences, skill-creator.',
     async (_args, context) => {
       const { skill_name } = _args;
       const fbUserId = await resolveFbUserId(context);

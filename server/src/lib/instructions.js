@@ -117,7 +117,7 @@ Read-only 診斷。你唔會 create、update 或 delete 任何嘢。
 
 # FIRST ACTIONS (in parallel)
 1. analyze_performance() — your primary data tool. Returns { current_7d, previous_7d, baseline_30d, _benchmarks, account_summary } in ONE API call.
-2. load_skill("data-analysis") — loads scenario routing, goal→metric map, funnel classification, and diagnostic evaluation logic. Follow it precisely.
+2. load_skill("analytics-engine") — loads data tools and metrics. Then load_skill("data-analysis") for analysis framework.
 
 # ⚡ STREAMING-FIRST PROTOCOL
 Account summary is ALREADY shown to the user by the tool. Do NOT repeat it. Jump STRAIGHT into the diagnostic. Start writing IMMEDIATELY.
@@ -158,7 +158,7 @@ ${BASE_OUTPUT_RULES}
 
 # FIRST ACTIONS (call ALL in parallel — speeds up card rendering)
 1. get_workflow_context()
-2. load_skill("targeting-audiences") — loads audience creation workflows. Follow it precisely.
+2. load_skill("audience-operations") — loads audience tools. Then load_skill("targeting-audiences") for strategy.
 3. get_ad_account_details()
 4. get_pages() — needed for video source, page engagement, lead ad, WhatsApp
 5. get_connected_instagram_accounts() — needed for IG engagement, IG video
@@ -241,12 +241,9 @@ Create campaigns, ad sets, creatives, and ads. Also handle edits (pause, budget 
 
 # FIRST ACTIONS (in parallel)
 1. get_workflow_context()
-2. load_skill based on intent:
-   - Creating: load_skill("campaign-creation")
-   - Bulk creating from doc: load_skill("campaign-creation") — when user uploaded a document with campaign plan data (message contains [Document:])
-   - Editing campaigns: load_skill("campaign-manager")
-   - Editing ad sets: load_skill("adset-manager")
-   - Editing ads: load_skill("ad-manager")
+2. load_skill("campaign-operations") — loads all campaign/adset/ad tools. Then load based on intent:
+   - Creating/editing: load_skill("campaign-manager") for optimization strategy
+   - All CRUD operations are in campaign-operations
 
 # EDIT MODE
 For pause/update/delete/rename requests:
@@ -256,7 +253,7 @@ For pause/update/delete/rename requests:
 4. Execute, then verify
 
 # CREATION MODE
-load_skill("campaign-creation") — follow it. It defines what info to collect and how to execute.
+load_skill("campaign-operations") — follow it for creation flow and execution.
 Key principles:
 - Parse what user already provided, only ask for missing pieces
 - Group questions — don't ask one field at a time
@@ -315,7 +312,7 @@ ${SHARED_OUTPUT_RULES}
 
 # FIRST ACTIONS (in parallel)
 1. get_workflow_context()
-2. load_skill("tracking-conversions") — loads tracking audit workflows. Follow it precisely.
+2. load_skill("account-infrastructure") — loads pixel, CAPI, and tracking tools.
 
 # AUDIT CHECKLIST
 1. **Pixel Status**: get_pixels() — 有冇裝？Active 定 inactive？
