@@ -3,14 +3,16 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
+import axios from 'axios';
+import { supabase } from '../lib/supabase.js';
 
 const router = Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SKILLS_DIR = path.resolve(__dirname, '../../skills');
-const DEFAULT_DIR = path.join(SKILLS_DIR, 'default');
-const CUSTOM_DIR = path.join(SKILLS_DIR, 'custom');
+const OFFICIAL_DIR = path.join(SKILLS_DIR, 'official');
 
-// Parse .md frontmatter (---\nkey: value\n---) + body
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
 const parseMd = (content, filename) => {
   const match = content.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
   if (!match) return { id: filename.replace('.md', ''), name: filename.replace('.md', ''), description: '', content, icon: 'sparkles' };
@@ -30,63 +32,66 @@ const parseMd = (content, filename) => {
   };
 };
 
-// Build .md file from data
-const buildMd = (data) => {
-  let frontmatter = `---\nname: ${data.name}\ndescription: ${data.description || ''}\nicon: ${data.icon || 'sparkles'}`;
-  if (data.type) frontmatter += `\ntype: ${data.type}`;
-  if (data.preview) frontmatter += `\npreview: ${data.preview}`;
-  frontmatter += `\n---`;
-  return `${frontmatter}\n\n${data.content || ''}`;
+// Read all .md skills from a directory
+const readSkillsFrom = async (dir, extraProps = {}) => {
+  const skills = [];
+  try {
+    const files = await fs.readdir(dir);
+    for (const file of files.filter(f => f.endsWith('.md'))) {
+      const content = await fs.readFile(path.join(dir, file), 'utf-8');
+      const skill = parseMd(content, file);
+      const stat = await fs.stat(path.join(dir, file));
+      Object.assign(skill, { updatedAt: stat.mtime.toISOString(), ...extraProps });
+      skills.push(skill);
+    }
+  } catch {}
+  return skills;
 };
 
-// Ensure custom dir exists
-const ensureCustomDir = async () => {
-  try { await fs.mkdir(CUSTOM_DIR, { recursive: true }); } catch {}
+// ── FB User ID extraction (cached) ──────────────────────────────────────────
+const userIdCache = new Map();
+
+const getFbUserId = async (token) => {
+  if (!token) return null;
+  if (userIdCache.has(token)) return userIdCache.get(token);
+  try {
+    const { data } = await axios.get(`https://graph.facebook.com/v25.0/me?fields=id&access_token=${token}`);
+    if (data?.id) { userIdCache.set(token, data.id); return data.id; }
+  } catch (err) { console.error('[skills] FB user ID error:', err.message); }
+  return null;
 };
 
-// POST /api/skills/generate — AI-powered skill generation from raw text
+// Middleware: resolve user
+const resolveUser = async (req, _res, next) => {
+  const auth = req.headers.authorization;
+  if (auth?.startsWith('Bearer ')) {
+    req.token = auth.slice(7);
+    req.fbUserId = await getFbUserId(req.token);
+  }
+  next();
+};
+
+router.use(resolveUser);
+
+// ── Routes ───────────────────────────────────────────────────────────────────
+
+// POST /api/skills/generate
 router.post('/generate', async (req, res) => {
   try {
     const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY;
-    if (!apiKey) return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
+    if (!apiKey) return res.status(500).json({ error: 'AI generation not configured' });
+    const genAI = new GoogleGenAI({ apiKey });
+    const raw = (req.body.rawText || '').slice(0, 8000);
+    if (!raw.trim()) return res.status(400).json({ error: 'No text provided' });
 
-    const { rawText } = req.body;
-    if (!rawText?.trim()) return res.status(400).json({ error: 'rawText is required' });
-
-    const truncated = rawText.slice(0, 8000);
-    const ai = new GoogleGenAI({ apiKey });
-
-    const result = await ai.models.generateContent({
+    const result = await genAI.models.generateContent({
       model: 'gemini-2.0-flash',
-      contents: [{ role: 'user', parts: [{ text: `You are a skill generator for an AI Ad Manager that helps marketers analyze Facebook/Meta ad performance.
-
-Given the raw input below, convert it into a structured analysis strategy skill. The skill tells the AI how to analyze ad data differently from the default approach.
-
-Return a JSON object with:
-- "name": Short descriptive name (2-5 words, e.g. "ROAS-First Analysis")
-- "description": One sentence explaining what this strategy focuses on
-- "preview": 2-3 lines of example output showing what analysis looks like with this strategy (use emoji markers like 📊 🚨 🚀)
-- "content": Well-structured markdown instructions that tell the AI how to analyze data. Include: role definition, what metrics to prioritize, how to classify/diagnose campaigns, what output format to use, and any specific frameworks or thresholds.
-
-Raw input:
-${truncated}` }] }],
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: 'object',
-          properties: {
-            name: { type: 'string' },
-            description: { type: 'string' },
-            preview: { type: 'string' },
-            content: { type: 'string' },
-          },
-          required: ['name', 'description', 'content'],
-        },
-      },
+      contents: `You are an expert at creating AI analysis strategies for Facebook ad data. Convert the following text into a structured analysis strategy.\n\nReturn ONLY valid JSON with these fields:\n- name (string, 2-5 words)\n- description (string, one sentence)\n- preview (string, 2-3 lines showing sample output)\n- content (string, full markdown instructions for the AI)\n\nText:\n${raw}`,
+      config: { responseMimeType: 'application/json', responseSchema: { type: 'object', properties: { name: { type: 'string' }, description: { type: 'string' }, preview: { type: 'string' }, content: { type: 'string' } }, required: ['name', 'description', 'content'] } },
     });
 
-    const text = result.text || result.candidates?.[0]?.content?.parts?.[0]?.text;
-    const parsed = JSON.parse(text);
+    const parsed = JSON.parse(result.text);
+    if (!parsed?.name || !parsed?.content) return res.status(500).json({ error: 'AI returned invalid structure' });
     res.json({ name: parsed.name, description: parsed.description, preview: parsed.preview || '', content: parsed.content });
   } catch (err) {
     console.error('[skills/generate] error:', err.message);
@@ -94,46 +99,40 @@ ${truncated}` }] }],
   }
 });
 
-// GET /api/skills — list all skills (default + custom)
-router.get('/', async (_req, res) => {
+// GET /api/skills — official (from files) + user's custom (from Supabase)
+router.get('/', async (req, res) => {
   try {
     const skills = [];
 
-    // Read default skills (scan subfolders: analytical, strategic, operational)
-    try {
-      const entries = await fs.readdir(DEFAULT_DIR, { withFileTypes: true });
-      for (const entry of entries) {
-        if (entry.isDirectory()) {
-          const subDir = path.join(DEFAULT_DIR, entry.name);
-          const files = await fs.readdir(subDir);
-          for (const file of files.filter(f => f.endsWith('.md'))) {
-            const content = await fs.readFile(path.join(subDir, file), 'utf-8');
-            const skill = parseMd(content, file);
-            skill.isDefault = true;
-            skill.layer = entry.name;
-            skills.push(skill);
-          }
-        } else if (entry.name.endsWith('.md')) {
-          // Also support flat .md files in default/ for backwards compat
-          const content = await fs.readFile(path.join(DEFAULT_DIR, entry.name), 'utf-8');
-          const skill = parseMd(content, entry.name);
-          skill.isDefault = true;
-          skills.push(skill);
+    // 1. Official skills (from filesystem)
+    const officialSkills = await readSkillsFrom(OFFICIAL_DIR, { isDefault: true, visibility: 'official' });
+    skills.push(...officialSkills);
+
+    // 2. User's custom skills (from Supabase)
+    if (supabase && req.fbUserId) {
+      const { data, error } = await supabase
+        .from('custom_skills')
+        .select('*')
+        .eq('fb_user_id', req.fbUserId)
+        .order('updated_at', { ascending: false });
+
+      if (!error && data) {
+        for (const row of data) {
+          skills.push({
+            id: row.id,
+            name: row.name,
+            description: row.description || '',
+            content: row.content || '',
+            icon: row.icon || 'sparkles',
+            type: row.type || 'strategy',
+            preview: row.preview || '',
+            isDefault: false,
+            visibility: 'custom',
+            updatedAt: row.updated_at,
+          });
         }
       }
-    } catch {}
-
-    // Read custom skills
-    try {
-      await ensureCustomDir();
-      const customFiles = await fs.readdir(CUSTOM_DIR);
-      for (const file of customFiles.filter(f => f.endsWith('.md'))) {
-        const content = await fs.readFile(path.join(CUSTOM_DIR, file), 'utf-8');
-        const skill = parseMd(content, file);
-        skill.isDefault = false;
-        skills.push(skill);
-      }
-    } catch {}
+    }
 
     res.json(skills);
   } catch (err) {
@@ -141,26 +140,38 @@ router.get('/', async (_req, res) => {
   }
 });
 
-// GET /api/skills/:id — get a single skill's full content
+// GET /api/skills/:id
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const filename = `${id}.md`;
 
-    // Search default subfolders (analytical, strategic, operational), then custom
-    const searchDirs = [
-      path.join(DEFAULT_DIR, 'analytical'),
-      path.join(DEFAULT_DIR, 'strategic'),
-      path.join(DEFAULT_DIR, 'operational'),
-      DEFAULT_DIR, // flat fallback
-      CUSTOM_DIR,
-    ];
-    for (const dir of searchDirs) {
+    // Check Supabase first (custom skills)
+    if (supabase && req.fbUserId) {
+      const { data } = await supabase
+        .from('custom_skills')
+        .select('*')
+        .eq('id', id)
+        .eq('fb_user_id', req.fbUserId)
+        .single();
+
+      if (data) {
+        return res.json({
+          id: data.id, name: data.name, description: data.description || '',
+          content: data.content || '', icon: data.icon || 'sparkles',
+          isDefault: false, visibility: 'custom', updatedAt: data.updated_at,
+        });
+      }
+    }
+
+    // Check official + system files
+    const filename = `${id}.md`;
+    const SYSTEM_DIR = path.join(SKILLS_DIR, 'system');
+    for (const dir of [OFFICIAL_DIR, SYSTEM_DIR]) {
       try {
         const content = await fs.readFile(path.join(dir, filename), 'utf-8');
         const skill = parseMd(content, filename);
-        skill.isDefault = dir !== CUSTOM_DIR;
-        skill.layer = dir.includes('analytical') ? 'analytical' : dir.includes('strategic') ? 'strategic' : dir.includes('operational') ? 'operational' : undefined;
+        skill.isDefault = dir === OFFICIAL_DIR;
+        skill.visibility = dir === OFFICIAL_DIR ? 'official' : 'system';
         return res.json(skill);
       } catch {}
     }
@@ -171,76 +182,92 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// POST /api/skills — create a new custom skill
+// POST /api/skills — create custom skill (Supabase)
 router.post('/', async (req, res) => {
   try {
     const { name, description, content, icon } = req.body;
     if (!name) return res.status(400).json({ error: 'Name is required' });
+    if (!supabase) return res.status(500).json({ error: 'Database not configured' });
 
-    await ensureCustomDir();
-
-    // Generate filename from name
+    const fbUserId = req.fbUserId || '_anonymous';
     const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
-    const filename = `${id}.md`;
-    const filepath = path.join(CUSTOM_DIR, filename);
 
     // Check if exists
-    try {
-      await fs.access(filepath);
-      return res.status(409).json({ error: 'A skill with this name already exists' });
-    } catch {} // File doesn't exist — good
+    const { data: existing } = await supabase
+      .from('custom_skills')
+      .select('id')
+      .eq('id', id)
+      .eq('fb_user_id', fbUserId)
+      .single();
 
-    const type = req.body.type || 'strategy';
-    const preview = req.body.preview || '';
-    const md = buildMd({ name, description: description || '', content: content || '', icon: icon || 'sparkles', type, preview });
-    await fs.writeFile(filepath, md, 'utf-8');
+    if (existing) return res.status(409).json({ error: 'A skill with this name already exists' });
 
-    res.json({ id, name, description: description || '', content: content || '', icon: icon || 'sparkles', type, preview, isDefault: false });
+    const row = {
+      id,
+      fb_user_id: fbUserId,
+      name,
+      description: description || '',
+      content: content || '',
+      icon: icon || 'sparkles',
+      type: req.body.type || 'strategy',
+      preview: req.body.preview || '',
+    };
+
+    const { error } = await supabase.from('custom_skills').insert(row);
+    if (error) return res.status(500).json({ error: error.message });
+
+    res.json({ ...row, isDefault: false, visibility: 'custom', updatedAt: new Date().toISOString() });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// PUT /api/skills/:id — update a skill (default or custom)
+// PUT /api/skills/:id — update custom skill
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { name, description, content, icon } = req.body;
+    if (!supabase) return res.status(500).json({ error: 'Database not configured' });
 
-    // Check if it's a default or custom skill
-    let filepath = path.join(CUSTOM_DIR, `${id}.md`);
-    let isDefault = false;
-    try { await fs.access(filepath); } catch {
-      // Not in custom — check default
-      filepath = path.join(DEFAULT_DIR, `${id}.md`);
-      try { await fs.access(filepath); isDefault = true; } catch {
-        return res.status(404).json({ error: 'Skill not found' });
-      }
-    }
+    const fbUserId = req.fbUserId || '_anonymous';
+    const updates = {
+      name: name || id,
+      description: description || '',
+      content: content || '',
+      icon: icon || 'sparkles',
+      type: req.body.type || 'strategy',
+      preview: req.body.preview || '',
+      updated_at: new Date().toISOString(),
+    };
 
-    const type = req.body.type || 'strategy';
-    const preview = req.body.preview || '';
-    const md = buildMd({ name: name || id, description: description || '', content: content || '', icon: icon || 'sparkles', type, preview });
-    await fs.writeFile(filepath, md, 'utf-8');
+    const { error } = await supabase
+      .from('custom_skills')
+      .update(updates)
+      .eq('id', id)
+      .eq('fb_user_id', fbUserId);
 
-    res.json({ id, name: name || id, description: description || '', content: content || '', icon: icon || 'sparkles', type, preview, isDefault });
+    if (error) return res.status(500).json({ error: error.message });
+
+    res.json({ id, ...updates, isDefault: false, visibility: 'custom', updatedAt: updates.updated_at });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// DELETE /api/skills/:id — delete a custom skill
+// DELETE /api/skills/:id
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const filepath = path.join(CUSTOM_DIR, `${id}.md`);
+    if (!supabase) return res.status(500).json({ error: 'Database not configured' });
 
-    // Only allow deleting custom skills
-    try { await fs.access(filepath); } catch {
-      return res.status(403).json({ error: 'Cannot delete default skills' });
-    }
+    const fbUserId = req.fbUserId || '_anonymous';
+    const { error } = await supabase
+      .from('custom_skills')
+      .delete()
+      .eq('id', id)
+      .eq('fb_user_id', fbUserId);
 
-    await fs.unlink(filepath);
+    if (error) return res.status(500).json({ error: error.message });
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

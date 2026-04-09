@@ -1,5 +1,5 @@
 ---
-name: campaign-manager
+name: Campaign Manager
 description: Plan and configure Facebook ad campaigns — guided 11-step creation flow with interactive options at every decision point. Also handles diagnostic response to insights warnings/criticals with one-click fixes.
 layer: strategic
 depends_on: [insights-reporting]

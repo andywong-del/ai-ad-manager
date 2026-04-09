@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Menu } from 'lucide-react';
 import { useChatSessions } from '../hooks/useChatSessions.js';
 import { useSkills } from '../hooks/useSkills.js';
@@ -9,30 +9,10 @@ import { SavedItemView } from './SavedItemView.jsx';
 import { StrategistConfig } from './StrategistConfig.jsx';
 import { SkillsLibrary } from './SkillsLibrary.jsx';
 import { AudienceManager } from './AudienceManager.jsx';
+import { CampaignManager } from './CampaignManager.jsx';
 
-// Use-case driven cards — categorized, battle-tested entry points
-const CARD_CATEGORIES = [
-  {
-    heading: 'Get Started',
-    cards: [
-      { icon: 'Zap', label: 'Create Campaign', desc: 'Step-by-step guided setup, or bulk create from a spreadsheet.', prompt: 'I want to create a new campaign.', color: 'violet' },
-      { icon: 'Users', label: 'Build Audience', desc: 'Website visitors, video viewers, IG/FB posts, lookalikes, customer lists.', prompt: 'I want to build a new audience.', color: 'emerald' },
-    ],
-  },
-  {
-    heading: 'Check What\'s Working',
-    cards: [
-      { icon: 'BarChart3', label: 'Analyze Ads', desc: 'Performance report — what to pause, what to scale, where budget is wasted.', prompt: 'How are my ads performing?', color: 'blue' },
-      { icon: 'Image', label: 'Audit Creatives', desc: 'Fatigue detection, hook rate ranking, AI visual analysis.', prompt: 'Audit my ad creatives.', color: 'amber' },
-    ],
-  },
-];
-
-const QUICK_CHIPS = [
-  { label: 'What should I pause?', prompt: 'What campaigns should I pause?' },
-  { label: 'Scale my winners', prompt: 'Which ads should I scale up?' },
-  { label: 'Check tracking health', prompt: 'Check my pixel and tracking health.' },
-];
+const CARD_CATEGORIES = [];
+const QUICK_CHIPS = [];
 
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
@@ -50,13 +30,13 @@ export const Dashboard = ({
   loginError,
 }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [chatLanguage, setChatLanguage] = useState(() => localStorage.getItem('aam_language') || 'en');
+  const [chatLanguage, setChatLanguage] = useState('en');
   const [activeView, setActiveView] = useState({ type: 'chat' });
   const [canvasData, setCanvasData] = useState(null);
 
   const {
     skills, activeSkill, activeSkillId, toggleSkill,
-    createSkill, updateSkill, deleteSkill, generateSkill, getSkillContext, getSkillContextById,
+    createSkill, updateSkill, deleteSkill, generateSkill, getSkillContext, getSkillContextById, fetchSkills,
   } = useSkills();
 
   const {
@@ -117,9 +97,61 @@ export const Dashboard = ({
     setActiveView({ type: 'audiences' });
   }, []);
 
+  const handleOpenCampaigns = useCallback(() => {
+    setActiveView({ type: 'campaigns' });
+  }, []);
+
   const handleOpenSkillsLibrary = useCallback(() => {
     setActiveView({ type: 'skillsLibrary' });
   }, []);
+
+
+  const [pendingInput, setPendingInput] = useState(null);
+  const [pendingSlashSkill, setPendingSlashSkill] = useState(null);
+
+  // Skill toggles — single source of truth, shared with SkillsLibrary
+  const [skillToggles, setSkillToggles] = useState(() => {
+    try {
+      const s = localStorage.getItem('skill_toggles');
+      if (s) return JSON.parse(s);
+    } catch {}
+    return {};
+  });
+
+  // Default all official skills to ON when skills list loads
+  useEffect(() => {
+    const officialIds = skills.filter(s => s.isDefault).map(s => s.id);
+    if (officialIds.length === 0) return;
+    setSkillToggles(prev => {
+      let changed = false;
+      const next = { ...prev };
+      officialIds.forEach(id => {
+        if (next[id] === undefined) { next[id] = true; changed = true; }
+      });
+      return changed ? next : prev;
+    });
+  }, [skills]);
+
+  const enabledSkillIds = Object.keys(skillToggles).filter(k => skillToggles[k]);
+  // Persist to localStorage
+  useEffect(() => {
+    localStorage.setItem('skill_toggles', JSON.stringify(skillToggles));
+  }, [skillToggles]);
+
+  const handleBuildSkillWithAI = useCallback(() => {
+    createNewChat();
+    const skillCreator = skills.find(s => s.id === 'skill-creator');
+    if (skillCreator) setPendingSlashSkill(skillCreator);
+    setPendingInput("Help me create a skill together using /skill-creator. First ask me what the skill should do.");
+    setActiveView({ type: 'chat' });
+  }, [skills, createNewChat]);
+
+  const handleTrySkill = useCallback((skill) => {
+    createNewChat();
+    setPendingSlashSkill(skill);
+    setPendingInput(`I just added the /${skill.id} skill for AI Ad Manager. Can you demo it with some great examples?`);
+    setActiveView({ type: 'chat' });
+  }, [createNewChat]);
 
   const handleAudienceToChat = useCallback((prompt) => {
     setActiveView({ type: 'chat' });
@@ -181,6 +213,7 @@ export const Dashboard = ({
         activeSkill={activeSkill}
         onToggleSkill={toggleSkill}
         onOpenAudiences={handleOpenAudiences}
+        onOpenCampaigns={handleOpenCampaigns}
         onOpenSkillsLibrary={handleOpenSkillsLibrary}
         token={token}
         onLogin={onLogin}
@@ -203,11 +236,14 @@ export const Dashboard = ({
             <SkillsLibrary
               skills={skills}
               onCreate={createSkill}
-              onUpdate={updateSkill}
               onDelete={deleteSkill}
-              onGenerate={generateSkill}
               onBack={() => setActiveView({ type: 'chat' })}
               onActivateSkill={(skill) => { toggleSkill(skill.id); setActiveView({ type: 'chat' }); }}
+              onBuildWithAI={handleBuildSkillWithAI}
+              onTrySkill={handleTrySkill}
+              onRefresh={fetchSkills}
+              skillToggles={skillToggles}
+              onToggleChange={setSkillToggles}
             />
           ) : activeView.type === 'skillConfig' && activeView.skill ? (
             <StrategistConfig
@@ -218,6 +254,18 @@ export const Dashboard = ({
               onAddDoc={() => {}}
               onRemoveDoc={() => {}}
               onBack={() => setActiveView({ type: 'skillsLibrary' })}
+            />
+          ) : activeView.type === 'campaigns' ? (
+            <CampaignManager
+              adAccountId={adAccountId}
+              onBack={() => setActiveView({ type: 'chat' })}
+              onSendToChat={handleAudienceToChat}
+              token={token}
+              onLogin={onLogin}
+              onLogout={onLogout}
+              selectedAccount={selectedAccount}
+              selectedBusiness={selectedBusiness}
+              onSelectAccount={handleAccountSelect}
             />
           ) : activeView.type === 'audiences' ? (
             <AudienceManager
@@ -268,6 +316,9 @@ export const Dashboard = ({
                 setActiveView({ type: viewMap[view] || 'chat' });
               }}
               onOpenCanvas={handleOpenCanvas}
+              initialInput={pendingInput}
+              initialSlashSkill={pendingSlashSkill}
+              enabledSkillIds={enabledSkillIds}
             />
           )}
         </div>

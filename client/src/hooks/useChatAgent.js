@@ -26,7 +26,7 @@ export const getWelcomeMessage = (accountName, language = 'en') => {
 export { makeId };
 
 export const useChatAgent = ({ token, adAccountId, accountName, language = 'en', initialMessages, externalSessionId }) => {
-  const [messages, setMessages] = useState(initialMessages || [getWelcomeMessage(accountName, language)]);
+  const [messages, setMessages] = useState(initialMessages || []);
   const [isTyping, setIsTyping] = useState(false);
   const [thinkingText, setThinkingText] = useState('');
   const [notification, setNotification] = useState(null);
@@ -88,7 +88,7 @@ export const useChatAgent = ({ token, adAccountId, accountName, language = 'en',
     if (abortRef.current) abortRef.current.abort();
     const newId = makeId();
     sessionIdRef.current = newId;
-    setMessages([getWelcomeMessage(accountName, language)]);
+    setMessages([]);
     setIsTyping(false);
     setThinkingText('');
     setCreationStep(null);

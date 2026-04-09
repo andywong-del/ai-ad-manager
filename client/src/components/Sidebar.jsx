@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Zap, Plus, MessageSquare, Trash2, ChevronDown, ChevronLeft, ChevronRight, LogOut, FileText, Lightbulb, FolderOpen, Building2, Check, Globe, GripVertical, FolderPlus, X, Users, Sparkles, MoreVertical, Pin, Pencil, Menu } from 'lucide-react';
+import { Zap, Plus, MessageSquare, Trash2, ChevronDown, ChevronLeft, ChevronRight, LogOut, FileText, Lightbulb, FolderOpen, Building2, Check, Globe, GripVertical, FolderPlus, X, Users, Sparkles, MoreVertical, Pin, Pencil, Menu, BarChart3, Image, Calendar, TrendingUp, ClipboardList } from 'lucide-react';
 import { groupSessionsByDate } from '../hooks/useChatSessions.js';
 import { useAdAccounts } from '../hooks/useAdAccounts.js';
 import { useBusinesses } from '../hooks/useBusinesses.js';
@@ -216,6 +216,7 @@ export const Sidebar = ({
   onRenameFolder,
   onReorderFolders,
   onOpenAudiences,
+  onOpenCampaigns,
   token,
   onLogin,
 }) => {
@@ -313,8 +314,53 @@ export const Sidebar = ({
         </button>
       </div>
 
-      {/* Audiences */}
+      {/* Tools */}
       <div className="px-3 mb-1">
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 mb-1">Tools</p>
+        <button
+          onClick={onOpenSkillsLibrary}
+          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12px] font-medium transition-all border
+            ${activeView?.type === 'skillsLibrary' || activeView?.type === 'skillConfig'
+              ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+              : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700 border border-transparent'}`}
+        >
+          <Sparkles size={14} className={activeView?.type === 'skillsLibrary' || activeView?.type === 'skillConfig' ? 'text-indigo-500' : 'text-slate-400'} />
+          <span className="flex-1 text-left">Skills</span>
+          <ChevronRight size={12} className="text-slate-300" />
+        </button>
+      </div>
+
+      {/* Manage */}
+      <div className="px-3 mb-2">
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 mb-1 mt-2">Manage</p>
+
+        {/* Campaigns */}
+        <button
+          onClick={onOpenCampaigns}
+          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12px] font-medium transition-all border
+            ${activeView?.type === 'campaigns'
+              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+              : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700 border border-transparent'}`}
+        >
+          <BarChart3 size={14} className={activeView?.type === 'campaigns' ? 'text-emerald-500' : 'text-slate-400'} />
+          <span className="flex-1 text-left">Campaigns</span>
+          <ChevronRight size={12} className="text-slate-300" />
+        </button>
+
+        {/* Creative Library */}
+        <button
+          onClick={() => {}}
+          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12px] font-medium transition-all border
+            ${activeView?.type === 'creativeLibrary'
+              ? 'bg-pink-50 text-pink-700 border-pink-200'
+              : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700 border border-transparent'}`}
+        >
+          <Image size={14} className={activeView?.type === 'creativeLibrary' ? 'text-pink-500' : 'text-slate-400'} />
+          <span className="flex-1 text-left">Creative Library</span>
+          <span className="text-[9px] text-slate-300 font-medium">Soon</span>
+        </button>
+
+        {/* Audiences */}
         <button
           onClick={onOpenAudiences}
           className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12px] font-medium transition-all border
@@ -326,20 +372,31 @@ export const Sidebar = ({
           <span className="flex-1 text-left">Audiences</span>
           <ChevronRight size={12} className="text-slate-300" />
         </button>
-      </div>
 
-      {/* Skills Library */}
-      <div className="px-3 mb-2">
+        {/* Automation Rules */}
         <button
-          onClick={onOpenSkillsLibrary}
+          onClick={() => {}}
           className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12px] font-medium transition-all border
-            ${activeView?.type === 'skillsLibrary' || activeView?.type === 'skillConfig'
-              ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+            ${activeView?.type === 'optimization'
+              ? 'bg-violet-50 text-violet-700 border-violet-200'
               : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700 border border-transparent'}`}
         >
-          <Sparkles size={14} className={activeView?.type === 'skillsLibrary' || activeView?.type === 'skillConfig' ? 'text-indigo-500' : 'text-slate-400'} />
-          <span className="flex-1 text-left">Skills Library</span>
-          <ChevronRight size={12} className="text-slate-300" />
+          <TrendingUp size={14} className={activeView?.type === 'optimization' ? 'text-violet-500' : 'text-slate-400'} />
+          <span className="flex-1 text-left">Automation Rules</span>
+          <span className="text-[9px] text-slate-300 font-medium">Soon</span>
+        </button>
+
+        {/* Report */}
+        <button
+          onClick={() => {}}
+          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12px] font-medium transition-all border
+            ${activeView?.type === 'report'
+              ? 'bg-cyan-50 text-cyan-700 border-cyan-200'
+              : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700 border border-transparent'}`}
+        >
+          <ClipboardList size={14} className={activeView?.type === 'report' ? 'text-cyan-500' : 'text-slate-400'} />
+          <span className="flex-1 text-left">Report</span>
+          <span className="text-[9px] text-slate-300 font-medium">Soon</span>
         </button>
       </div>
 
@@ -495,29 +552,6 @@ export const Sidebar = ({
               );
             })
           )}
-        </div>
-      </div>
-
-      {/* Language Selector */}
-      <div className="px-3 pb-2 border-t border-slate-100 pt-3">
-        <div className="flex items-center gap-2 px-1 mb-1">
-          <Globe size={13} className="text-slate-400" />
-          <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Reply Language</span>
-        </div>
-        <div className="flex gap-1 bg-slate-100 rounded-lg p-0.5">
-          {[{ value: 'en', label: 'English' }, { value: 'yue', label: '廣東話' }].map(({ value, label }) => (
-            <button
-              key={value}
-              onClick={() => onLanguageChange?.(value)}
-              className={`flex-1 px-2 py-1.5 rounded-md text-[11px] font-medium transition-all
-                ${language === value
-                  ? 'bg-white text-slate-800 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-600'
-                }`}
-            >
-              {label}
-            </button>
-          ))}
         </div>
       </div>
 

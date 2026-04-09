@@ -1,5 +1,5 @@
 ---
-name: automation-rules
+name: Automation Rules
 description: Plan automation strategies for ad rules, labels, and block lists — auto-pause, auto-scale, and notification rules with safety guardrails
 layer: strategic
 depends_on: [insights-reporting]

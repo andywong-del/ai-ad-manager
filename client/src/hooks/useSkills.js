@@ -27,6 +27,8 @@ const DEFAULT_SKILLS = [
   { id: 'creative-assembly', name: 'Creative Assembly', description: 'Stage 3: Collect creative materials and auto-generate ad copy variations', icon: 'palette', isDefault: true },
   { id: 'ad-launcher', name: 'Ad Launcher', description: 'Execution: Final review, create campaign + ad set + creative + ad, preflight, preview, activate', icon: 'zap', isDefault: true },
   { id: 'bulk-campaign-setup', name: 'Bulk Campaign Setup', description: 'Create multiple campaigns at once from an uploaded document with campaign plan data', icon: 'zap', isDefault: true },
+  // ── Operational ──
+  { id: 'skill-creator', name: 'Skill Creator', description: 'Guide users through creating a new custom skill via structured conversation', icon: 'sparkles', isDefault: true },
 ];
 
 export const useSkills = () => {

@@ -1,5 +1,5 @@
 ---
-name: insights-reporting
+name: Insights & Reporting
 description: Analyze Facebook ad performance with diagnostic statuses and strategic recommendations
 layer: analytical
 leads_to: [campaign-manager, adset-manager, creative-manager, targeting-audiences, tracking-conversions]

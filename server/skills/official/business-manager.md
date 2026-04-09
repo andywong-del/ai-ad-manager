@@ -1,9 +1,7 @@
 ---
-
-## name: business-manager  
-description: Navigate Facebook Business Manager -- view businesses, ad accounts, pages, pixels, and team members with account health analysis  
-layer: analytical  
-leads_to: [campaign-manager, tracking-conversions, targeting-audiences, creative-manager]
+name: Business Manager
+description: Navigate Facebook Business Manager — view businesses, ad accounts, pages, pixels, and team members with account health analysis
+---
 
 # Business Manager
 

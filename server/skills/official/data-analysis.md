@@ -1,5 +1,5 @@
 ---
-name: data-analysis
+name: Data Analysis
 description: Performance analysis, diagnostics, and business intelligence. Covers performance overview, cost diagnostics, capital loss detection, scaling opportunities, and business management.
 layer: analytical
 leads_to: [campaign-manager, adset-manager, creative-manager, targeting-audiences, tracking-conversions, automation-rules]

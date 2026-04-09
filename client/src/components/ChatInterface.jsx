@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
-import { Send, Square, Paperclip, CheckCircle2, XCircle, ArrowUpRight, BarChart3, Target, TrendingDown, Search, FileText, DollarSign, AlertTriangle, Zap, X, Upload, Image, Film, TrendingUp, ChevronRight, Shield, Sparkles, Download, Bookmark, ChevronDown, Link2, Building2, Check, ChevronLeft, Users } from 'lucide-react';
+import { Send, Square, Paperclip, CheckCircle2, XCircle, ArrowUpRight, BarChart3, Target, TrendingDown, Search, FileText, DollarSign, AlertTriangle, Zap, X, Upload, Image, Film, TrendingUp, ChevronRight, Shield, Sparkles, Download, Bookmark, ChevronDown, Link2, Building2, Check, ChevronLeft, Users, Plus } from 'lucide-react';
 import VideoAudienceCard from './VideoAudienceCard.jsx';
 import EngagementAudienceCard from './EngagementAudienceCard.jsx';
 import LookalikeAudienceCard from './LookalikeAudienceCard.jsx';
@@ -2012,8 +2012,9 @@ const SKILL_ICONS = {
   audience_strategist: Target,
 };
 
-const SkillsDropdown = ({ skills, activeSkill, onToggleSkill, onManageSkills, onClose }) => {
+const SkillsDropdown = ({ skills, activeSkill, onToggleSkill, onManageSkills, onClose, enabledSkillIds = [] }) => {
   const ref = useRef(null);
+  const [skillSearch, setSkillSearch] = useState('');
 
   useEffect(() => {
     const handler = (e) => {
@@ -2023,35 +2024,65 @@ const SkillsDropdown = ({ skills, activeSkill, onToggleSkill, onManageSkills, on
     return () => document.removeEventListener('mousedown', handler);
   }, [onClose]);
 
-  // Flat list — no category grouping for compact dropdown
+  const enabledSkills = skills.filter(s => enabledSkillIds.includes(s.id));
+  const filtered = skillSearch
+    ? enabledSkills.filter(s => s.name.toLowerCase().includes(skillSearch.toLowerCase()) || s.id.includes(skillSearch.toLowerCase()))
+    : enabledSkills;
+
   return (
-    <div ref={ref} className="absolute bottom-full left-0 mb-2 w-[240px] bg-white border border-slate-200 rounded-xl shadow-xl shadow-slate-200/50 z-[100] overflow-hidden">
+    <div ref={ref} className="absolute bottom-full left-0 mb-2 w-[320px] bg-white border border-slate-200 rounded-2xl shadow-2xl shadow-slate-200/60 z-[100]">
+      {/* Search */}
+      <div className="px-3 pt-3 pb-2">
+        <div className="relative">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            value={skillSearch}
+            onChange={e => setSkillSearch(e.target.value)}
+            placeholder="Search Skills"
+            className="w-full pl-9 pr-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-[13px] text-slate-700 placeholder-slate-400 outline-none focus:border-indigo-300 focus:bg-white transition-colors"
+            autoFocus
+          />
+        </div>
+      </div>
+
       {/* Skill list */}
-      <div className="max-h-[320px] overflow-y-auto py-1">
-        {skills.filter(s => !s.isDefault).length === 0 ? (
+      <div className="max-h-[260px] overflow-y-auto px-1.5 pb-1.5">
+        {filtered.length === 0 ? (
           <div className="px-3 py-4 text-center">
-            <p className="text-[12px] text-slate-400">No custom strategies yet</p>
-            <p className="text-[11px] text-slate-400 mt-1">Create one from the Skills Library</p>
+            <p className="text-[12px] text-slate-400">{skillSearch ? 'No matching skills' : 'No enabled skills'}</p>
+            <p className="text-[11px] text-slate-400 mt-1">{skillSearch ? 'Try a different search' : 'Enable skills from the Skills Library'}</p>
           </div>
-        ) : skills.filter(s => !s.isDefault).map(skill => {
+        ) : filtered.map(skill => {
           const isActive = activeSkill?.id === skill.id;
+          const isOfficial = skill.isDefault;
           return (
             <button key={skill.id} onClick={() => { onToggleSkill(skill.id); onClose(); }}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors ${isActive ? 'bg-indigo-50' : 'hover:bg-slate-50'}`}>
-              <Sparkles size={14} className={isActive ? 'text-indigo-500' : 'text-slate-400'} />
-              <span className={`text-[13px] font-medium flex-1 truncate ${isActive ? 'text-indigo-700' : 'text-slate-700'}`}>{skill.name}</span>
-              {isActive && <CheckCircle2 size={14} className="text-indigo-500 shrink-0" />}
+              className={`w-full flex items-start gap-2.5 px-3 py-2.5 rounded-xl text-left transition-colors ${isActive ? 'bg-indigo-50' : 'hover:bg-slate-50'}`}>
+              <Sparkles size={14} className={`mt-0.5 shrink-0 ${isActive ? 'text-indigo-500' : 'text-slate-400'}`} />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className={`text-[13px] font-semibold truncate ${isActive ? 'text-indigo-700' : 'text-slate-700'}`}>{skill.name}</span>
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${isOfficial ? 'bg-slate-100 text-slate-500' : 'bg-indigo-50 text-indigo-500'}`}>
+                    {isOfficial ? 'Official' : 'Custom'}
+                  </span>
+                </div>
+                {skill.description && (
+                  <p className="text-[11px] text-slate-400 truncate mt-0.5">{skill.description}</p>
+                )}
+              </div>
+              {isActive && <CheckCircle2 size={14} className="text-indigo-500 shrink-0 mt-0.5" />}
             </button>
           );
         })}
       </div>
+
       {/* Footer */}
       {onManageSkills && (
-        <div className="border-t border-slate-100 px-3 py-2">
+        <div className="border-t border-slate-100 px-3 py-2.5">
           <button onClick={() => { onManageSkills(null); onClose(); }}
             className="w-full flex items-center gap-2 px-1 py-1 text-[12px] font-medium text-slate-500 hover:text-indigo-600 transition-colors rounded-lg">
             <Sparkles size={12} />
-            Manage Experts...
+            Manage Skills
           </button>
         </div>
       )}
@@ -2267,14 +2298,15 @@ const useSuggestedSkill = (input, skills, activeSkill, slashSkills) => {
   return null;
 };
 
-const ChatInput = ({ input, setInput, onKeyDown, onSend, onStop, onFilesAdded, attachments, onRemoveAttachment, fileRef, isTyping, handleFileUpload, isOver, activeSkill, onDeactivateSkill, skills = [], onSlashSelect, slashSkills = [], onRemoveSlashSkill, onClearAllSlash, onToggleSkill, onManageSkills, token, onLogin, onLogout, isLoginLoading, loginError, selectedAccount, selectedBusiness, onSelectAccount }) => {
+const ChatInput = ({ input, setInput, onKeyDown, onSend, onStop, onFilesAdded, attachments, onRemoveAttachment, fileRef, isTyping, handleFileUpload, isOver, activeSkill, onDeactivateSkill, skills = [], onSlashSelect, slashSkills = [], onRemoveSlashSkill, onClearAllSlash, onToggleSkill, onManageSkills, token, onLogin, onLogout, isLoginLoading, loginError, selectedAccount, selectedBusiness, onSelectAccount, enabledSkillIds = [] }) => {
   const [skillsOpen, setSkillsOpen] = useState(false);
+  const [plusMenuOpen, setPlusMenuOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   // Slash command detection — show picker when input starts with "/"
   const showSlash = input.startsWith('/');
   const slashFilter = showSlash ? input.slice(1).trim() : '';
   const filteredSkills = showSlash ? skills.filter(s =>
-    !s.isDefault && // only show custom strategies, not built-in skills
+    enabledSkillIds.includes(s.id) && // only show enabled skills from dashboard
     !slashSkills.find(ss => ss.id === s.id) && // hide already-selected
     (!slashFilter || s.name.toLowerCase().includes(slashFilter.toLowerCase()) || s.id.includes(slashFilter.toLowerCase()))
   ) : [];
@@ -2287,6 +2319,10 @@ const ChatInput = ({ input, setInput, onKeyDown, onSend, onStop, onFilesAdded, a
   const handleChange = (e) => {
     setInput(e.target.value);
     setSlashIndex(0);
+    // Auto-grow textarea
+    const el = e.target;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 160) + 'px'; // max ~7 rows
   };
 
   const handleSlashKeyDown = (e) => {
@@ -2360,31 +2396,54 @@ const ChatInput = ({ input, setInput, onKeyDown, onSend, onStop, onFilesAdded, a
             value={input}
             onChange={(e) => { handleChange(e); if (dismissedSuggestion) setDismissedSuggestion(null); }}
             onKeyDown={handleSlashKeyDown}
-            placeholder={slashSkills.length ? 'Type your message...' : activeSkill ? `Ask with ${activeSkill.name} active...` : attachments.length ? 'Describe what to do with these files...' : 'Ask anything about your ads... (type / for experts)'}
+            placeholder={slashSkills.length ? 'Type your message...' : activeSkill ? `Ask with ${activeSkill.name} active...` : attachments.length ? 'Describe what to do with these files...' : 'Manage ads, create skills, analyze performance... (type / for skills)'}
             rows={1}
             disabled={isTyping}
-            className="w-full resize-none text-sm bg-transparent text-slate-800 placeholder:text-slate-400 focus:outline-none disabled:text-slate-400 max-h-32 overflow-y-auto"
-            style={{ lineHeight: '1.5' }}
+            className="w-full resize-none text-sm bg-transparent text-slate-800 placeholder:text-slate-400 focus:outline-none disabled:text-slate-400 overflow-y-auto"
+            style={{ lineHeight: '1.5', maxHeight: '160px' }}
           />
         </div>
         <div className="px-4 pb-3 flex items-center justify-between">
           <div className="relative flex items-center gap-2">
-            <button onClick={() => setSkillsOpen(!skillsOpen)}
-              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors relative ${skillsOpen ? 'text-indigo-600 bg-indigo-50' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`}
-              title="Experts">
-              <Sparkles size={16} />
+            {/* + Menu: files & skills */}
+            <button onClick={() => { setPlusMenuOpen(!plusMenuOpen); setSkillsOpen(false); }}
+              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors relative ${plusMenuOpen || skillsOpen ? 'text-indigo-600 bg-indigo-50' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`}
+              title="Add">
+              <Plus size={16} />
               {activeSkill && <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-indigo-500 ring-2 ring-white" />}
             </button>
-            {skillsOpen && (
-              <SkillsDropdown skills={skills} activeSkill={activeSkill} onToggleSkill={onToggleSkill} onManageSkills={onManageSkills} onClose={() => setSkillsOpen(false)} />
+            <input ref={fileRef} type="file" accept="image/*,video/*,.pdf,.txt,.doc,.docx" multiple className="hidden" onChange={handleFileUpload} />
+
+            {/* Plus menu dropdown */}
+            {plusMenuOpen && !skillsOpen && (
+              <>
+                <div className="fixed inset-0 z-[90]" onClick={() => setPlusMenuOpen(false)} />
+                <div className="absolute bottom-full left-0 mb-2 w-[220px] bg-white border border-slate-200 rounded-2xl shadow-2xl shadow-slate-200/60 z-[100] py-1.5">
+                  <button onClick={() => { setPlusMenuOpen(false); fileRef.current?.click(); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-slate-700 hover:bg-slate-50 rounded-lg">
+                    <Paperclip size={15} className="text-slate-400" />
+                    Add from local files
+                  </button>
+                  <button onClick={() => { setPlusMenuOpen(false); setSkillsOpen(true); }}
+                    className="w-full flex items-center justify-between px-4 py-2.5 text-[13px] text-slate-700 hover:bg-slate-50 rounded-lg">
+                    <span className="flex items-center gap-2.5">
+                      <Sparkles size={15} className="text-slate-400" />
+                      Use Skills
+                    </span>
+                    <ChevronRight size={14} className="text-slate-300" />
+                  </button>
+                </div>
+              </>
             )}
+
+            {/* Skills dropdown */}
+            {skillsOpen && (
+              <SkillsDropdown skills={skills} activeSkill={activeSkill} onToggleSkill={onToggleSkill} onManageSkills={onManageSkills} onClose={() => { setSkillsOpen(false); setPlusMenuOpen(false); }} enabledSkillIds={enabledSkillIds} />
+            )}
+
             <AccountConnector token={token} onLogin={onLogin} onLogout={onLogout} isLoginLoading={isLoginLoading} loginError={loginError} selectedAccount={selectedAccount} selectedBusiness={selectedBusiness} onSelectAccount={onSelectAccount} />
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => fileRef.current?.click()} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
-              <Paperclip size={16} />
-            </button>
-            <input ref={fileRef} type="file" accept="image/*,video/*,.pdf,.txt,.doc,.docx" multiple className="hidden" onChange={handleFileUpload} />
             {isTyping ? (
               <button onClick={onStop}
                 className="w-8 h-8 rounded-lg bg-red-500 hover:bg-red-400 text-white flex items-center justify-center transition-colors shadow-sm"
@@ -2409,17 +2468,38 @@ const ChatInput = ({ input, setInput, onKeyDown, onSend, onStop, onFilesAdded, a
 };
 
 // ── Main component ────────────────────────────────────────────────────────────
-export const ChatInterface = ({ messages, isTyping, thinkingText, activityLog = [], onSend, onStop, suggestedActions = [], cardCategories = [], quickChips = [], adAccountId, onSaveItem, folders = [], activeSkill = null, onDeactivateSkill, skills = [], onToggleSkill, onManageSkills, onNavigate, onOpenCanvas, token, onLogin, onLogout, isLoginLoading, loginError, selectedAccount, selectedBusiness, onSelectAccount }) => {
+export const ChatInterface = ({ messages, isTyping, thinkingText, activityLog = [], onSend, onStop, suggestedActions = [], cardCategories = [], quickChips = [], adAccountId, onSaveItem, folders = [], activeSkill = null, onDeactivateSkill, skills = [], onToggleSkill, onManageSkills, onNavigate, onOpenCanvas, token, onLogin, onLogout, isLoginLoading, loginError, selectedAccount, selectedBusiness, onSelectAccount, initialInput, initialSlashSkill, enabledSkillIds = [] }) => {
   const [input, setInput] = useState('');
+
+  // Pre-fill input from parent (e.g. "Build with AI Ad Manager")
+  const [consumedInput, setConsumedInput] = useState(null);
+  useEffect(() => {
+    if (initialInput && initialInput !== consumedInput) {
+      setInput(initialInput);
+      setConsumedInput(initialInput);
+      // Focus the input
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  }, [initialInput, consumedInput]);
   const [attachments, setAttachments] = useState([]); // { id, file, preview, status, progress, result }
   const [isDragOver, setIsDragOver] = useState(false);
   const [fileError, setFileError] = useState(null); // validation error toast
   const [slashSkills, setSlashSkills] = useState([]); // multiple one-off skills from /command
+
+  // Pre-fill slash skill from parent (e.g. "Try it out" from Skills Library)
+  const [consumedSlash, setConsumedSlash] = useState(null);
+  useEffect(() => {
+    if (initialSlashSkill && initialSlashSkill.id !== consumedSlash) {
+      setSlashSkills(prev => prev.find(s => s.id === initialSlashSkill.id) ? prev : [...prev, initialSlashSkill]);
+      setConsumedSlash(initialSlashSkill.id);
+    }
+  }, [initialSlashSkill, consumedSlash]);
   const endRef   = useRef(null);
   const inputRef = useRef(null);
   const fileRef  = useRef(null);
   const lastId   = messages[messages.length - 1]?.id;
-  const isEmptyState = messages.length <= 1;
+  // Empty state: no messages, or only the old welcome message
+  const isEmptyState = messages.length === 0 || (messages.length === 1 && messages[0].id === 'welcome');
   const dragCounter = useRef(0);
 
   // Upload a single file to Meta via our bulk-upload endpoint
@@ -2622,6 +2702,13 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, activityLog = 
       return;
     }
 
+    // Intercept common navigation phrases from AI quick replies
+    const lc = t.toLowerCase();
+    if (lc.includes('go to skills library') || lc.includes('skills library') && lc.length < 30) {
+      if (onNavigate) onNavigate('skills');
+      return;
+    }
+
     const doneAttachments = attachments.filter(a => a.status === 'done');
 
     if (!t && !doneAttachments.length) return;
@@ -2718,11 +2805,11 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, activityLog = 
       {/* Empty State */}
       {isEmptyState && (
         <div className="flex-1 flex flex-col px-8 overflow-y-auto">
-          <div className="flex-[0_0_18%]" />
-
+          <div className="flex-[2]" />
           <div className="w-full max-w-2xl mx-auto">
+
             <h1 className="text-3xl font-extrabold text-slate-900 mb-6 text-center tracking-tight">
-              What would you like to know?
+              What can I help you optimize today?
             </h1>
             <ChatInput
               input={input} setInput={setInput} onKeyDown={handleKeyDown}
@@ -2731,7 +2818,7 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, activityLog = 
               fileRef={fileRef} isTyping={isTyping}
               handleFileUpload={handleFileInput} isOver={isDragOver}
               activeSkill={activeSkill} onDeactivateSkill={onDeactivateSkill}
-              skills={skills} onSlashSelect={handleSlashSelect} slashSkills={slashSkills} onRemoveSlashSkill={handleRemoveSlashSkill} onClearAllSlash={() => setSlashSkills([])}
+              skills={skills} onSlashSelect={handleSlashSelect} slashSkills={slashSkills} onRemoveSlashSkill={handleRemoveSlashSkill} onClearAllSlash={() => setSlashSkills([])} enabledSkillIds={enabledSkillIds}
               onToggleSkill={onToggleSkill} onManageSkills={onManageSkills}
               token={token} onLogin={onLogin} onLogout={onLogout} isLoginLoading={isLoginLoading} loginError={loginError} selectedAccount={selectedAccount} selectedBusiness={selectedBusiness} onSelectAccount={onSelectAccount}
             />
@@ -2759,6 +2846,7 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, activityLog = 
               </div>
             )}
           </div>
+          <div className="flex-[3]" />
         </div>
       )}
 
@@ -2803,7 +2891,7 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, activityLog = 
                 fileRef={fileRef} isTyping={isTyping}
                 handleFileUpload={handleFileInput} isOver={isDragOver}
                 activeSkill={activeSkill} onDeactivateSkill={onDeactivateSkill}
-                skills={skills} onSlashSelect={handleSlashSelect} slashSkills={slashSkills} onRemoveSlashSkill={handleRemoveSlashSkill} onClearAllSlash={() => setSlashSkills([])}
+                skills={skills} onSlashSelect={handleSlashSelect} slashSkills={slashSkills} onRemoveSlashSkill={handleRemoveSlashSkill} onClearAllSlash={() => setSlashSkills([])} enabledSkillIds={enabledSkillIds}
                 onToggleSkill={onToggleSkill} onManageSkills={onManageSkills}
                 token={token} onLogin={onLogin} isLoginLoading={isLoginLoading} loginError={loginError} selectedAccount={selectedAccount} selectedBusiness={selectedBusiness} onSelectAccount={onSelectAccount}
               />

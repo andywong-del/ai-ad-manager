@@ -6,9 +6,12 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import * as meta from '../services/metaClient.js';
 import { activeSessions } from './sessionBus.js';
+import { supabase } from './supabase.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const SKILLS_DIR = path.resolve(__dirname, '../../skills/default');
+const SKILLS_BASE = path.resolve(__dirname, '../../skills');
+const OFFICIAL_SKILLS_DIR = path.join(SKILLS_BASE, 'official');
+const SYSTEM_SKILLS_DIR = path.join(SKILLS_BASE, 'system');
 
 // ── Goal → Action Type mapping (source of truth for benchmark computation) ──
 const GOAL_ACTION_MAP = {
@@ -1175,6 +1178,21 @@ const obj = (props, required) => ({ type: 'object', properties: props, ...(requi
 const str = (desc) => ({ type: 'string', description: desc });
 const num = (desc) => ({ type: 'number', description: desc });
 
+// ── Helpers for per-user skill resolution ────────────────────────────────────
+const _fbUserCache = new Map();
+const resolveFbUserId = async (context) => {
+  const token = context.state?.get?.('token');
+  if (!token) return null;
+  if (_fbUserCache.has(token)) return _fbUserCache.get(token);
+  try {
+    const { data } = await axios.get(`https://graph.facebook.com/v25.0/me?fields=id&access_token=${token}`);
+    if (data?.id) { _fbUserCache.set(token, data.id); return data.id; }
+  } catch {}
+  return null;
+};
+
+// Custom skills now stored in Supabase (no filesystem)
+
 const adTools = [
   // ── Campaigns ───────────────────────────────────────────────────────────
   T('get_campaigns', 'List all campaigns with last 7 days performance (spend, impressions, clicks, objective). For analytics, use get_object_insights with level="campaign" instead — it returns optimization_goal pre-joined in each row.', getCampaigns),
@@ -1425,41 +1443,66 @@ const adTools = [
     obj({ campaign_id: str('Campaign ID to validate') }, ['campaign_id'])),
 
   // ── Skill Loader ──────────────────────────────────────────────────────
-  T('load_skill', 'Load a skill\'s detailed workflow guidance. Call this BEFORE executing complex flows like campaign creation, audience creation, report generation, etc. The skill contains step-by-step instructions, API formats, and best practices. Available pipeline skills: campaign-setup, creative-assembly, ad-launcher. Available operational skills: campaign-manager, targeting-audiences, creative-manager, insights-reporting, ad-manager, adset-manager, tracking-conversions, automation-rules, business-manager, lead-ads, product-catalogs.',
+  T('load_skill', 'Load a skill\'s detailed workflow guidance. Call this BEFORE executing complex flows like campaign creation, audience creation, report generation, etc. Available skills: campaign-setup, creative-assembly, ad-launcher, campaign-creation, audience-creation, campaign-manager, targeting-audiences, creative-manager, insights-reporting, data-analysis, ad-manager, adset-manager, tracking-conversions, automation-rules, business-manager, lead-ads, product-catalogs, skill-creator, bulk-campaign-setup.',
     async (_args, context) => {
       const { skill_name } = _args;
+      const fbUserId = await resolveFbUserId(context);
 
-      // Check if user has an active custom strategy skill — overrides analytical skills
+      // 1. Check Supabase for custom skill override
       const customOverride = context.state?.get?.('activeCustomSkill');
-      if (customOverride) {
-        try {
-          const customPath = path.join(SKILLS_DIR, 'custom', `${customOverride}.md`);
-          const content = await fs.readFile(customPath, 'utf-8');
-          const body = content.replace(/^---\n[\s\S]*?\n---\n?/, '').trim();
-          return { skill: customOverride, layer: 'custom', content: body, overrides: skill_name };
-        } catch { /* custom skill not found, fall through to defaults */ }
+      if (customOverride && supabase && fbUserId) {
+        const { data } = await supabase.from('custom_skills').select('content').eq('id', customOverride).eq('fb_user_id', fbUserId).single();
+        if (data?.content) return { skill: customOverride, layer: 'custom', content: data.content, overrides: skill_name };
       }
 
-      // Search across all layer subfolders including pipeline
-      for (const layer of ['pipeline', 'analytical', 'strategic', 'operational']) {
+      // 2. Check Supabase for user's custom skill by name
+      if (supabase && fbUserId) {
+        const { data } = await supabase.from('custom_skills').select('content').eq('id', skill_name).eq('fb_user_id', fbUserId).single();
+        if (data?.content) return { skill: skill_name, layer: 'custom', content: data.content };
+      }
+
+      // 3. Search official + system .md files
+      for (const dir of [OFFICIAL_SKILLS_DIR, SYSTEM_SKILLS_DIR]) {
         try {
-          const filepath = path.join(SKILLS_DIR, layer, `${skill_name}.md`);
+          const filepath = path.join(dir, `${skill_name}.md`);
           const content = await fs.readFile(filepath, 'utf-8');
           const body = content.replace(/^---\n[\s\S]*?\n---\n?/, '').trim();
-          return { skill: skill_name, layer, content: body };
-        } catch { /* try next layer */ }
+          return { skill: skill_name, layer: dir === OFFICIAL_SKILLS_DIR ? 'official' : 'system', content: body };
+        } catch { /* try next */ }
       }
-      // Fallback: flat file in SKILLS_DIR
-      try {
-        const filepath = path.join(SKILLS_DIR, `${skill_name}.md`);
-        const content = await fs.readFile(filepath, 'utf-8');
-        const body = content.replace(/^---\n[\s\S]*?\n---\n?/, '').trim();
-        return { skill: skill_name, content: body };
-      } catch {
-        return { error: `Skill "${skill_name}" not found. Pipeline skills: campaign-setup, creative-assembly, ad-launcher. Operational skills: campaign-manager, targeting-audiences, creative-manager, insights-reporting, ad-manager, adset-manager, tracking-conversions, automation-rules, business-manager, lead-ads, product-catalogs` };
-      }
+
+      return { error: `Skill "${skill_name}" not found.` };
     },
-    obj({ skill_name: str('Skill ID to load, e.g. "campaign-setup", "creative-assembly", "ad-launcher", "campaign-manager", "insights-reporting"') }, ['skill_name'])),
+    obj({ skill_name: str('Skill ID to load') }, ['skill_name'])),
+
+  // ── Skill Creator ──────────────────────────────────────────────────────
+  T('create_skill',
+    'Create and save a new custom skill to the Skills Library (stored in database). The skill will appear in the user\'s Skills Library dashboard where they can enable/disable it or use it via slash commands.',
+    async (_args, context) => {
+      const { name, description, content, icon } = _args;
+      if (!name || !content) return { error: 'name and content are required' };
+      if (!supabase) return { error: 'Database not configured' };
+
+      const fbUserId = await resolveFbUserId(context) || '_anonymous';
+      const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+
+      // Check if exists
+      const { data: existing } = await supabase.from('custom_skills').select('id').eq('id', id).eq('fb_user_id', fbUserId).single();
+      if (existing) return { error: `A skill named "${name}" already exists` };
+
+      const { error } = await supabase.from('custom_skills').insert({
+        id, fb_user_id: fbUserId, name, description: description || '', content, icon: icon || 'sparkles', type: 'strategy',
+      });
+      if (error) return { error: error.message };
+
+      return { success: true, id, name, description: description || '', message: `Skill "${name}" saved! It's now available in the Skills Library. Toggle it on or use /${id} in chat.` };
+    },
+    obj({
+      name: str('Skill name (2-5 words)'),
+      description: str('One-sentence description of what the skill does'),
+      content: str('Full markdown content with instructions for the AI'),
+      icon: str('Icon key: sparkles, chart, target, users, palette, zap, dollar, trending'),
+    }, ['name', 'content'])),
 
   // ── Workflow Context ────────────────────────────────────────────────────
   T('get_workflow_context',
@@ -1602,7 +1645,9 @@ const rootTools = pick(
   'get_campaign_ad_sets', 'get_campaign_ads', 'get_ad_set_ads',
   'get_ad_account_details',
   // Shared
-  'get_workflow_context', 'update_workflow_context', 'load_skill'
+  'get_workflow_context', 'update_workflow_context', 'load_skill',
+  // Skill creation
+  'create_skill'
 );
 
 export { adTools, rootTools, analystTools, audienceTools, creativeTools, executorTools, technicalTools };

@@ -1,5 +1,5 @@
 ---
-name: targeting-audiences
+name: Targeting & Audiences
 description: Plan audience targeting strategies — custom audiences, lookalikes, saved audiences, and interest targeting with single-card creation UI
 layer: strategic
 depends_on: [insights-reporting]

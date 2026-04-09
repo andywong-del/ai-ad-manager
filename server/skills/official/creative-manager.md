@@ -1,5 +1,5 @@
 ---
-name: creative-manager
+name: Creative Manager
 description: Audit creative health — detect fatigue, analyze hook rates, recommend format pivots and copy refreshes
 layer: analytical
 depends_on: [insights-reporting]
