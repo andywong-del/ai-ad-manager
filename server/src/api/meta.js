@@ -157,10 +157,11 @@ router.get('/adaccounts/:id/campaigns-list', async (req, res, next) => {
 // Campaign tree: campaigns with insights for Campaign Manager module
 router.get('/adaccounts/:id/campaigns-tree', async (req, res, next) => {
   try {
-    const { limit, after } = req.query;
+    const { limit, after, date_preset } = req.query;
     const result = await metaClient.getCampaigns(req.token, req.params.id, {
       limit: limit ? parseInt(limit) : 20,
       after: after || undefined,
+      datePreset: date_preset || 'last_7d',
     });
     res.json(result);
   } catch (err) {
@@ -172,11 +173,12 @@ router.get('/adaccounts/:id/campaigns-tree', async (req, res, next) => {
 // Ad sets for a campaign (lazy-loaded when user expands)
 router.get('/campaigns/:id/adsets', async (req, res, next) => {
   try {
-    const { limit, after } = req.query;
+    const { limit, after, date_preset } = req.query;
+    const dp = date_preset || 'last_7d';
     const params = {
       access_token: req.token,
       limit: limit ? parseInt(limit) : 20,
-      fields: 'id,name,status,effective_status,daily_budget,lifetime_budget,optimization_goal,insights.date_preset(last_7d){spend,impressions,clicks,ctr,cpm,reach,frequency,actions,action_values,cost_per_action_type}',
+      fields: `id,name,status,effective_status,daily_budget,lifetime_budget,optimization_goal,insights.date_preset(${dp}){spend,impressions,clicks,ctr,cpm,reach,frequency,actions,action_values,cost_per_action_type}`,
     };
     if (after) params.after = after;
     const { data } = await metaClient.metaApi.get(`/${req.params.id}/adsets`, { params });
@@ -190,11 +192,12 @@ router.get('/campaigns/:id/adsets', async (req, res, next) => {
 // Ads for an ad set (lazy-loaded when user expands)
 router.get('/adsets/:id/ads', async (req, res, next) => {
   try {
-    const { limit, after } = req.query;
+    const { limit, after, date_preset } = req.query;
+    const dp = date_preset || 'last_7d';
     const params = {
       access_token: req.token,
       limit: limit ? parseInt(limit) : 20,
-      fields: 'id,name,status,effective_status,creative{id,thumbnail_url,image_url,video_id},insights.date_preset(last_7d){spend,impressions,clicks,ctr,cpm,reach,frequency,actions,action_values,cost_per_action_type}',
+      fields: `id,name,status,effective_status,creative{id,thumbnail_url,image_url,video_id},insights.date_preset(${dp}){spend,impressions,clicks,ctr,cpm,reach,frequency,actions,action_values,cost_per_action_type}`,
     };
     if (after) params.after = after;
     const { data } = await metaClient.metaApi.get(`/${req.params.id}/ads`, { params });

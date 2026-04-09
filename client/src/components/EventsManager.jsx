@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { Search, RefreshCw, Plus, Loader2, X, Activity, Radio, Clock, CheckCircle, AlertTriangle, XCircle, Zap, ChevronDown } from 'lucide-react';
+import { Search, RefreshCw, Plus, Loader2, X, Activity, Radio, Clock, CheckCircle, AlertTriangle, XCircle, Zap, ChevronDown, Copy, Check } from 'lucide-react';
 import { AccountSelector } from './AccountSelector.jsx';
 import api from '../services/api.js';
 
@@ -27,6 +27,23 @@ const PixelStatus = ({ pixel }) => {
 };
 
 // ── Pixel card ──
+const CopyCodeButton = ({ code }) => {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = (e) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(code).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+  return (
+    <button onClick={handleCopy}
+      className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-slate-500 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 rounded-md transition-colors">
+      {copied ? <><Check size={10} className="text-emerald-500" /><span className="text-emerald-600">Copied!</span></> : <><Copy size={10} /> Copy Code</>}
+    </button>
+  );
+};
+
 const PixelCard = ({ pixel, onViewStats, expanded, onToggle }) => (
   <div className="bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-md transition-all">
     <button onClick={onToggle} className="w-full px-5 py-4 flex items-start justify-between text-left">
@@ -59,7 +76,10 @@ const PixelCard = ({ pixel, onViewStats, expanded, onToggle }) => (
         </div>
         {pixel.code && (
           <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Pixel Code</p>
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pixel Code</p>
+              <CopyCodeButton code={pixel.code} />
+            </div>
             <pre className="text-[10px] text-slate-500 bg-slate-50 rounded-lg p-3 overflow-x-auto max-h-[100px] border border-slate-200">{pixel.code}</pre>
           </div>
         )}
@@ -137,9 +157,26 @@ const StatsModal = ({ pixelId, onClose }) => {
           ) : !stats || (Array.isArray(stats) && stats.length === 0) ? (
             <div className="py-12 text-center text-[13px] text-slate-400">No stats data available</div>
           ) : (
-            <pre className="text-[11px] text-slate-600 bg-slate-50 rounded-lg p-4 overflow-x-auto border border-slate-200 whitespace-pre-wrap">
-              {JSON.stringify(stats, null, 2)}
-            </pre>
+            <div className="border border-slate-200 rounded-lg overflow-hidden">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200">
+                    <th className="px-4 py-2.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Event</th>
+                    <th className="px-4 py-2.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider text-right">Count</th>
+                    <th className="px-4 py-2.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider text-right">Last Received</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(Array.isArray(stats) ? stats : stats.data || [stats]).map((row, i) => (
+                    <tr key={i} className={`border-b border-slate-100 last:border-0 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
+                      <td className="px-4 py-2.5 text-[12px] font-medium text-slate-700">{row.event || row.name || row.event_name || '—'}</td>
+                      <td className="px-4 py-2.5 text-[12px] text-slate-600 text-right font-mono">{row.count ?? row.value ?? '—'}</td>
+                      <td className="px-4 py-2.5 text-[12px] text-slate-500 text-right">{fmtDate(row.last_received || row.last_fired_time || row.timestamp)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </div>

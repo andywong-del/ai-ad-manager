@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
-import { Send, Square, Paperclip, CheckCircle2, XCircle, ArrowUpRight, BarChart3, Target, TrendingDown, Search, FileText, DollarSign, AlertTriangle, Zap, X, Upload, Image, Film, TrendingUp, ChevronRight, Shield, Sparkles, Download, Bookmark, ChevronDown, Link2, Building2, Check, ChevronLeft, Users, Plus } from 'lucide-react';
+import { Send, Square, Paperclip, CheckCircle2, XCircle, ArrowUpRight, BarChart3, Target, TrendingDown, Search, FileText, DollarSign, AlertTriangle, Zap, X, Upload, Image, Film, TrendingUp, ChevronRight, Shield, Sparkles, Download, Bookmark, ChevronDown, Link2, Building2, Check, ChevronLeft, Users, Plus, RefreshCw } from 'lucide-react';
 import VideoAudienceCard from './VideoAudienceCard.jsx';
 import EngagementAudienceCard from './EngagementAudienceCard.jsx';
 import LookalikeAudienceCard from './LookalikeAudienceCard.jsx';
@@ -1635,7 +1635,7 @@ const TableMessage = ({ message }) => (
 );
 
 // ── Attachment thumbnail chip ────────────────────────────────────────────────
-const AttachmentChip = ({ attachment, onRemove }) => {
+const AttachmentChip = ({ attachment, onRemove, onRetry }) => {
   const isImage = attachment.file?.type?.startsWith('image/');
   const isDoc = attachment.isDoc || attachment.file?.name?.match(/\.(pdf|txt|doc|docx)$/i);
   return (
@@ -1670,8 +1670,17 @@ const AttachmentChip = ({ attachment, onRemove }) => {
           </div>
         )}
         {attachment.status === 'error' && (
-          <div className="absolute bottom-1 right-1">
-            <XCircle size={14} className="text-red-500 bg-white rounded-full" />
+          <div className="absolute inset-0 bg-white/70 backdrop-blur-sm flex flex-col items-center justify-center">
+            <XCircle size={14} className="text-red-500" />
+            {onRetry && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onRetry(attachment); }}
+                className="mt-1 flex items-center gap-0.5 text-[9px] font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                title="Retry upload"
+              >
+                <RefreshCw size={10} /> Retry
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -1688,12 +1697,12 @@ const AttachmentChip = ({ attachment, onRemove }) => {
 };
 
 // ── Attachment bar (above input) ─────────────────────────────────────────────
-const AttachmentBar = ({ attachments, onRemove }) => {
+const AttachmentBar = ({ attachments, onRemove, onRetry }) => {
   if (!attachments.length) return null;
   return (
     <div className="flex gap-2 px-4 pt-3 pb-1 overflow-x-auto">
       {attachments.map((a) => (
-        <AttachmentChip key={a.id} attachment={a} onRemove={onRemove} />
+        <AttachmentChip key={a.id} attachment={a} onRemove={onRemove} onRetry={onRetry} />
       ))}
     </div>
   );
@@ -2281,21 +2290,32 @@ const AccountConnector = ({ token, onLogin, onLogout, isLoginLoading, loginError
 // ── Input box with drag & drop + slash commands ─────────────────────────────
 // Keyword-based skill suggestion — match user input against skill descriptions
 const useSuggestedSkill = (input, skills, activeSkill, slashSkills) => {
-  if (!input || input.startsWith('/') || input.length < 8 || activeSkill || slashSkills.length) return null;
-  const lower = input.toLowerCase();
-  const KEYWORD_MAP = {
-    performance_analyst: ['performance', 'roas', 'cpa', 'ctr', 'cpc', 'metrics', 'report', 'kpi', 'spend', 'impressions', 'clicks', 'conversions'],
-    creative_strategist: ['creative', 'ad copy', 'headline', 'fatigue', 'copy', 'variations', 'a/b test', 'design', 'image', 'video ad'],
-    budget_optimizer: ['budget', 'spend', 'allocat', 'scaling', 'scale up', 'cost', 'optimize budget', 'reallocat', 'waste'],
-    audience_strategist: ['audience', 'targeting', 'lookalike', 'overlap', 'retarget', 'custom audience', 'interest', 'demographic'],
-    inception_funnel_audit: ['funnel', 'tofu', 'mofu', 'bofu', 'awareness', 'consideration', 'conversion funnel', 'full funnel', 'audit'],
-  };
-  for (const [skillId, keywords] of Object.entries(KEYWORD_MAP)) {
-    if (keywords.some(kw => lower.includes(kw))) {
-      return skills.find(s => s.id === skillId) || null;
+  const [suggested, setSuggested] = useState(null);
+  useEffect(() => {
+    if (!input || input.startsWith('/') || input.length < 8 || activeSkill || slashSkills.length) {
+      setSuggested(null);
+      return;
     }
-  }
-  return null;
+    const timer = setTimeout(() => {
+      const lower = input.toLowerCase();
+      const KEYWORD_MAP = {
+        performance_analyst: ['performance', 'roas', 'cpa', 'ctr', 'cpc', 'metrics', 'report', 'kpi', 'spend', 'impressions', 'clicks', 'conversions'],
+        creative_strategist: ['creative', 'ad copy', 'headline', 'fatigue', 'copy', 'variations', 'a/b test', 'design', 'image', 'video ad'],
+        budget_optimizer: ['budget', 'spend', 'allocat', 'scaling', 'scale up', 'cost', 'optimize budget', 'reallocat', 'waste'],
+        audience_strategist: ['audience', 'targeting', 'lookalike', 'overlap', 'retarget', 'custom audience', 'interest', 'demographic'],
+        inception_funnel_audit: ['funnel', 'tofu', 'mofu', 'bofu', 'awareness', 'consideration', 'conversion funnel', 'full funnel', 'audit'],
+      };
+      for (const [skillId, keywords] of Object.entries(KEYWORD_MAP)) {
+        if (keywords.some(kw => lower.includes(kw))) {
+          setSuggested(skills.find(s => s.id === skillId) || null);
+          return;
+        }
+      }
+      setSuggested(null);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [input, skills, activeSkill, slashSkills]);
+  return suggested;
 };
 
 const ChatInput = ({ input, setInput, onKeyDown, onSend, onStop, onFilesAdded, attachments, onRemoveAttachment, fileRef, isTyping, handleFileUpload, isOver, activeSkill, activeSkills = [], onDeactivateSkill, skills = [], onSlashSelect, slashSkills = [], onRemoveSlashSkill, onClearAllSlash, onToggleSkill, onManageSkills, token, onLogin, onLogout, isLoginLoading, loginError, selectedAccount, selectedBusiness, onSelectAccount, enabledSkillIds = [], activeSkillIds }) => {
@@ -2351,7 +2371,7 @@ const ChatInput = ({ input, setInput, onKeyDown, onSend, onStop, onFilesAdded, a
     <div className="relative">
       <div className={`bg-white/80 backdrop-blur-xl border rounded-2xl shadow-lg shadow-slate-200/50 transition-all
         ${isOver ? 'border-blue-400 ring-2 ring-blue-100' : 'border-slate-200'}`}>
-        <AttachmentBar attachments={attachments} onRemove={onRemoveAttachment} />
+        <AttachmentBar attachments={attachments} onRemove={onRemoveAttachment} onRetry={uploadFile} />
         {/* Skill chips — shown above textarea */}
         {hasChips && (
           <div className="px-4 pt-3 pb-0 flex flex-wrap items-center gap-1.5">
@@ -2557,6 +2577,15 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, activityLog = 
     const files = Array.from(fileList);
     const isDoc = (f) => f.name.match(/\.(pdf|txt|doc|docx)$/i);
 
+    // ── File count limit ──────────────────────────────────────────────
+    const MAX_FILES = 10;
+    const currentCount = attachments.length;
+    if (currentCount + files.length > MAX_FILES) {
+      setFileError(`Maximum ${MAX_FILES} files per message (${currentCount} already attached)`);
+      setTimeout(() => setFileError(null), 6000);
+      return;
+    }
+
     // ── Format & size validation ──────────────────────────────────────
     const ALLOWED_IMAGE = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
     const ALLOWED_VIDEO = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska'];
@@ -2637,7 +2666,7 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, activityLog = 
         setAttachments(prev => prev.map(a => a.id === id ? { ...a, status: 'error', error: err.message } : a));
       }
     });
-  }, [uploadFile]);
+  }, [uploadFile, attachments]);
 
   const handleFileInput = useCallback((e) => {
     if (e.target.files?.length) addFiles(e.target.files);

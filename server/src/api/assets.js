@@ -112,6 +112,7 @@ router.post('/bulk-upload', async (req, res) => {
     const { adAccountId, files } = req.body;
     if (!adAccountId) return res.status(400).json({ error: 'adAccountId is required' });
     if (!files?.length) return res.status(400).json({ error: 'files array is required' });
+    if (files.length > 20) return res.status(413).json({ error: 'Maximum 20 files per upload' });
 
     const token = req.token;
     const results = [];

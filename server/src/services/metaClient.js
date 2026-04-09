@@ -122,11 +122,11 @@ export const getCampaignsList = async (token, adAccountId) => {
   return data?.data || [];
 };
 
-export const getCampaigns = async (token, adAccountId, { limit = 20, after } = {}) => {
+export const getCampaigns = async (token, adAccountId, { limit = 20, after, datePreset = 'last_7d' } = {}) => {
   const params = {
     access_token: token,
     limit,
-    fields: 'id,name,status,objective,daily_budget,lifetime_budget,insights.date_preset(last_7d){spend,impressions,clicks,ctr,cpm,actions,action_values,cost_per_action_type}',
+    fields: `id,name,status,objective,daily_budget,lifetime_budget,insights.date_preset(${datePreset}){spend,impressions,clicks,ctr,cpm,actions,action_values,cost_per_action_type}`,
   };
   if (after) params.after = after;
   const { data } = await metaApi.get(`/${adAccountId}/campaigns`, { params });

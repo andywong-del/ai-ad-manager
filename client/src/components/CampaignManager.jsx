@@ -48,15 +48,44 @@ const fmtBudget = (daily, lifetime) => {
   return '—';
 };
 
+// Map campaign objective to the primary action type and display label
+const OBJECTIVE_ACTION_MAP = {
+  'OUTCOME_SALES': { actionType: 'offsite_conversion.fb_pixel_purchase', label: 'Purchases' },
+  'OUTCOME_LEADS': { actionType: 'lead', label: 'Leads' },
+  'OUTCOME_ENGAGEMENT': { actionType: 'post_engagement', label: 'Engagements' },
+  'OUTCOME_AWARENESS': { actionType: 'reach', label: 'Reach' },
+  'OUTCOME_TRAFFIC': { actionType: 'link_click', label: 'Link Clicks' },
+  'OUTCOME_APP_PROMOTION': { actionType: 'app_install', label: 'App Installs' },
+  // Legacy objectives
+  'CONVERSIONS': { actionType: 'offsite_conversion.fb_pixel_purchase', label: 'Purchases' },
+  'LEAD_GENERATION': { actionType: 'lead', label: 'Leads' },
+  'LINK_CLICKS': { actionType: 'link_click', label: 'Link Clicks' },
+  'POST_ENGAGEMENT': { actionType: 'post_engagement', label: 'Engagements' },
+  'VIDEO_VIEWS': { actionType: 'video_view', label: 'ThruPlays' },
+  'REACH': { actionType: 'reach', label: 'Reach' },
+  'BRAND_AWARENESS': { actionType: 'reach', label: 'Reach' },
+  'APP_INSTALLS': { actionType: 'app_install', label: 'App Installs' },
+  'MESSAGES': { actionType: 'onsite_conversion.messaging_conversation_started_7d', label: 'Conversations' },
+  'PRODUCT_CATALOG_SALES': { actionType: 'offsite_conversion.fb_pixel_purchase', label: 'Purchases' },
+};
+
+const getResultLabel = (objective) => OBJECTIVE_ACTION_MAP[objective]?.label || 'Results';
+
 const extractMetrics = (item) => {
   const ins = item.insights?.data?.[0] || {};
   const actions = ins.actions || [];
   const actionValues = ins.action_values || [];
   const costPerAction = ins.cost_per_action_type || [];
-  const resultAction = actions.find(a => a.action_type === 'offsite_conversion.fb_pixel_purchase')
-    || actions.find(a => a.action_type === 'offsite_conversion.fb_pixel_view_content')
-    || actions.find(a => a.action_type === 'link_click')
-    || actions[0];
+
+  // Use objective to find the right action type
+  const objective = item.objective;
+  const mapped = OBJECTIVE_ACTION_MAP[objective];
+  const resultAction = mapped
+    ? actions.find(a => a.action_type === mapped.actionType) || actions[0]
+    : actions.find(a => a.action_type === 'offsite_conversion.fb_pixel_purchase')
+      || actions.find(a => a.action_type === 'link_click')
+      || actions[0];
+
   const resultValue = actionValues.find(a => a.action_type === resultAction?.action_type);
   const resultCpa = costPerAction.find(a => a.action_type === resultAction?.action_type);
   const roas = resultValue && ins.spend ? (Number(resultValue.value) / Number(ins.spend)).toFixed(1) + 'x' : null;
@@ -265,6 +294,9 @@ export const CampaignManager = ({ adAccountId, onBack, onSendToChat, token, onLo
   const [selectedCampaign, setSelectedCampaign] = useState(null); // for filtering ad sets
   const [selectedAdSet, setSelectedAdSet] = useState(null); // for filtering ads
 
+  // Date range
+  const [datePreset, setDatePreset] = useState('last_7d');
+
   // Data
   const [campaigns, setCampaigns] = useState([]);
   const [adSets, setAdSets] = useState([]);
@@ -279,7 +311,7 @@ export const CampaignManager = ({ adAccountId, onBack, onSendToChat, token, onLo
   const [loadingMore, setLoadingMore] = useState(false);
 
   // Normalize
-  const normCampaign = (c) => ({ ...c, _active: c.status === 'ACTIVE', _status: mapStatus(c.status, c.effective_status), _budget: fmtBudget(c.daily_budget, c.lifetime_budget), _metrics: extractMetrics(c), _level: 'campaign' });
+  const normCampaign = (c) => ({ ...c, _active: c.status === 'ACTIVE', _status: mapStatus(c.status, c.effective_status), _budget: fmtBudget(c.daily_budget, c.lifetime_budget), _metrics: extractMetrics(c), _level: 'campaign', _resultLabel: getResultLabel(c.objective) });
   const normAdSet = (as) => ({ ...as, _active: as.status === 'ACTIVE', _status: mapStatus(as.status, as.effective_status), _budget: fmtBudget(as.daily_budget, as.lifetime_budget), _metrics: extractMetrics(as), _level: 'adset', _campaignName: as._campaignName });
   const normAd = (ad) => ({ ...ad, _active: ad.status === 'ACTIVE', _status: mapStatus(ad.status, ad.effective_status), _budget: '—', _metrics: extractMetrics(ad), _level: 'ad', thumbnail: ad.creative?.thumbnail_url || ad.creative?.image_url || null });
 
@@ -288,7 +320,7 @@ export const CampaignManager = ({ adAccountId, onBack, onSendToChat, token, onLo
     if (!adAccountId) return;
     if (after) setLoadingMore(true); else { setLoading(true); setError(null); }
     try {
-      const params = { limit: 20 };
+      const params = { limit: 20, date_preset: datePreset };
       if (after) params.after = after;
       const { data } = await api.get(`/meta/adaccounts/${adAccountId}/campaigns-tree`, { params });
       const items = (data.data || []).map(normCampaign);
@@ -301,14 +333,14 @@ export const CampaignManager = ({ adAccountId, onBack, onSendToChat, token, onLo
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [adAccountId]);
+  }, [adAccountId, datePreset]);
 
   // Fetch ad sets for a campaign (paginated)
   const fetchAdSets = useCallback(async (campaignId, after) => {
     if (!campaignId) return;
     if (after) setLoadingMore(true); else { setLoading(true); setError(null); }
     try {
-      const params = { limit: 20 };
+      const params = { limit: 20, date_preset: datePreset };
       if (after) params.after = after;
       const { data } = await api.get(`/meta/campaigns/${campaignId}/adsets`, { params });
       const campaign = campaigns.find(c => c.id === campaignId);
@@ -322,14 +354,14 @@ export const CampaignManager = ({ adAccountId, onBack, onSendToChat, token, onLo
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [campaigns]);
+  }, [campaigns, datePreset]);
 
   // Fetch ads for an ad set (paginated)
   const fetchAds = useCallback(async (adSetId, after) => {
     if (!adSetId) return;
     if (after) setLoadingMore(true); else { setLoading(true); setError(null); }
     try {
-      const params = { limit: 20 };
+      const params = { limit: 20, date_preset: datePreset };
       if (after) params.after = after;
       const { data } = await api.get(`/meta/adsets/${adSetId}/ads`, { params });
       const items = (data.data || []).map(normAd);
@@ -342,7 +374,7 @@ export const CampaignManager = ({ adAccountId, onBack, onSendToChat, token, onLo
       setLoading(false);
       setLoadingMore(false);
     }
-  }, []);
+  }, [datePreset]);
 
   useEffect(() => { fetchCampaigns(); }, [fetchCampaigns]);
 
@@ -551,6 +583,18 @@ export const CampaignManager = ({ adAccountId, onBack, onSendToChat, token, onLo
   const pausedCount = currentData.filter(c => !c._active).length;
   const levelLabel = activeTab === 'campaigns' ? 'Campaign' : activeTab === 'adsets' ? 'Ad Set' : 'Ad';
 
+  // Compute the most common result label among visible campaigns for dynamic column headers
+  const dynamicResultLabel = useMemo(() => {
+    if (activeTab !== 'campaigns' || filtered.length === 0) return null;
+    const counts = {};
+    filtered.forEach(item => {
+      const label = item._resultLabel || 'Results';
+      counts[label] = (counts[label] || 0) + 1;
+    });
+    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    return sorted[0]?.[0] || null;
+  }, [filtered, activeTab]);
+
   return (
     <div className="flex-1 flex flex-col h-full bg-slate-50/50">
       {/* Header */}
@@ -661,6 +705,18 @@ export const CampaignManager = ({ adAccountId, onBack, onSendToChat, token, onLo
             </button>
           ))}
         </div>
+        <select value={datePreset} onChange={e => { setDatePreset(e.target.value); }}
+          className="px-2.5 py-2 rounded-lg border border-slate-200 bg-white text-[11px] font-medium text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+          <option value="today">Today</option>
+          <option value="yesterday">Yesterday</option>
+          <option value="last_3d">Last 3 Days</option>
+          <option value="last_7d">Last 7 Days</option>
+          <option value="last_14d">Last 14 Days</option>
+          <option value="last_30d">Last 30 Days</option>
+          <option value="this_month">This Month</option>
+          <option value="last_month">Last Month</option>
+          <option value="maximum">Lifetime</option>
+        </select>
         <div className="relative">
           <button onClick={() => setShowColumnDropdown(!showColumnDropdown)}
             className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-[11px] font-medium transition-all ${showColumnDropdown ? 'border-blue-300 bg-blue-50 text-blue-600' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'}`}>
@@ -716,10 +772,13 @@ export const CampaignManager = ({ adAccountId, onBack, onSendToChat, token, onLo
                   </th>
                   {columns.map(colId => {
                     const col = ALL_COLUMNS.find(c => c.id === colId);
+                    let label = col?.label;
+                    if (colId === 'results' && dynamicResultLabel) label = dynamicResultLabel;
+                    if (colId === 'cpa' && dynamicResultLabel) label = `Cost / ${dynamicResultLabel.replace(/s$/, '')}`;
                     return (
                       <th key={colId} onClick={() => handleSort(colId)}
                         className="py-2.5 px-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap cursor-pointer hover:text-slate-600 select-none">
-                        {col?.label} {sortKey === colId && <span className="ml-0.5">{sortDir === 'asc' ? '↑' : '↓'}</span>}
+                        {label} {sortKey === colId && <span className="ml-0.5">{sortDir === 'asc' ? '↑' : '↓'}</span>}
                       </th>
                     );
                   })}
