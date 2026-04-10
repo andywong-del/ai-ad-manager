@@ -236,27 +236,36 @@ const CreativeRow = ({ creative, onClick }) => {
 export const AdLibrary = ({ adAccountId, token, onLogin, onLogout, selectedAccount, selectedBusiness, onSelectAccount, onBack }) => {
   const [creatives, setCreatives] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [viewMode, setViewMode] = useState('grid');
   const [selectedCreative, setSelectedCreative] = useState(null);
+  const [paging, setPaging] = useState(null);
 
-  const fetchCreatives = useCallback(async () => {
+  const fetchCreatives = useCallback(async (after) => {
     if (!adAccountId) return;
-    setLoading(true);
-    setError(null);
+    if (after) setLoadingMore(true); else { setLoading(true); setError(null); }
     try {
-      const res = await api.get('/creatives', { params: { adAccountId } });
-      setCreatives(res.data || []);
+      const params = { adAccountId, limit: 24 };
+      if (after) params.after = after;
+      const res = await api.get('/creatives', { params });
+      const items = res.data?.data || res.data || [];
+      if (after) setCreatives(prev => [...prev, ...items]);
+      else setCreatives(items);
+      setPaging(res.data?.paging || null);
     } catch (err) {
       setError(err.response?.data?.error || err.message);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }, [adAccountId]);
 
   useEffect(() => { fetchCreatives(); }, [fetchCreatives]);
+
+  const hasMore = !!paging?.next;
 
   const filtered = useMemo(() => {
     let list = [...creatives];
@@ -372,6 +381,15 @@ export const AdLibrary = ({ adAccountId, token, onLogin, onLogout, selectedAccou
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+        {/* Load More */}
+        {hasMore && filtered.length > 0 && (
+          <div className="flex justify-center py-4">
+            <button onClick={() => fetchCreatives(paging?.cursors?.after)} disabled={loadingMore}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium text-slate-500 hover:bg-slate-100 border border-slate-200 transition-colors disabled:opacity-50">
+              {loadingMore ? <><Loader2 size={13} className="animate-spin" /> Loading...</> : 'Load More'}
+            </button>
           </div>
         )}
       </div>

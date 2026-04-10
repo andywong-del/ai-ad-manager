@@ -4,15 +4,21 @@ import * as metaClient from '../services/metaClient.js';
 const router = Router();
 
 
-// GET / - List ad creatives
+// GET / - List ad creatives (paginated)
 router.get('/', async (req, res) => {
   try {
-    const { adAccountId } = req.query;
+    const { adAccountId, limit, after } = req.query;
     if (!adAccountId) {
       return res.status(400).json({ error: 'adAccountId query parameter is required' });
     }
-    const creatives = await metaClient.getAdCreatives(req.token, adAccountId);
-    res.json(creatives);
+    const params = {
+      access_token: req.token,
+      limit: limit ? parseInt(limit) : 24,
+      fields: 'id,name,status,body,title,image_hash,image_url,video_id,object_story_spec,object_url,call_to_action_type,url_tags,asset_feed_spec,thumbnail_url',
+    };
+    if (after) params.after = after;
+    const { data } = await metaClient.metaApi.get(`/${adAccountId}/adcreatives`, { params });
+    res.json({ data: data?.data || [], paging: data?.paging || null });
   } catch (err) {
     const metaErr = err.response?.data?.error;
     console.error('[creatives] GET / error:', metaErr || err.message);

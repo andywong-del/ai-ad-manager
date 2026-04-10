@@ -1921,13 +1921,19 @@ const MessageBubble = ({ message, isLatest, onSend, isTyping, onSaveItem, folder
 
   // User message
   return (
-    <div className="flex items-end justify-end gap-3 mb-6">
+    <div className="flex items-end justify-end gap-3 mb-6 group">
       <div className="max-w-[75%]">
         <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-2xl rounded-br-sm px-4 py-3 text-sm leading-relaxed shadow-md shadow-blue-200/30">
           {message.attachments && <MessageAttachments attachments={message.attachments} />}
           {message.text}
         </div>
-        <p className="text-xs text-slate-400 mt-1 text-right mr-1">{fmtTime(message.timestamp)}</p>
+        <div className="flex items-center justify-end gap-2 mt-1 mr-1">
+          <button onClick={() => onSend(message.text)} title="Retry this message"
+            className="text-[10px] text-slate-300 hover:text-blue-500 transition-colors opacity-0 group-hover:opacity-100">
+            Retry
+          </button>
+          <p className="text-xs text-slate-400">{fmtTime(message.timestamp)}</p>
+        </div>
       </div>
     </div>
   );

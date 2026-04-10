@@ -40,7 +40,9 @@ router.post('/images', async (req, res) => {
 // DELETE /images - Delete ad image
 router.delete('/images', async (req, res) => {
   try {
-    const { adAccountId, hash } = req.body;
+    // Support both body and query params (some clients strip body from DELETE)
+    const adAccountId = req.body?.adAccountId || req.query?.adAccountId;
+    const hash = req.body?.hash || req.query?.hash;
     if (!adAccountId) return res.status(400).json({ error: 'adAccountId is required' });
     if (!hash) return res.status(400).json({ error: 'hash is required' });
 
@@ -100,6 +102,25 @@ router.get('/videos/:id/status', async (req, res) => {
   } catch (err) {
     const metaErr = err.response?.data?.error;
     console.error('[assets] GET /videos/:id/status error:', metaErr || err.message);
+    res.status(err.response?.status || 500).json({ error: metaErr?.message || err.message, code: metaErr?.code });
+  }
+});
+
+// DELETE /videos/:id - Delete ad video
+router.delete('/videos/:id', async (req, res) => {
+  try {
+    const { adAccountId } = req.query;
+    if (!adAccountId) return res.status(400).json({ error: 'adAccountId is required' });
+
+    // Meta doesn't have a direct video delete API — videos are managed at the ad level
+    // But we can try to delete via the video node
+    const { data } = await metaClient.metaApi.delete(`/${req.params.id}`, {
+      params: { access_token: req.token }
+    });
+    res.json(data);
+  } catch (err) {
+    const metaErr = err.response?.data?.error;
+    console.error('[assets] DELETE /videos/:id error:', metaErr || err.message);
     res.status(err.response?.status || 500).json({ error: metaErr?.message || err.message, code: metaErr?.code });
   }
 });
