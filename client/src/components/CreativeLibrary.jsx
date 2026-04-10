@@ -157,6 +157,8 @@ export const CreativeLibrary = ({ adAccountId, token, onLogin, onLogout, selecte
   const [previewAsset, setPreviewAsset] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [visibleCount, setVisibleCount] = useState(18);
+  const [deleteTarget, setDeleteTarget] = useState(null); // asset pending delete confirmation
+  const [deleteError, setDeleteError] = useState(null);
 
   const fetchAssets = useCallback(async () => {
     if (!adAccountId) return;
@@ -210,40 +212,58 @@ export const CreativeLibrary = ({ adAccountId, token, onLogin, onLogout, selecte
     else setSelectedIds(new Set(allAssets.map(a => a.id || a.hash)));
   }, [allAssets, selectedIds]);
 
-  const handleDelete = useCallback(async (asset) => {
-    if (!confirm(`Delete "${asset.name || asset.title}"? This cannot be undone.`)) return;
+  // Step 1: user clicks delete → set target. Step 2: confirm dialog → execute.
+  const handleDelete = useCallback((asset) => {
+    setDeleteTarget(asset);
+    setDeleteError(null);
+  }, []);
+
+  const confirmDelete = useCallback(async () => {
+    if (!deleteTarget) return;
+    const asset = deleteTarget;
     setDeleting(true);
+    setDeleteError(null);
     try {
       if (asset._type === 'image') {
-        await api.delete('/assets/images', { data: { adAccountId, hash: asset.hash } });
+        await api.delete('/assets/images', { params: { adAccountId, hash: asset.hash } });
         setImages(prev => prev.filter(i => i.hash !== asset.hash));
       } else {
         await api.delete(`/assets/videos/${asset.id}`, { params: { adAccountId } });
         setVideos(prev => prev.filter(v => v.id !== asset.id));
       }
       setSelectedIds(prev => { const n = new Set(prev); n.delete(asset.id || asset.hash); return n; });
+      setDeleteTarget(null);
     } catch (err) {
       console.error('Delete failed:', err);
+      setDeleteError(err.response?.data?.error || err.message || 'Delete failed');
     } finally {
       setDeleting(false);
     }
-  }, [adAccountId]);
+  }, [deleteTarget, adAccountId]);
 
-  const bulkDelete = useCallback(async () => {
-    if (!confirm(`Delete ${selectedIds.size} assets? This cannot be undone.`)) return;
+  const handleBulkDelete = useCallback(() => {
+    // Set a special bulk target
+    setDeleteTarget({ _bulk: true, count: selectedIds.size });
+    setDeleteError(null);
+  }, [selectedIds]);
+
+  const confirmBulkDelete = useCallback(async () => {
     setDeleting(true);
+    setDeleteError(null);
     try {
       const promises = [...selectedIds].map(id => {
         const img = images.find(i => i.hash === id);
-        if (img) return api.delete('/assets/images', { data: { adAccountId, hash: id } });
+        if (img) return api.delete('/assets/images', { params: { adAccountId, hash: id } });
         return api.delete(`/assets/videos/${id}`, { params: { adAccountId } });
       });
       await Promise.all(promises);
       setImages(prev => prev.filter(i => !selectedIds.has(i.hash)));
       setVideos(prev => prev.filter(v => !selectedIds.has(v.id)));
       setSelectedIds(new Set());
+      setDeleteTarget(null);
     } catch (err) {
       console.error('Bulk delete failed:', err);
+      setDeleteError(err.response?.data?.error || err.message || 'Bulk delete failed');
     } finally {
       setDeleting(false);
     }
@@ -283,7 +303,7 @@ export const CreativeLibrary = ({ adAccountId, token, onLogin, onLogout, selecte
       {selectedIds.size > 0 && (
         <div className="flex items-center gap-3 px-6 py-2.5 bg-pink-600 text-white shrink-0">
           <span className="text-[12px] font-semibold">{selectedIds.size} selected</span>
-          <button onClick={bulkDelete} disabled={deleting}
+          <button onClick={handleBulkDelete} disabled={deleting}
             className="flex items-center gap-1 px-3 py-1.5 text-[11px] font-medium bg-white/20 hover:bg-red-500/60 rounded-lg transition-colors ml-4">
             <Trash2 size={12} /> Delete
           </button>
@@ -417,6 +437,32 @@ export const CreativeLibrary = ({ adAccountId, token, onLogin, onLogout, selecte
 
       {/* Preview modal */}
       {previewAsset && <PreviewModal asset={previewAsset} onClose={() => setPreviewAsset(null)} />}
+
+      {/* Delete confirmation dialog */}
+      {deleteTarget && (
+        <>
+          <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40" onClick={() => setDeleteTarget(null)} />
+          <div className="fixed top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[360px] bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="px-5 pt-5 pb-3">
+              <h3 className="text-sm font-bold text-slate-900 mb-1">
+                {deleteTarget._bulk ? `Delete ${deleteTarget.count} assets?` : `Delete "${deleteTarget.name || deleteTarget.title || 'asset'}"?`}
+              </h3>
+              <p className="text-xs text-slate-500">This cannot be undone.</p>
+              {deleteError && (
+                <div className="mt-2 bg-red-50 border border-red-200 text-red-600 text-xs px-3 py-2 rounded-lg">{deleteError}</div>
+              )}
+            </div>
+            <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-slate-100">
+              <button onClick={() => { setDeleteTarget(null); setDeleteError(null); }}
+                className="px-4 py-2 rounded-lg text-xs font-medium text-slate-500 hover:bg-slate-50">Cancel</button>
+              <button onClick={deleteTarget._bulk ? confirmBulkDelete : confirmDelete} disabled={deleting}
+                className="px-4 py-2 rounded-lg text-xs font-semibold text-white bg-red-600 hover:bg-red-500 transition-colors disabled:opacity-50">
+                {deleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };
