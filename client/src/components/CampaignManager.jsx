@@ -195,24 +195,66 @@ const BudgetEditor = ({ value, onSave, onCancel }) => {
 // ── Column dropdown ──
 const ColumnDropdown = ({ columns, onSetColumns, onClose }) => {
   const [selected, setSelected] = useState(new Set(columns));
+  const [customTemplates, setCustomTemplates] = useState(getCustomTemplates);
+  const [savingName, setSavingName] = useState('');
+  const [showSave, setShowSave] = useState(false);
   const grouped = useMemo(() => {
     const g = {};
     ALL_COLUMNS.forEach(c => { (g[c.group] = g[c.group] || []).push(c); });
     return g;
   }, []);
   const toggle = (id) => setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  const handleSaveTemplate = () => {
+    if (!savingName.trim()) return;
+    const newTemplate = { id: `custom_${Date.now()}`, label: savingName.trim(), cols: [...selected] };
+    const updated = [...customTemplates, newTemplate];
+    setCustomTemplates(updated);
+    saveCustomTemplates(updated);
+    setSavingName('');
+    setShowSave(false);
+  };
+
+  const handleDeleteTemplate = (id) => {
+    const updated = customTemplates.filter(t => t.id !== id);
+    setCustomTemplates(updated);
+    saveCustomTemplates(updated);
+  };
+
   return (
     <div className="absolute top-full right-0 mt-1 z-30 bg-white rounded-2xl shadow-xl border border-slate-200 w-80 overflow-hidden" onClick={e => e.stopPropagation()}>
       <div className="px-4 pt-4 pb-2">
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Quick presets</p>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Templates</p>
         <div className="flex flex-wrap gap-1.5">
           {BUILT_IN_TEMPLATES.map(p => (
-            <button key={p.id} onClick={() => setSelected(new Set(p.cols))}
-              className="px-3 py-1.5 text-[11px] font-medium rounded-lg border border-slate-200 text-slate-500 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all">
+            <button key={p.id} onClick={() => setSelected(new Set(p.cols))} title={p.desc}
+              className={`px-3 py-1.5 text-[11px] font-medium rounded-lg border transition-all
+                ${[...selected].join(',') === p.cols.join(',') ? 'bg-blue-500 text-white border-blue-500' : 'border-slate-200 text-slate-500 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200'}`}>
               {p.label}
             </button>
           ))}
         </div>
+        {/* Custom templates */}
+        {customTemplates.length > 0 && (
+          <>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-3 mb-1.5">My Templates</p>
+            <div className="flex flex-wrap gap-1.5">
+              {customTemplates.map(t => (
+                <div key={t.id} className="flex items-center gap-0.5">
+                  <button onClick={() => setSelected(new Set(t.cols))}
+                    className={`px-3 py-1.5 text-[11px] font-medium rounded-l-lg border transition-all
+                      ${[...selected].join(',') === t.cols.join(',') ? 'bg-blue-500 text-white border-blue-500' : 'border-slate-200 text-slate-500 hover:bg-blue-50 hover:text-blue-600'}`}>
+                    {t.label}
+                  </button>
+                  <button onClick={() => handleDeleteTemplate(t.id)}
+                    className="px-1 py-1.5 text-[11px] rounded-r-lg border border-l-0 border-slate-200 text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors">
+                    <X size={10} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
       <div className="px-4 py-3 max-h-[280px] overflow-y-auto border-t border-slate-100">
         {Object.entries(grouped).map(([group, cols]) => (
@@ -230,12 +272,33 @@ const ColumnDropdown = ({ columns, onSetColumns, onClose }) => {
           </div>
         ))}
       </div>
-      <div className="px-4 py-3 border-t border-slate-100 flex justify-between items-center bg-slate-50/50">
-        <span className="text-[11px] text-slate-400">{selected.size} columns</span>
-        <div className="flex gap-2">
-          <button onClick={onClose} className="px-3 py-1.5 text-[11px] text-slate-500 hover:bg-slate-100 rounded-lg font-medium">Cancel</button>
-          <button onClick={() => { onSetColumns([...selected]); onClose(); }}
-            className="px-3 py-1.5 text-[11px] text-white bg-blue-500 hover:bg-blue-600 rounded-lg font-medium shadow-sm">Apply</button>
+      <div className="px-4 py-3 border-t border-slate-100 bg-slate-50/50">
+        {showSave ? (
+          <div className="flex items-center gap-2 mb-2">
+            <input autoFocus value={savingName} onChange={e => setSavingName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleSaveTemplate(); if (e.key === 'Escape') setShowSave(false); }}
+              placeholder="Template name..."
+              className="flex-1 px-2.5 py-1.5 text-[11px] border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
+            <button onClick={handleSaveTemplate} className="px-2.5 py-1.5 text-[11px] text-white bg-blue-500 hover:bg-blue-600 rounded-lg font-medium">Save</button>
+            <button onClick={() => setShowSave(false)} className="px-2 py-1.5 text-[11px] text-slate-400 hover:text-slate-600">
+              <X size={12} />
+            </button>
+          </div>
+        ) : null}
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-slate-400">{selected.size} columns</span>
+            {!showSave && (
+              <button onClick={() => setShowSave(true)} className="text-[11px] text-blue-500 hover:text-blue-600 font-medium">
+                Save as Template
+              </button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button onClick={onClose} className="px-3 py-1.5 text-[11px] text-slate-500 hover:bg-slate-100 rounded-lg font-medium">Cancel</button>
+            <button onClick={() => { onSetColumns([...selected]); onClose(); }}
+              className="px-3 py-1.5 text-[11px] text-white bg-blue-500 hover:bg-blue-600 rounded-lg font-medium shadow-sm">Apply</button>
+          </div>
         </div>
       </div>
     </div>
@@ -817,7 +880,14 @@ export const CampaignManager = ({ adAccountId, onBack, onSendToChat, token, onLo
         </div>
         {/* Objective filter (campaigns tab only) */}
         {activeTab === 'campaigns' && availableObjectives.length > 1 && (
-          <select value={objectiveFilter} onChange={e => setObjectiveFilter(e.target.value)}
+          <select value={objectiveFilter} onChange={e => {
+            setObjectiveFilter(e.target.value);
+            // Auto-suggest matching template
+            if (e.target.value !== 'all') {
+              const match = getTemplateForObjective(e.target.value);
+              if (match) setColumns(match.cols);
+            }
+          }}
             className="px-2.5 py-2 rounded-lg border border-slate-200 bg-white text-[11px] font-medium text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
             <option value="all">All Objectives</option>
             {availableObjectives.map(o => (
@@ -958,7 +1028,9 @@ export const CampaignManager = ({ adAccountId, onBack, onSendToChat, token, onLo
                             <p className="text-[12px] font-medium text-slate-800 truncate max-w-[300px]">{item.name}</p>
                           )}
                           {activeTab === 'campaigns' && item.objective && (
-                            <p className="text-[10px] text-slate-400 mt-0.5">{item.objective?.replace(/_/g, ' ')}</p>
+                            <span className={`inline-block text-[9px] font-medium px-1.5 py-0.5 rounded-full mt-0.5 ${OBJECTIVE_COLORS[fmtObjective(item.objective)] || 'bg-slate-50 text-slate-400'}`}>
+                              {fmtObjective(item.objective)}
+                            </span>
                           )}
                         </div>
                       </div>
