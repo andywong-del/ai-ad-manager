@@ -325,6 +325,7 @@ export const CampaignManager = ({ adAccountId, onBack, onSendToChat, token, onLo
   const [showAskAI, setShowAskAI] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [objectiveFilter, setObjectiveFilter] = useState('all'); // 'all' or objective key
   const [columns, setColumns] = useState(['status', 'budget', 'spent', 'results', 'cpa']);
   const [showColumnDropdown, setShowColumnDropdown] = useState(false);
   const [editingBudget, setEditingBudget] = useState(null);
@@ -341,6 +342,9 @@ export const CampaignManager = ({ adAccountId, onBack, onSendToChat, token, onLo
 
   // Date range
   const [datePreset, setDatePreset] = useState('last_7d');
+  const [customDateFrom, setCustomDateFrom] = useState('');
+  const [customDateTo, setCustomDateTo] = useState('');
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Data
   const [campaigns, setCampaigns] = useState([]);
@@ -649,10 +653,18 @@ export const CampaignManager = ({ adAccountId, onBack, onSendToChat, token, onLo
     return cleaned ? Number(cleaned) : -Infinity;
   };
 
+  // Unique objectives in current campaigns (for filter dropdown)
+  const availableObjectives = useMemo(() => {
+    if (activeTab !== 'campaigns') return [];
+    const objs = new Set(campaigns.map(c => c.objective).filter(Boolean));
+    return [...objs].map(o => ({ value: o, label: OBJECTIVE_LABELS[o] || o.replace(/_/g, ' ') }));
+  }, [campaigns, activeTab]);
+
   const filtered = useMemo(() => {
     let list = currentData.filter(c => {
       if (statusFilter === 'active' && !c._active) return false;
       if (statusFilter === 'paused' && c._active) return false;
+      if (objectiveFilter !== 'all' && activeTab === 'campaigns' && c.objective !== objectiveFilter) return false;
       if (search && !c.name.toLowerCase().includes(search.toLowerCase())) return false;
       return true;
     });
@@ -789,7 +801,7 @@ export const CampaignManager = ({ adAccountId, onBack, onSendToChat, token, onLo
       )}
 
       {/* Filters */}
-      <div className="px-6 py-3 flex items-center gap-3 shrink-0 bg-white border-b border-slate-100">
+      <div className="px-6 py-3 flex items-center gap-3 shrink-0 bg-white border-b border-slate-100 flex-wrap">
         <div className="relative flex-1 max-w-sm">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={`Search ${levelLabel.toLowerCase()}s...`}
@@ -803,18 +815,58 @@ export const CampaignManager = ({ adAccountId, onBack, onSendToChat, token, onLo
             </button>
           ))}
         </div>
-        <select value={datePreset} onChange={e => { setDatePreset(e.target.value); }}
-          className="px-2.5 py-2 rounded-lg border border-slate-200 bg-white text-[11px] font-medium text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
-          <option value="today">Today</option>
-          <option value="yesterday">Yesterday</option>
-          <option value="last_3d">Last 3 Days</option>
-          <option value="last_7d">Last 7 Days</option>
-          <option value="last_14d">Last 14 Days</option>
-          <option value="last_30d">Last 30 Days</option>
-          <option value="this_month">This Month</option>
-          <option value="last_month">Last Month</option>
-          <option value="maximum">Lifetime</option>
-        </select>
+        {/* Objective filter (campaigns tab only) */}
+        {activeTab === 'campaigns' && availableObjectives.length > 1 && (
+          <select value={objectiveFilter} onChange={e => setObjectiveFilter(e.target.value)}
+            className="px-2.5 py-2 rounded-lg border border-slate-200 bg-white text-[11px] font-medium text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+            <option value="all">All Objectives</option>
+            {availableObjectives.map(o => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        )}
+        {/* Date range */}
+        <div className="relative">
+          <select value={datePreset} onChange={e => {
+            const v = e.target.value;
+            if (v === 'custom') { setShowDatePicker(true); setDatePreset('custom'); }
+            else { setDatePreset(v); setShowDatePicker(false); }
+          }}
+            className="px-2.5 py-2 rounded-lg border border-slate-200 bg-white text-[11px] font-medium text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+            <option value="today">Today</option>
+            <option value="yesterday">Yesterday</option>
+            <option value="last_3d">Last 3 Days</option>
+            <option value="last_7d">Last 7 Days</option>
+            <option value="last_14d">Last 14 Days</option>
+            <option value="last_30d">Last 30 Days</option>
+            <option value="this_month">This Month</option>
+            <option value="last_month">Last Month</option>
+            <option value="maximum">Lifetime</option>
+            <option value="custom">{customDateFrom && customDateTo ? `${customDateFrom} – ${customDateTo}` : 'Custom Range'}</option>
+          </select>
+          {showDatePicker && (
+            <div className="absolute top-full right-0 mt-1 z-30 bg-white rounded-xl shadow-xl border border-slate-200 p-4 w-64" onClick={e => e.stopPropagation()}>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Custom Date Range</p>
+              <div className="space-y-2">
+                <div>
+                  <label className="text-[10px] text-slate-500 font-medium">From</label>
+                  <input type="date" value={customDateFrom} onChange={e => setCustomDateFrom(e.target.value)}
+                    className="w-full mt-0.5 px-2.5 py-1.5 rounded-lg border border-slate-200 text-[11px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-500 font-medium">To</label>
+                  <input type="date" value={customDateTo} onChange={e => setCustomDateTo(e.target.value)}
+                    className="w-full mt-0.5 px-2.5 py-1.5 rounded-lg border border-slate-200 text-[11px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 mt-3">
+                <button onClick={() => setShowDatePicker(false)} className="px-2.5 py-1.5 text-[11px] text-slate-500 hover:bg-slate-50 rounded-lg">Cancel</button>
+                <button onClick={() => { setShowDatePicker(false); }} disabled={!customDateFrom || !customDateTo}
+                  className="px-2.5 py-1.5 text-[11px] text-white bg-blue-500 hover:bg-blue-600 rounded-lg font-medium disabled:opacity-50">Apply</button>
+              </div>
+            </div>
+          )}
+        </div>
         <div className="relative">
           <button onClick={() => setShowColumnDropdown(!showColumnDropdown)}
             className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-[11px] font-medium transition-all ${showColumnDropdown ? 'border-blue-300 bg-blue-50 text-blue-600' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'}`}>

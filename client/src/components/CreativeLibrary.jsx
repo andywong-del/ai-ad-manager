@@ -156,6 +156,7 @@ export const CreativeLibrary = ({ adAccountId, token, onLogin, onLogout, selecte
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [previewAsset, setPreviewAsset] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(18);
 
   const fetchAssets = useCallback(async () => {
     if (!adAccountId) return;
@@ -177,6 +178,9 @@ export const CreativeLibrary = ({ adAccountId, token, onLogin, onLogout, selecte
 
   useEffect(() => { fetchAssets(); }, [fetchAssets]);
 
+  // Reset visible count when filter/search changes
+  useEffect(() => { setVisibleCount(18); }, [filter, search]);
+
   // Combined & filtered list
   const allAssets = useMemo(() => {
     let list = [];
@@ -186,10 +190,12 @@ export const CreativeLibrary = ({ adAccountId, token, onLogin, onLogout, selecte
       const q = search.toLowerCase();
       list = list.filter(a => (a.name || a.title || '').toLowerCase().includes(q));
     }
-    // Sort by created_time descending
     list.sort((a, b) => new Date(b.created_time || 0) - new Date(a.created_time || 0));
     return list;
   }, [images, videos, filter, search]);
+
+  const visibleAssets = useMemo(() => allAssets.slice(0, visibleCount), [allAssets, visibleCount]);
+  const hasMore = visibleCount < allAssets.length;
 
   const toggleSelect = useCallback((id) => {
     setSelectedIds(prev => {
@@ -258,7 +264,7 @@ export const CreativeLibrary = ({ adAccountId, token, onLogin, onLogout, selecte
                 Asset Library
               </h1>
               <p className="text-xs text-slate-400 mt-0.5">
-                {loading ? 'Loading...' : `${imageCount} images · ${videoCount} videos`}
+                {loading ? 'Loading...' : `${imageCount} images · ${videoCount} videos${allAssets.length > visibleCount ? ` · showing ${visibleCount}` : ''}`}
               </p>
             </div>
             <AccountSelector token={token} onLogin={onLogin} onLogout={onLogout}
@@ -340,52 +346,72 @@ export const CreativeLibrary = ({ adAccountId, token, onLogin, onLogout, selecte
             <p className="text-xs text-slate-400">Upload images or videos in the chat to see them here.</p>
           </div>
         ) : viewMode === 'grid' ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-            {allAssets.map(asset => (
-              <AssetCard
-                key={asset.id || asset.hash}
-                asset={asset}
-                isVideo={asset._type === 'video'}
-                selected={selectedIds.has(asset.id || asset.hash)}
-                onSelect={toggleSelect}
-                onPreview={setPreviewAsset}
-                onDelete={handleDelete}
-                viewMode="grid"
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+              {visibleAssets.map(asset => (
+                <AssetCard
+                  key={asset.id || asset.hash}
+                  asset={asset}
+                  isVideo={asset._type === 'video'}
+                  selected={selectedIds.has(asset.id || asset.hash)}
+                  onSelect={toggleSelect}
+                  onPreview={setPreviewAsset}
+                  onDelete={handleDelete}
+                  viewMode="grid"
+                />
+              ))}
+            </div>
+            {hasMore && (
+              <div className="flex justify-center py-4">
+                <button onClick={() => setVisibleCount(v => v + 18)}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium text-slate-500 hover:bg-slate-100 border border-slate-200 transition-colors">
+                  Load More ({allAssets.length - visibleCount} remaining)
+                </button>
+              </div>
+            )}
+          </>
         ) : (
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50/80">
-                  <th className="py-2.5 px-3 w-10">
-                    <input type="checkbox" checked={selectedIds.size === allAssets.length && allAssets.length > 0}
-                      onChange={toggleSelectAll}
-                      className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500/30" />
-                  </th>
-                  <th className="py-2.5 px-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Asset</th>
-                  <th className="py-2.5 px-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Type</th>
-                  <th className="py-2.5 px-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Date</th>
-                  <th className="py-2.5 px-3 w-10"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {allAssets.map(asset => (
-                  <AssetCard
-                    key={asset.id || asset.hash}
-                    asset={asset}
-                    isVideo={asset._type === 'video'}
-                    selected={selectedIds.has(asset.id || asset.hash)}
-                    onSelect={toggleSelect}
-                    onPreview={setPreviewAsset}
-                    onDelete={handleDelete}
-                    viewMode="list"
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <>
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50/80">
+                    <th className="py-2.5 px-3 w-10">
+                      <input type="checkbox" checked={selectedIds.size === allAssets.length && allAssets.length > 0}
+                        onChange={toggleSelectAll}
+                        className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500/30" />
+                    </th>
+                    <th className="py-2.5 px-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Asset</th>
+                    <th className="py-2.5 px-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Type</th>
+                    <th className="py-2.5 px-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Date</th>
+                    <th className="py-2.5 px-3 w-10"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleAssets.map(asset => (
+                    <AssetCard
+                      key={asset.id || asset.hash}
+                      asset={asset}
+                      isVideo={asset._type === 'video'}
+                      selected={selectedIds.has(asset.id || asset.hash)}
+                      onSelect={toggleSelect}
+                      onPreview={setPreviewAsset}
+                      onDelete={handleDelete}
+                      viewMode="list"
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {hasMore && (
+              <div className="flex justify-center py-4">
+                <button onClick={() => setVisibleCount(v => v + 18)}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium text-slate-500 hover:bg-slate-100 border border-slate-200 transition-colors">
+                  Load More ({allAssets.length - visibleCount} remaining)
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 
