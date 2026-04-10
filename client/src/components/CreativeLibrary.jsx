@@ -250,23 +250,32 @@ export const CreativeLibrary = ({ adAccountId, token, onLogin, onLogout, selecte
   const confirmBulkDelete = useCallback(async () => {
     setDeleting(true);
     setDeleteError(null);
-    try {
-      const promises = [...selectedIds].map(id => {
-        const img = images.find(i => i.hash === id);
-        if (img) return api.delete('/assets/images', { params: { adAccountId, hash: id } });
-        return api.delete(`/assets/videos/${id}`, { params: { adAccountId } });
-      });
-      await Promise.all(promises);
-      setImages(prev => prev.filter(i => !selectedIds.has(i.hash)));
-      setVideos(prev => prev.filter(v => !selectedIds.has(v.id)));
-      setSelectedIds(new Set());
-      setDeleteTarget(null);
-    } catch (err) {
-      console.error('Bulk delete failed:', err);
-      setDeleteError(err.response?.data?.error || err.message || 'Bulk delete failed');
-    } finally {
-      setDeleting(false);
+    const errors = [];
+    const deletedIds = new Set();
+    for (const id of selectedIds) {
+      try {
+        const img = images.find(i => i.id === id || i.hash === id);
+        if (img) {
+          await api.delete('/assets/images', { params: { adAccountId, hash: img.hash } });
+        } else {
+          await api.delete(`/assets/videos/${id}`, { params: { adAccountId } });
+        }
+        deletedIds.add(id);
+      } catch (err) {
+        errors.push(err.response?.data?.error || err.message);
+      }
     }
+    if (deletedIds.size > 0) {
+      setImages(prev => prev.filter(i => !deletedIds.has(i.id) && !deletedIds.has(i.hash)));
+      setVideos(prev => prev.filter(v => !deletedIds.has(v.id)));
+      setSelectedIds(prev => { const n = new Set(prev); deletedIds.forEach(id => n.delete(id)); return n; });
+    }
+    if (errors.length > 0) {
+      setDeleteError(`${deletedIds.size} deleted, ${errors.length} failed: ${errors[0]}`);
+    } else {
+      setDeleteTarget(null);
+    }
+    setDeleting(false);
   }, [selectedIds, images, adAccountId]);
 
   const imageCount = images.length;
