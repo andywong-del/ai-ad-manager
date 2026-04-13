@@ -369,7 +369,7 @@ export const Sidebar = ({
               <div className="flex-1 overflow-auto">
                 {sortedFolders.length > 0 && (
                   <div className="px-2 py-1.5">
-                    <p className="text-[9px] font-bold text-slate-300 uppercase tracking-wider px-2 mb-1">Folders</p>
+                    <p className="text-[9px] font-bold text-slate-300 uppercase tracking-wider px-2 mb-1">Projects</p>
                     {sortedFolders.map(folder => (
                       <button key={folder.id} onClick={() => { setCollapsedHistoryOpen(false); onToggle(); }}
                         className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 text-left transition-colors">
@@ -380,7 +380,7 @@ export const Sidebar = ({
                   </div>
                 )}
                 <div className="px-2 py-1.5">
-                  <p className="text-[9px] font-bold text-slate-300 uppercase tracking-wider px-2 mb-1">Recent</p>
+                  <p className="text-[9px] font-bold text-slate-300 uppercase tracking-wider px-2 mb-1">All Tasks</p>
                   {sessions.slice(0, 10).map(s => (
                     <button key={s.id} onClick={() => { onSwitchSession(s.id); setCollapsedHistoryOpen(false); }}
                       className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-colors
@@ -563,14 +563,14 @@ export const Sidebar = ({
         </button>
       </div>
 
-      {/* Scrollable area: Folders first, then Chat History */}
+      {/* Scrollable area: Projects first, then All Tasks */}
       <div className="flex-1 overflow-y-auto px-2 pb-2">
 
-        {/* Folders Section */}
+        {/* Projects Section */}
         <div className="mb-3">
           <div className="flex items-center justify-between px-3 py-1.5">
-            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Chat Library</p>
-            <button onClick={handleAddFolder} className="text-slate-300 hover:text-blue-500 transition-colors" title="Add folder">
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Projects</p>
+            <button onClick={handleAddFolder} className="text-slate-300 hover:text-blue-500 transition-colors" title="Add project">
               <FolderPlus size={13} />
             </button>
           </div>
@@ -656,12 +656,15 @@ export const Sidebar = ({
           )}
         </div>
 
-        {/* Chat History */}
+        {/* All Tasks */}
         <div className="border-t border-slate-100 pt-2">
+          <div className="flex items-center justify-between px-3 py-1.5 mb-0.5">
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">All Tasks</p>
+          </div>
           {sessions.length === 0 ? (
             <div className="px-3 py-6 text-center">
               <MessageSquare size={20} className="text-slate-200 mx-auto mb-2" />
-              <p className="text-[11px] text-slate-400">No conversations yet</p>
+              <p className="text-[11px] text-slate-400">No tasks yet</p>
             </div>
           ) : (
             DATE_GROUP_ORDER.map(group => {
