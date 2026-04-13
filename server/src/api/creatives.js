@@ -35,7 +35,7 @@ router.get('/ad-library', async (req, res) => {
       'id', 'name', 'status', 'effective_status', 'created_time',
       'campaign_id', 'campaign{id,name,objective,status}',
       'adset_id', 'adset{id,name,status}',
-      'creative{id,name,title,body,image_url,image_hash,thumbnail_url,video_id,object_story_spec,call_to_action_type,asset_feed_spec}',
+      'creative{id,name,title,body,image_url,image_hash,thumbnail_url,video_id,object_story_spec,call_to_action_type,asset_feed_spec,effective_object_story_id}',
       'preview_shareable_link',
     ].join(',');
     const params = {

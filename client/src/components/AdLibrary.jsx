@@ -109,7 +109,6 @@ const AdPreviewModal = ({ ad, onClose }) => {
 // ── Ad Card (FB-style) ──
 const AdCard = ({ ad, onPreview }) => {
   const creative = ad.creative || {};
-  const imageUrl = creative.image_url || creative.thumbnail_url;
   const hasVideo = !!creative.video_id;
   const statusColor = getStatusColor(ad.effective_status || ad.status);
   const body = creative.body || '';
@@ -125,83 +124,80 @@ const AdCard = ({ ad, onPreview }) => {
   const displayLink = linkData.link || creative.object_url || '';
   const displayCta = ctaLabel || fmtCta(linkData.call_to_action?.type) || '';
 
+  // Prefer full-res image: link_data.picture > image_url > thumbnail_url
+  const imageUrl = linkData.picture || linkData.image_url || creative.image_url || creative.thumbnail_url;
+
   return (
-    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-lg transition-all max-w-[420px] w-full">
-      {/* Page header area */}
-      <div className="px-4 pt-4 pb-2">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${statusColor.bg} ${statusColor.text} border ${statusColor.border}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${statusColor.dot}`} />
+    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-lg transition-all w-full">
+      {/* Status + CTA header */}
+      <div className="px-3 pt-3 pb-1.5">
+        <div className="flex items-center justify-between mb-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${statusColor.bg} ${statusColor.text} border ${statusColor.border}`}>
+              <span className={`w-1 h-1 rounded-full ${statusColor.dot}`} />
               {ad.effective_status || ad.status || 'Unknown'}
             </span>
             {displayCta && (
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200 uppercase">
+              <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200 uppercase">
                 {displayCta}
               </span>
             )}
           </div>
-          <span className="text-[10px] text-slate-300">{fmtDate(ad.created_time)}</span>
+          <span className="text-[9px] text-slate-300">{fmtDate(ad.created_time)}</span>
         </div>
 
         {/* Ad body text */}
         {displayBody && (
-          <p className="text-[13px] text-slate-800 leading-relaxed mb-2 whitespace-pre-line line-clamp-4">{displayBody}</p>
+          <p className="text-[11px] text-slate-700 leading-snug mb-1.5 whitespace-pre-line line-clamp-2">{displayBody}</p>
         )}
       </div>
 
       {/* Image / Video thumbnail */}
       <button onClick={() => onPreview(ad)} className="w-full relative group">
         {imageUrl ? (
-          <div className="w-full aspect-[1.2] bg-slate-100 overflow-hidden">
-            <img src={imageUrl} alt={ad.name} className="w-full h-full object-cover" loading="lazy" />
+          <div className="w-full aspect-square bg-slate-100 overflow-hidden">
+            <img src={imageUrl} alt={ad.name} className="w-full h-full object-cover" loading="lazy"
+              referrerPolicy="no-referrer" />
           </div>
         ) : (
-          <div className="w-full aspect-[1.2] bg-slate-100 flex items-center justify-center">
-            <Palette size={40} className="text-slate-300" />
+          <div className="w-full aspect-square bg-slate-100 flex items-center justify-center">
+            <Palette size={28} className="text-slate-300" />
           </div>
         )}
         {hasVideo && (
-          <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/60 text-white rounded-full w-12 h-12 flex items-center justify-center group-hover:bg-black/80 transition-colors">
-            <Play size={20} fill="white" />
+          <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/60 text-white rounded-full w-10 h-10 flex items-center justify-center group-hover:bg-black/80 transition-colors">
+            <Play size={16} fill="white" />
           </span>
         )}
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors" />
       </button>
 
       {/* Link preview / CTA bar */}
-      {(displayTitle || displayDescription || displayLink) && (
-        <div className="px-4 py-3 bg-slate-50 border-t border-slate-200">
+      {(displayTitle || displayLink) && (
+        <div className="px-3 py-2 bg-slate-50 border-t border-slate-200">
           {displayLink && (
-            <p className="text-[10px] text-slate-400 uppercase tracking-wide mb-0.5 truncate">{displayLink.replace(/https?:\/\//, '').split('/')[0]}</p>
+            <p className="text-[9px] text-slate-400 uppercase tracking-wide truncate">{displayLink.replace(/https?:\/\//, '').split('/')[0]}</p>
           )}
           {displayTitle && (
-            <p className="text-[13px] font-semibold text-slate-800 line-clamp-1">{displayTitle}</p>
-          )}
-          {displayDescription && (
-            <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">{displayDescription}</p>
+            <p className="text-[11px] font-semibold text-slate-800 line-clamp-1">{displayTitle}</p>
           )}
         </div>
       )}
 
-      {/* Campaign / Adset info + actions */}
-      <div className="px-4 py-2.5 border-t border-slate-100 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
+      {/* Campaign / Adset info */}
+      <div className="px-3 py-2 border-t border-slate-100">
+        <div className="flex flex-col gap-0.5">
           {ad.campaign?.name && (
-            <span className="text-[10px] text-slate-400 flex items-center gap-1 truncate max-w-[150px]" title={`Campaign: ${ad.campaign.name}`}>
-              <Megaphone size={10} className="shrink-0 text-slate-300" /> {ad.campaign.name}
+            <span className="text-[9px] text-slate-400 flex items-center gap-1 truncate" title={`Campaign: ${ad.campaign.name}`}>
+              <Megaphone size={9} className="shrink-0 text-slate-300" /> {ad.campaign.name}
             </span>
           )}
           {ad.adset?.name && (
-            <span className="text-[10px] text-slate-400 flex items-center gap-1 truncate max-w-[150px]" title={`Ad Set: ${ad.adset.name}`}>
-              <Layers size={10} className="shrink-0 text-slate-300" /> {ad.adset.name}
+            <span className="text-[9px] text-slate-400 flex items-center gap-1 truncate" title={`Ad Set: ${ad.adset.name}`}>
+              <Layers size={9} className="shrink-0 text-slate-300" /> {ad.adset.name}
             </span>
           )}
         </div>
-        <button onClick={() => onPreview(ad)}
-          className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-blue-200 shrink-0">
-          <Eye size={11} /> Preview
-        </button>
       </div>
     </div>
   );
@@ -403,7 +399,7 @@ export const AdLibrary = ({ adAccountId, token, onLogin, onLogout, selectedAccou
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 justify-items-center">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filtered.map(ad => (
                 <AdCard key={ad.id} ad={ad} onPreview={setPreviewAd} />
               ))}
