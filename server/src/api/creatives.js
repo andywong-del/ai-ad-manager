@@ -35,7 +35,7 @@ router.get('/ad-library', async (req, res) => {
       'id', 'name', 'status', 'effective_status', 'created_time',
       'campaign_id', 'campaign{id,name,objective,status}',
       'adset_id', 'adset{id,name,status}',
-      'creative{id,name,title,body,image_url,image_hash,thumbnail_url,video_id,object_story_spec,call_to_action_type,asset_feed_spec,effective_object_story_id}',
+      'creative{id,name,title,body,image_url,image_hash,thumbnail_url,video_id,object_story_spec,call_to_action_type,asset_feed_spec,effective_object_story_id,effective_instagram_media_url}',
       'preview_shareable_link',
     ].join(',');
     const params = {
@@ -45,7 +45,39 @@ router.get('/ad-library', async (req, res) => {
     };
     if (after) params.after = after;
     const { data } = await metaClient.metaApi.get(`/${adAccountId}/ads`, { params });
-    res.json({ data: data?.data || [], paging: data?.paging || null });
+    const ads = data?.data || [];
+
+    // For ads that only have a tiny thumbnail_url (video ads), fetch full-res video thumbnails
+    const videoIds = ads
+      .filter(a => a.creative?.video_id && !a.creative?.image_url)
+      .map(a => a.creative.video_id)
+      .filter(Boolean);
+
+    let videoThumbMap = {};
+    if (videoIds.length > 0) {
+      try {
+        const uniqueIds = [...new Set(videoIds)].slice(0, 50);
+        const { data: vData } = await metaClient.metaApi.get('/', {
+          params: { ids: uniqueIds.join(','), fields: 'id,thumbnails{uri,width,height}', access_token: req.token }
+        });
+        for (const [vid, info] of Object.entries(vData || {})) {
+          // Pick the largest thumbnail
+          const thumbs = info.thumbnails?.data || [];
+          const best = thumbs.sort((a, b) => (b.width || 0) - (a.width || 0))[0];
+          if (best?.uri) videoThumbMap[vid] = best.uri;
+        }
+      } catch { /* ignore — fall back to existing thumbnail */ }
+    }
+
+    // Enrich ads with full-res video thumbnails
+    const enriched = ads.map(a => {
+      if (a.creative?.video_id && videoThumbMap[a.creative.video_id]) {
+        return { ...a, creative: { ...a.creative, _full_thumb: videoThumbMap[a.creative.video_id] } };
+      }
+      return a;
+    });
+
+    res.json({ data: enriched, paging: data?.paging || null });
   } catch (err) {
     const metaErr = err.response?.data?.error;
     console.error('[creatives] GET /ad-library error:', metaErr || err.message);

@@ -6,13 +6,6 @@ import api from '../services/api.js';
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
 const fmtCta = (cta) => cta ? cta.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '';
 
-// Meta thumbnail_url often has &stp=...p64x64... which forces tiny resolution.
-// Strip the stp param to get full-res, or replace p64x64 with larger size.
-const upscaleThumb = (url) => {
-  if (!url) return url;
-  // Remove the stp parameter that forces small size
-  return url.replace(/&stp=[^&]+/g, '').replace(/\?stp=[^&]+&?/g, '?');
-};
 
 const AD_FORMATS = [
   { value: 'MOBILE_FEED_STANDARD', label: 'Mobile Feed' },
@@ -132,8 +125,8 @@ const AdCard = ({ ad, onPreview }) => {
   const displayLink = linkData.link || creative.object_url || '';
   const displayCta = ctaLabel || fmtCta(linkData.call_to_action?.type) || '';
 
-  // Prefer full-res image: link_data.picture > image_url > upscaled thumbnail
-  const imageUrl = linkData.picture || linkData.image_url || creative.image_url || upscaleThumb(creative.thumbnail_url);
+  // Prefer full-res: link_data.picture > image_url > full video thumb > thumbnail
+  const imageUrl = linkData.picture || linkData.image_url || creative.image_url || creative._full_thumb || creative.thumbnail_url;
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-lg transition-all w-full">
