@@ -1,8 +1,247 @@
 import { useState, useRef, useEffect } from 'react';
-import { Search, Plus, Filter, MoreHorizontal, Sparkles, ChevronLeft, Upload, GitBranch, Trash2, Download, X, Check, Clock, Play, PenLine, RefreshCw } from 'lucide-react';
+import { Search, Plus, Filter, MoreHorizontal, Sparkles, ChevronLeft, Upload, GitBranch, Trash2, Download, X, Check, Clock, Play, PenLine, RefreshCw, FileText, FolderOpen, ChevronRight, Copy, Maximize2, Minimize2 } from 'lucide-react';
+
+// ── Simple Markdown Renderer ──────────────────────────────────────────────
+const renderMarkdown = (md) => {
+  if (!md) return null;
+  const lines = md.split('\n');
+  const elements = [];
+  let i = 0;
+  let key = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Headings
+    if (line.startsWith('# ')) {
+      elements.push(<h1 key={key++} className="text-[22px] font-bold text-slate-900 mt-6 mb-3">{parseInline(line.slice(2))}</h1>);
+      i++; continue;
+    }
+    if (line.startsWith('## ')) {
+      elements.push(<h2 key={key++} className="text-[18px] font-bold text-slate-800 mt-5 mb-2">{parseInline(line.slice(3))}</h2>);
+      i++; continue;
+    }
+    if (line.startsWith('### ')) {
+      elements.push(<h3 key={key++} className="text-[15px] font-bold text-slate-700 mt-4 mb-2">{parseInline(line.slice(4))}</h3>);
+      i++; continue;
+    }
+
+    // Code blocks
+    if (line.startsWith('```')) {
+      const lang = line.slice(3).trim();
+      const codeLines = [];
+      i++;
+      while (i < lines.length && !lines[i].startsWith('```')) {
+        codeLines.push(lines[i]);
+        i++;
+      }
+      i++; // skip closing ```
+      elements.push(
+        <pre key={key++} className="bg-slate-900 text-slate-100 rounded-lg p-4 my-3 overflow-x-auto text-[12px] leading-relaxed font-mono">
+          <code>{codeLines.join('\n')}</code>
+        </pre>
+      );
+      continue;
+    }
+
+    // Ordered list items
+    if (/^\d+\.\s/.test(line)) {
+      const listItems = [];
+      while (i < lines.length && /^\d+\.\s/.test(lines[i])) {
+        // Check for sub-items
+        const mainText = lines[i].replace(/^\d+\.\s/, '');
+        const subItems = [];
+        i++;
+        while (i < lines.length && /^\s+\d+\.\s/.test(lines[i])) {
+          subItems.push(lines[i].replace(/^\s+\d+\.\s/, ''));
+          i++;
+        }
+        listItems.push({ text: mainText, subs: subItems });
+      }
+      elements.push(
+        <ol key={key++} className="list-decimal list-inside space-y-2 my-3 text-[13px] text-slate-600 leading-relaxed">
+          {listItems.map((item, idx) => (
+            <li key={idx}>
+              {parseInline(item.text)}
+              {item.subs.length > 0 && (
+                <ol className="list-decimal list-inside ml-5 mt-1.5 space-y-1">
+                  {item.subs.map((sub, si) => <li key={si}>{parseInline(sub)}</li>)}
+                </ol>
+              )}
+            </li>
+          ))}
+        </ol>
+      );
+      continue;
+    }
+
+    // Unordered list items
+    if (/^[-*]\s/.test(line)) {
+      const listItems = [];
+      while (i < lines.length && /^[-*]\s/.test(lines[i])) {
+        listItems.push(lines[i].replace(/^[-*]\s/, ''));
+        i++;
+      }
+      elements.push(
+        <ul key={key++} className="list-disc list-inside space-y-1.5 my-3 text-[13px] text-slate-600 leading-relaxed">
+          {listItems.map((item, idx) => <li key={idx}>{parseInline(item)}</li>)}
+        </ul>
+      );
+      continue;
+    }
+
+    // Empty line
+    if (!line.trim()) { i++; continue; }
+
+    // Paragraph
+    elements.push(<p key={key++} className="text-[13px] text-slate-600 leading-relaxed my-2">{parseInline(line)}</p>);
+    i++;
+  }
+
+  return elements;
+};
+
+// Parse inline markdown: **bold**, *italic*, `code`, [links](url)
+const parseInline = (text) => {
+  if (!text) return text;
+  const parts = [];
+  let remaining = text;
+  let k = 0;
+
+  while (remaining.length > 0) {
+    // Bold
+    const boldMatch = remaining.match(/\*\*(.+?)\*\*/);
+    // Inline code
+    const codeMatch = remaining.match(/`([^`]+)`/);
+    // Find the earliest match
+    const matches = [
+      boldMatch ? { type: 'bold', index: remaining.indexOf(boldMatch[0]), match: boldMatch } : null,
+      codeMatch ? { type: 'code', index: remaining.indexOf(codeMatch[0]), match: codeMatch } : null,
+    ].filter(Boolean).sort((a, b) => a.index - b.index);
+
+    if (matches.length === 0) {
+      parts.push(remaining);
+      break;
+    }
+
+    const first = matches[0];
+    if (first.index > 0) {
+      parts.push(remaining.slice(0, first.index));
+    }
+
+    if (first.type === 'bold') {
+      parts.push(<strong key={k++} className="font-semibold text-slate-800">{first.match[1]}</strong>);
+      remaining = remaining.slice(first.index + first.match[0].length);
+    } else if (first.type === 'code') {
+      parts.push(<code key={k++} className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[11px] font-mono">{first.match[1]}</code>);
+      remaining = remaining.slice(first.index + first.match[0].length);
+    }
+  }
+
+  return parts;
+};
+
+// ── Skill Detail View ─────────────────────────────────────────────────────
+const SkillDetailView = ({ skill, onClose, onTrySkill, onDownload }) => {
+  const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const fileName = `${skill.id || skill.name.toLowerCase().replace(/\s+/g, '-')}.skill`;
+
+  const yamlFrontmatter = `name: ${skill.name}\ndescription: "${skill.description || ''}"`;
+
+  const handleCopy = () => {
+    const full = `---\n${yamlFrontmatter}\ntype: skill\n---\n\n${skill.content || ''}`;
+    navigator.clipboard.writeText(full).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const panelClass = expanded
+    ? 'fixed inset-0 z-50 bg-white flex flex-col'
+    : 'fixed inset-y-0 right-0 z-50 w-[720px] bg-white shadow-2xl border-l border-slate-200 flex flex-col';
+
+  return (
+    <>
+      {!expanded && <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40" onClick={onClose} />}
+      <div className={panelClass}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 bg-white shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0">
+              <Sparkles size={15} className="text-indigo-500" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-[13px] font-bold text-slate-800 truncate">{fileName}</h3>
+              <p className="text-[10px] text-slate-400">Skill</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {onTrySkill && (
+              <button onClick={() => onTrySkill(skill)}
+                className="px-3.5 py-1.5 rounded-lg text-[11px] font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 transition-colors">
+                Try it out
+              </button>
+            )}
+            <button onClick={() => onDownload(skill)}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors" title="Download">
+              <Download size={15} />
+            </button>
+            <button onClick={() => setExpanded(prev => !prev)}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors" title={expanded ? 'Collapse' : 'Expand'}>
+              {expanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+            </button>
+            <button onClick={onClose}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+              <X size={15} />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex-1 flex min-h-0">
+          {/* Left sidebar: file tree */}
+          <div className="w-[200px] shrink-0 border-r border-slate-200 bg-slate-50/50 py-3">
+            <button className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium text-white bg-slate-600 rounded-md mx-1.5" style={{ width: 'calc(100% - 12px)' }}>
+              <FileText size={12} /> SKILL.md
+            </button>
+            <div className="flex items-center gap-2 px-3 py-1.5 mt-0.5 text-[11px] text-slate-400 mx-1.5 cursor-default">
+              <ChevronRight size={10} />
+              <FolderOpen size={12} /> references
+            </div>
+          </div>
+
+          {/* Right: content */}
+          <div className="flex-1 overflow-auto p-6">
+            {/* YAML frontmatter block */}
+            <div className="bg-slate-900 rounded-lg overflow-hidden mb-6">
+              <div className="flex items-center justify-between px-4 py-2 border-b border-slate-700">
+                <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">YAML</span>
+                <button onClick={handleCopy}
+                  className="text-slate-500 hover:text-slate-300 transition-colors" title="Copy">
+                  {copied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+                </button>
+              </div>
+              <pre className="px-4 py-3 text-[12px] leading-relaxed font-mono overflow-x-auto">
+                <code>
+                  <span className="text-emerald-400">name</span><span className="text-slate-400">: </span><span className="text-amber-300">{skill.name}</span>{'\n'}
+                  <span className="text-emerald-400">description</span><span className="text-slate-400">: </span><span className="text-amber-300">"{skill.description || ''}"</span>
+                </code>
+              </pre>
+            </div>
+
+            {/* Rendered markdown content */}
+            <div className="prose-custom">
+              {renderMarkdown(skill.content)}
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
 
 // ── Skill Card ─────────────────────────────────────────────────────────────
-const SkillCard = ({ skill, isActive, onToggle, onMenuAction }) => {
+const SkillCard = ({ skill, isActive, onToggle, onMenuAction, onView }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
   const menuBtnRef = useRef(null);
@@ -18,7 +257,7 @@ const SkillCard = ({ skill, isActive, onToggle, onMenuAction }) => {
   };
 
   return (
-    <div className="relative bg-white rounded-2xl border border-slate-200 p-5 flex flex-col gap-3 group hover:border-indigo-200 hover:shadow-md transition-all">
+    <div onClick={() => onView?.(skill)} className="relative bg-white rounded-2xl border border-slate-200 p-5 flex flex-col gap-3 group hover:border-indigo-200 hover:shadow-md transition-all cursor-pointer">
       {/* Top row: name + toggle */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
@@ -205,6 +444,7 @@ export const SkillsLibrary = ({ skills, onCreate, onDelete, onBack, onBuildWithA
   const [addDropdownOpen, setAddDropdownOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [showGitHubImport, setShowGitHubImport] = useState(false);
+  const [viewingSkill, setViewingSkill] = useState(null);
   const activeToggles = skillToggles || {};
   const setActiveToggles = (updater) => {
     if (onToggleChange) {
@@ -431,6 +671,7 @@ export const SkillsLibrary = ({ skills, onCreate, onDelete, onBack, onBuildWithA
                 isActive={!!activeToggles[skill.id]}
                 onToggle={handleToggle}
                 onMenuAction={handleMenuAction}
+                onView={setViewingSkill}
               />
             ))}
           </div>
@@ -443,6 +684,16 @@ export const SkillsLibrary = ({ skills, onCreate, onDelete, onBack, onBuildWithA
           skill={deleteTarget}
           onConfirm={handleDelete}
           onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+
+      {/* Skill Detail View */}
+      {viewingSkill && (
+        <SkillDetailView
+          skill={viewingSkill}
+          onClose={() => setViewingSkill(null)}
+          onTrySkill={(s) => { setViewingSkill(null); onTrySkill?.(s); }}
+          onDownload={(s) => handleMenuAction('download', s)}
         />
       )}
     </div>
