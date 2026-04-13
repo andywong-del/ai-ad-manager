@@ -1,7 +1,19 @@
 import { Router } from 'express';
+import axios from 'axios';
 import * as metaClient from '../services/metaClient.js';
 
 const router = Router();
+
+// Resolve Facebook redirect image URLs to direct CDN URLs via HEAD request
+async function resolveFbImageUrl(url) {
+  try {
+    const resp = await axios.head(url, { maxRedirects: 0, validateStatus: s => s === 302 || s === 301 });
+    return resp.headers.location || url;
+  } catch (err) {
+    if (err.response?.headers?.location) return err.response.headers.location;
+    return url;
+  }
+}
 
 
 // GET / - List ad creatives (paginated)
@@ -45,7 +57,71 @@ router.get('/ad-library', async (req, res) => {
     };
     if (after) params.after = after;
     const { data } = await metaClient.metaApi.get(`/${adAccountId}/ads`, { params });
-    res.json({ data: data?.data || [], paging: data?.paging || null });
+    const ads = data?.data || [];
+
+    // Collect all image hashes that need resolving (carousel ads without image_url)
+    const hashesToResolve = new Set();
+    for (const ad of ads) {
+      const c = ad.creative || {};
+      if (c.image_url) continue; // already has full-res
+      const oss = c.object_story_spec || {};
+      if (oss.link_data?.picture) continue;
+      // Check asset_feed_spec for carousel image hashes
+      const afs = c.asset_feed_spec;
+      if (afs?.images?.length) {
+        for (const img of afs.images) { if (img.hash) hashesToResolve.add(img.hash); }
+      }
+      // Also check creative's own image_hash
+      if (c.image_hash) hashesToResolve.add(c.image_hash);
+    }
+
+    // Batch resolve image hashes → full URLs in a single API call
+    let hashUrlMap = {};
+    if (hashesToResolve.size > 0) {
+      try {
+        const { data: imgData } = await metaClient.metaApi.get(`/${adAccountId}/adimages`, {
+          params: { access_token: req.token, hashes: JSON.stringify([...hashesToResolve]), fields: 'hash,url' }
+        });
+        for (const item of (imgData?.data || [])) {
+          if (item.hash && item.url) hashUrlMap[item.hash] = item.url;
+        }
+      } catch { /* ignore */ }
+    }
+
+    // Resolve blurry images
+    const resolveJobs = ads.map(async (ad) => {
+      const c = ad.creative || {};
+      const oss = c.object_story_spec || {};
+      const vd = oss.video_data || {};
+      const ld = oss.link_data || {};
+      const afs = c.asset_feed_spec;
+
+      // Already has a good image
+      if (c.image_url || ld.picture) return ad;
+
+      // Try image hash lookup first (works for carousel + any ad with image_hash)
+      if (c.image_hash && hashUrlMap[c.image_hash]) {
+        return { ...ad, creative: { ...c, _resolved_image: hashUrlMap[c.image_hash] } };
+      }
+      if (afs?.images?.length) {
+        const firstHash = afs.images[0]?.hash;
+        if (firstHash && hashUrlMap[firstHash]) {
+          return { ...ad, creative: { ...c, _resolved_image: hashUrlMap[firstHash] } };
+        }
+      }
+
+      // Video ad with FB redirect URL
+      const fbRedirect = vd.image_url || ld.image_url;
+      if (fbRedirect && fbRedirect.includes('facebook.com/ads/image')) {
+        const resolved = await resolveFbImageUrl(fbRedirect);
+        return { ...ad, creative: { ...c, _resolved_image: resolved } };
+      }
+
+      return ad;
+    });
+
+    const enriched = await Promise.all(resolveJobs);
+    res.json({ data: enriched, paging: data?.paging || null });
   } catch (err) {
     const metaErr = err.response?.data?.error;
     console.error('[creatives] GET /ad-library error:', metaErr || err.message);

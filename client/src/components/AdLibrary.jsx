@@ -108,99 +108,116 @@ const AdPreviewModal = ({ ad, onClose }) => {
   );
 };
 
-// ── Ad Card (FB-style) ──
+// ── Ad Card (FB Ad Library style — looks like a social media post) ──
 const AdCard = ({ ad, onPreview }) => {
+  const [expanded, setExpanded] = useState(false);
   const creative = ad.creative || {};
   const hasVideo = !!creative.video_id;
   const statusColor = getStatusColor(ad.effective_status || ad.status);
-  const body = creative.body || '';
-  const title = creative.title || '';
   const ctaLabel = fmtCta(creative.call_to_action_type);
 
-  // Extract from object_story_spec for richer data
+  // Extract from object_story_spec
   const oss = creative.object_story_spec || {};
   const linkData = oss.link_data || oss.video_data || {};
-  const displayBody = body || linkData.message || '';
-  const displayTitle = title || linkData.name || linkData.title || '';
-  const displayDescription = linkData.description || '';
+  const displayBody = creative.body || linkData.message || '';
+  const displayTitle = creative.title || linkData.name || linkData.title || '';
   const displayLink = linkData.link || creative.object_url || '';
   const displayCta = ctaLabel || fmtCta(linkData.call_to_action?.type) || '';
+  const domain = displayLink ? displayLink.replace(/https?:\/\//, '').split('/')[0] : '';
 
-  // Prefer full-res: link_data sources > creative.image_url > thumbnail fallback
-  const imageUrl = linkData.picture || linkData.image_url || creative.image_url || creative._full_thumb || creative.thumbnail_url;
+  // Full-res image
+  // Full-res: direct CDN > server-resolved redirect > FB redirect > thumbnail fallback
+  const imageUrl = linkData.picture || creative.image_url || creative._resolved_image || linkData.image_url || creative.thumbnail_url;
+
+  // Truncate body text
+  const isLong = displayBody.length > 200;
+  const bodyText = expanded ? displayBody : displayBody.slice(0, 200);
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-lg transition-all w-full">
-      {/* Status + CTA header */}
-      <div className="px-3 pt-3 pb-1.5">
-        <div className="flex items-center justify-between mb-1.5">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${statusColor.bg} ${statusColor.text} border ${statusColor.border}`}>
-              <span className={`w-1 h-1 rounded-full ${statusColor.dot}`} />
-              {ad.effective_status || ad.status || 'Unknown'}
-            </span>
-            {displayCta && (
-              <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200 uppercase">
-                {displayCta}
-              </span>
-            )}
-          </div>
-          <span className="text-[9px] text-slate-300">{fmtDate(ad.created_time)}</span>
-        </div>
-
-        {/* Ad body text */}
-        {displayBody && (
-          <p className="text-[11px] text-slate-700 leading-snug mb-1.5 whitespace-pre-line line-clamp-2">{displayBody}</p>
-        )}
+    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-md transition-all w-full">
+      {/* Status bar — like FB Ad Library header */}
+      <div className="px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
+        <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold ${statusColor.text}`}>
+          <span className={`w-2 h-2 rounded-full ${statusColor.dot}`} />
+          {ad.effective_status || ad.status || 'Unknown'}
+        </span>
+        <span className="text-[10px] text-slate-400">Started {fmtDate(ad.created_time)}</span>
       </div>
 
-      {/* Image / Video thumbnail */}
-      <button onClick={() => onPreview(ad)} className="w-full relative group">
-        {imageUrl ? (
-          <div className="w-full aspect-square bg-slate-100 overflow-hidden">
-            <img src={imageUrl} alt={ad.name} className="w-full h-full object-cover" loading="lazy"
-              referrerPolicy="no-referrer" />
-          </div>
-        ) : (
-          <div className="w-full aspect-square bg-slate-100 flex items-center justify-center">
-            <Palette size={28} className="text-slate-300" />
-          </div>
-        )}
-        {hasVideo && (
-          <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/60 text-white rounded-full w-10 h-10 flex items-center justify-center group-hover:bg-black/80 transition-colors">
-            <Play size={16} fill="white" />
-          </span>
-        )}
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors" />
-      </button>
-
-      {/* Link preview / CTA bar */}
-      {(displayTitle || displayLink) && (
-        <div className="px-3 py-2 bg-slate-50 border-t border-slate-200">
-          {displayLink && (
-            <p className="text-[9px] text-slate-400 uppercase tracking-wide truncate">{displayLink.replace(/https?:\/\//, '').split('/')[0]}</p>
+      {/* Campaign / Ad Set context */}
+      {(ad.campaign?.name || ad.adset?.name) && (
+        <div className="px-4 py-1.5 bg-slate-50/50 border-b border-slate-100 flex items-center gap-3">
+          {ad.campaign?.name && (
+            <span className="text-[10px] text-slate-400 flex items-center gap-1 truncate" title={ad.campaign.name}>
+              <Megaphone size={10} className="shrink-0 text-slate-300" /> {ad.campaign.name}
+            </span>
           )}
-          {displayTitle && (
-            <p className="text-[11px] font-semibold text-slate-800 line-clamp-1">{displayTitle}</p>
+          {ad.adset?.name && (
+            <span className="text-[10px] text-slate-400 flex items-center gap-1 truncate" title={ad.adset.name}>
+              <Layers size={10} className="shrink-0 text-slate-300" /> {ad.adset.name}
+            </span>
           )}
         </div>
       )}
 
-      {/* Campaign / Adset info */}
-      <div className="px-3 py-2 border-t border-slate-100">
-        <div className="flex flex-col gap-0.5">
-          {ad.campaign?.name && (
-            <span className="text-[9px] text-slate-400 flex items-center gap-1 truncate" title={`Campaign: ${ad.campaign.name}`}>
-              <Megaphone size={9} className="shrink-0 text-slate-300" /> {ad.campaign.name}
-            </span>
+      {/* Post header — page name + "Sponsored" */}
+      <div className="px-4 pt-3 pb-1">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-full bg-slate-200 flex items-center justify-center text-[11px] font-bold text-slate-500 shrink-0">
+            {(ad.name || 'A').charAt(0).toUpperCase()}
+          </div>
+          <div>
+            <p className="text-[12px] font-semibold text-slate-800 leading-tight">{ad.name || 'Untitled Ad'}</p>
+            <p className="text-[10px] text-slate-400">Sponsored</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Post body text */}
+      {displayBody && (
+        <div className="px-4 py-2">
+          <p className="text-[12px] text-slate-700 leading-relaxed whitespace-pre-line">{bodyText}{isLong && !expanded ? '...' : ''}</p>
+          {isLong && (
+            <button onClick={() => setExpanded(!expanded)}
+              className="text-[11px] font-medium text-slate-500 hover:text-slate-700 mt-0.5">
+              {expanded ? 'See less' : 'See more'}
+            </button>
           )}
-          {ad.adset?.name && (
-            <span className="text-[9px] text-slate-400 flex items-center gap-1 truncate" title={`Ad Set: ${ad.adset.name}`}>
-              <Layers size={9} className="shrink-0 text-slate-300" /> {ad.adset.name}
+        </div>
+      )}
+
+      {/* Creative image / video */}
+      <button onClick={() => onPreview(ad)} className="w-full relative group">
+        {imageUrl ? (
+          <div className="w-full bg-slate-100 overflow-hidden">
+            <img src={imageUrl} alt={ad.name} className="w-full object-cover max-h-[320px]" loading="lazy" />
+          </div>
+        ) : (
+          <div className="w-full aspect-video bg-slate-100 flex items-center justify-center">
+            <Palette size={32} className="text-slate-300" />
+          </div>
+        )}
+        {hasVideo && (
+          <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full w-14 h-14 flex items-center justify-center group-hover:bg-black/70 transition-colors shadow-lg">
+            <Play size={22} fill="white" />
+          </span>
+        )}
+      </button>
+
+      {/* Link preview + CTA button (like FB post footer) */}
+      {(displayTitle || domain || displayCta) && (
+        <div className="px-4 py-2.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            {domain && <p className="text-[10px] text-slate-400 uppercase tracking-wide truncate">{domain}</p>}
+            {displayTitle && <p className="text-[12px] font-semibold text-slate-800 line-clamp-1">{displayTitle}</p>}
+          </div>
+          {displayCta && (
+            <span className="shrink-0 px-3 py-1.5 text-[11px] font-semibold text-blue-600 bg-blue-50 border border-blue-200 rounded-lg">
+              {displayCta}
             </span>
           )}
         </div>
-      </div>
+      )}
     </div>
   );
 };
@@ -401,7 +418,7 @@ export const AdLibrary = ({ adAccountId, token, onLogin, onLogout, selectedAccou
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {filtered.map(ad => (
                 <AdCard key={ad.id} ad={ad} onPreview={setPreviewAd} />
               ))}
