@@ -246,20 +246,22 @@ export const Sidebar = ({
   const [collapsedHistoryOpen, setCollapsedHistoryOpen] = useState(false);
   const [addingProject, setAddingProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
+  const [collapsedProjectsOpen, setCollapsedProjectsOpen] = useState(false);
   const [editingFolderId, setEditingFolderId] = useState(null);
   const [editFolderName, setEditFolderName] = useState('');
   const newFolderRef = useRef(null);
 
-  // Close context menu / collapsed history on outside click
+  // Close context menu / collapsed flyouts on outside click
   useEffect(() => {
-    if (!contextMenu && !collapsedHistoryOpen) return;
+    if (!contextMenu && !collapsedHistoryOpen && !collapsedProjectsOpen) return;
     const handler = (e) => {
       if (contextMenu && contextRef.current && !contextRef.current.contains(e.target)) setContextMenu(null);
       if (collapsedHistoryOpen) setCollapsedHistoryOpen(false);
+      if (collapsedProjectsOpen) setCollapsedProjectsOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, [contextMenu, collapsedHistoryOpen]);
+  }, [contextMenu, collapsedHistoryOpen, collapsedProjectsOpen]);
 
   const grouped = groupSessionsByDate(sessions);
   const sortedFolders = [...folders].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
@@ -355,10 +357,48 @@ export const Sidebar = ({
             );
           })}
         </div>
-        {/* Divider + History */}
+        {/* Divider */}
         <div className="w-6 h-px bg-slate-200 my-2" />
+
+        {/* Projects flyout */}
         <div className="relative w-full px-1.5 shrink-0">
-          <button onClick={() => setCollapsedHistoryOpen(v => !v)}
+          <button onClick={() => { setCollapsedProjectsOpen(v => !v); setCollapsedHistoryOpen(false); }}
+            className={`group w-full h-[36px] rounded-xl flex items-center justify-center transition-colors
+              ${collapsedProjectsOpen ? 'bg-slate-100 text-slate-600' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'}`}>
+            <FolderOpen size={16} />
+            {!collapsedProjectsOpen && (
+              <span className="absolute left-full ml-2 px-2.5 py-1 text-[11px] font-medium text-white bg-slate-800 rounded-lg whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-[60] shadow-lg">Projects</span>
+            )}
+          </button>
+          {collapsedProjectsOpen && (
+            <div className="absolute left-full top-0 ml-2 w-[220px] bg-white border border-slate-200 rounded-xl shadow-xl z-[60] overflow-hidden max-h-[350px] flex flex-col">
+              <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Projects</p>
+                <button onClick={() => { setCollapsedProjectsOpen(false); onToggle(); setTimeout(() => setAddingProject(true), 200); }}
+                  className="text-slate-300 hover:text-blue-500 transition-colors"><Plus size={12} /></button>
+              </div>
+              <div className="flex-1 overflow-auto">
+                {projects.length === 0 ? (
+                  <p className="text-[10px] text-slate-400 px-3 py-4 text-center">No projects yet</p>
+                ) : projects.map(proj => (
+                  <button key={proj.id} onClick={() => { setCollapsedProjectsOpen(false); onOpenProject(proj.id); }}
+                    className={`w-full flex items-center gap-2 px-3 py-2 text-left transition-colors
+                      ${activeView?.type === 'projectDetail' && activeView?.projectId === proj.id ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-600'}`}>
+                    <FolderOpen size={13} className="text-slate-400 shrink-0" />
+                    <span className="text-[11px] truncate flex-1">{proj.name}</span>
+                    {(proj.tasks || []).length > 0 && (
+                      <span className="text-[9px] text-slate-300">{(proj.tasks || []).filter(t => t.completed).length}/{(proj.tasks || []).length}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* All Tasks flyout */}
+        <div className="relative w-full px-1.5 shrink-0">
+          <button onClick={() => { setCollapsedHistoryOpen(v => !v); setCollapsedProjectsOpen(false); }}
             className={`group w-full h-[36px] rounded-xl flex items-center justify-center transition-colors
               ${collapsedHistoryOpen ? 'bg-slate-100 text-slate-600' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'}`}>
             <MessageSquare size={16} />
@@ -367,35 +407,20 @@ export const Sidebar = ({
             )}
           </button>
           {collapsedHistoryOpen && (
-            <div className="absolute left-full top-0 ml-2 w-[240px] bg-white border border-slate-200 rounded-xl shadow-xl z-[60] overflow-hidden max-h-[400px] flex flex-col">
+            <div className="absolute left-full top-0 ml-2 w-[220px] bg-white border border-slate-200 rounded-xl shadow-xl z-[60] overflow-hidden max-h-[350px] flex flex-col">
               <div className="px-3 py-2 border-b border-slate-100">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">All Tasks</p>
               </div>
               <div className="flex-1 overflow-auto">
-                {projects.length > 0 && (
-                  <div className="px-2 py-1.5">
-                    <p className="text-[9px] font-bold text-slate-300 uppercase tracking-wider px-2 mb-1">Projects</p>
-                    {projects.map(proj => (
-                      <button key={proj.id} onClick={() => { setCollapsedHistoryOpen(false); onOpenProject(proj.id); }}
-                        className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 text-left transition-colors">
-                        <FolderOpen size={13} className="text-slate-400 shrink-0" />
-                        <span className="text-[11px] text-slate-600 truncate">{proj.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-                <div className="px-2 py-1.5">
-                  <p className="text-[9px] font-bold text-slate-300 uppercase tracking-wider px-2 mb-1">All Tasks</p>
-                  {sessions.slice(0, 10).map(s => (
-                    <button key={s.id} onClick={() => { onSwitchSession(s.id); setCollapsedHistoryOpen(false); }}
-                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-colors
-                        ${s.id === activeSessionId ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-600'}`}>
-                      <MessageSquare size={12} className="shrink-0 text-slate-400" />
-                      <span className="text-[11px] truncate">{s.title || 'Untitled'}</span>
-                    </button>
-                  ))}
-                  {sessions.length === 0 && <p className="text-[10px] text-slate-400 px-2 py-2">No conversations yet</p>}
-                </div>
+                {sessions.slice(0, 15).map(s => (
+                  <button key={s.id} onClick={() => { onSwitchSession(s.id); setCollapsedHistoryOpen(false); }}
+                    className={`w-full flex items-center gap-2 px-3 py-2 text-left transition-colors
+                      ${s.id === activeSessionId ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-600'}`}>
+                    <MessageSquare size={12} className="shrink-0 text-slate-400" />
+                    <span className="text-[11px] truncate">{s.title || 'Untitled'}</span>
+                  </button>
+                ))}
+                {sessions.length === 0 && <p className="text-[10px] text-slate-400 px-3 py-4 text-center">No tasks yet</p>}
               </div>
             </div>
           )}
