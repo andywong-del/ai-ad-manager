@@ -58,5 +58,12 @@ export const useAuth = () => {
     window.dispatchEvent(new Event('fb_token_changed'));
   };
 
-  return { longLivedToken, isLoading, error, login, logout };
+  // Direct setter for dev bypass (skip FB login flow)
+  const setTokenDirect = (token) => {
+    localStorage.setItem(TOKEN_KEY, token);
+    setLongLivedToken(token);
+    window.dispatchEvent(new Event('fb_token_changed'));
+  };
+
+  return { longLivedToken, isLoading, error, login, logout, setTokenDirect };
 };

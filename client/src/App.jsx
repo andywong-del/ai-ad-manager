@@ -1,4 +1,4 @@
-import { useState, Component } from 'react';
+import { useState, useEffect, Component } from 'react';
 
 class ErrorBoundary extends Component {
   state = { error: null };
@@ -24,13 +24,28 @@ import { Dashboard } from './components/Dashboard.jsx';
 const DEV_BYPASS = import.meta.env.DEV && import.meta.env.VITE_DEV_BYPASS === 'true';
 
 export default function App() {
-  const { longLivedToken, isLoading, error, login, logout } = useAuth();
+  const { longLivedToken, isLoading, error, login, logout, setTokenDirect } = useAuth();
   const [selectedBusiness, setSelectedBusiness] = useState(() => {
     try { return JSON.parse(localStorage.getItem('aam_selected_business')); } catch { return null; }
   });
   const [selectedAccount, setSelectedAccount] = useState(() => {
     try { return JSON.parse(localStorage.getItem('aam_selected_account')); } catch { return null; }
   });
+
+  // Dev bypass: auto-seed token + ad account from server so localhost skips login
+  useEffect(() => {
+    if (!DEV_BYPASS || longLivedToken) return;
+    fetch('/api/dev-config').then(r => r.json()).then(cfg => {
+      if (!cfg.enabled) return;
+      localStorage.setItem('fb_long_lived_token', cfg.token);
+      setTokenDirect(cfg.token);
+      if (cfg.adAccountId && !selectedAccount) {
+        const acc = { id: cfg.adAccountId, name: cfg.adAccountId, account_id: cfg.adAccountId.replace('act_', '') };
+        setSelectedAccount(acc);
+        localStorage.setItem('aam_selected_account', JSON.stringify(acc));
+      }
+    }).catch(() => {});
+  }, [DEV_BYPASS, longLivedToken]);
 
   // Always show Dashboard — soft wall prompts login when needed
   return (

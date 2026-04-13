@@ -159,6 +159,10 @@ export const CreativeLibrary = ({ adAccountId, token, onLogin, onLogout, selecte
   const [visibleCount, setVisibleCount] = useState(18);
   const [deleteTarget, setDeleteTarget] = useState(null); // asset pending delete confirmation
   const [deleteError, setDeleteError] = useState(null);
+  const [datePreset, setDatePreset] = useState('maximum');
+  const [customDateFrom, setCustomDateFrom] = useState('');
+  const [customDateTo, setCustomDateTo] = useState('');
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const fetchAssets = useCallback(async () => {
     if (!adAccountId) return;
@@ -192,9 +196,28 @@ export const CreativeLibrary = ({ adAccountId, token, onLogin, onLogout, selecte
       const q = search.toLowerCase();
       list = list.filter(a => (a.name || a.title || '').toLowerCase().includes(q));
     }
+    // Date filter
+    if (datePreset !== 'maximum') {
+      const now = new Date();
+      let from, to;
+      if (datePreset === 'custom' && customDateFrom && customDateTo) {
+        from = new Date(customDateFrom);
+        to = new Date(customDateTo + 'T23:59:59');
+      } else {
+        to = now;
+        const d = new Date();
+        if (datePreset === 'last_7d') d.setDate(d.getDate() - 7);
+        else if (datePreset === 'last_14d') d.setDate(d.getDate() - 14);
+        else if (datePreset === 'last_30d') d.setDate(d.getDate() - 30);
+        else if (datePreset === 'this_month') d.setDate(1);
+        else if (datePreset === 'last_month') { d.setMonth(d.getMonth() - 1); d.setDate(1); to = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59); }
+        from = d;
+      }
+      if (from && to) list = list.filter(a => { const ct = new Date(a.created_time); return ct >= from && ct <= to; });
+    }
     list.sort((a, b) => new Date(b.created_time || 0) - new Date(a.created_time || 0));
     return list;
-  }, [images, videos, filter, search]);
+  }, [images, videos, filter, search, datePreset, customDateFrom, customDateTo]);
 
   const visibleAssets = useMemo(() => allAssets.slice(0, visibleCount), [allAssets, visibleCount]);
   const hasMore = visibleCount < allAssets.length;
@@ -336,6 +359,39 @@ export const CreativeLibrary = ({ adAccountId, token, onLogin, onLogout, selecte
               {label}
             </button>
           ))}
+        </div>
+        {/* Date filter */}
+        <div className="relative">
+          <select value={datePreset} onChange={e => {
+            const v = e.target.value;
+            if (v === 'custom') { setShowDatePicker(true); setDatePreset('custom'); }
+            else { setDatePreset(v); setShowDatePicker(false); }
+          }}
+            className="px-2.5 py-2 rounded-lg border border-slate-200 bg-white text-[11px] font-medium text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+            <option value="last_7d">Last 7 Days</option>
+            <option value="last_14d">Last 14 Days</option>
+            <option value="last_30d">Last 30 Days</option>
+            <option value="this_month">This Month</option>
+            <option value="last_month">Last Month</option>
+            <option value="maximum">Lifetime</option>
+            <option value="custom">{customDateFrom && customDateTo ? `${customDateFrom} – ${customDateTo}` : 'Custom Range'}</option>
+          </select>
+          {showDatePicker && (
+            <div className="absolute top-full right-0 mt-1 z-30 bg-white rounded-xl shadow-xl border border-slate-200 p-4 w-64" onClick={e => e.stopPropagation()}>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Custom Date Range</p>
+              <div className="space-y-2">
+                <div><label className="text-[10px] text-slate-500 font-medium">From</label>
+                  <input type="date" value={customDateFrom} onChange={e => setCustomDateFrom(e.target.value)} className="w-full mt-0.5 px-2.5 py-1.5 rounded-lg border border-slate-200 text-[11px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20" /></div>
+                <div><label className="text-[10px] text-slate-500 font-medium">To</label>
+                  <input type="date" value={customDateTo} onChange={e => setCustomDateTo(e.target.value)} className="w-full mt-0.5 px-2.5 py-1.5 rounded-lg border border-slate-200 text-[11px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20" /></div>
+              </div>
+              <div className="flex justify-end gap-2 mt-3">
+                <button onClick={() => setShowDatePicker(false)} className="px-2.5 py-1.5 text-[11px] text-slate-500 hover:bg-slate-50 rounded-lg">Cancel</button>
+                <button onClick={() => setShowDatePicker(false)} disabled={!customDateFrom || !customDateTo}
+                  className="px-2.5 py-1.5 text-[11px] text-white bg-blue-500 hover:bg-blue-600 rounded-lg font-medium disabled:opacity-50">Apply</button>
+              </div>
+            </div>
+          )}
         </div>
         <div className="flex rounded-lg border border-slate-200 bg-white overflow-hidden">
           <button onClick={() => setViewMode('grid')}

@@ -747,7 +747,7 @@ export const CampaignManager = ({ adAccountId, onBack, onSendToChat, token, onLo
       });
     }
     return list;
-  }, [currentData, statusFilter, search, sortKey, sortDir]);
+  }, [currentData, statusFilter, objectiveFilter, activeTab, search, sortKey, sortDir]);
 
   const activeCount = currentData.filter(c => c._active).length;
   const pausedCount = currentData.filter(c => !c._active).length;

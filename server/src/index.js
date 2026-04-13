@@ -28,6 +28,16 @@ app.use(cors({ origin: true }));
 app.use(express.json({ limit: '50mb' }));
 
 app.get('/api/ping', (_req, res) => res.json({ ok: true }));
+
+// Dev config — lets localhost skip login by seeding token + ad account
+app.get('/api/dev-config', (_req, res) => {
+  if (!process.env.META_DEMO_TOKEN) return res.json({ enabled: false });
+  res.json({
+    enabled: true,
+    token: process.env.META_DEMO_TOKEN,
+    adAccountId: process.env.AD_ACCOUNT_ID || null,
+  });
+});
 app.get('/api/debug', async (_req, res) => {
   const { rootTools, analystTools } = await import('./lib/tools.js');
   res.json({

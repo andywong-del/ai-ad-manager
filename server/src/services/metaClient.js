@@ -1138,13 +1138,15 @@ export const updatePixel = async (token, pixelId, updates) => {
 };
 
 export const getPixelStats = async (token, pixelId) => {
-  const { data } = await metaApi.get(`/${pixelId}/stats`, {
-    params: {
-      access_token: token,
-      aggregation: 'event',
-    }
-  });
-  return data?.data || [];
+  // Fetch both stats and diagnostics in parallel
+  const [statsRes, checksRes] = await Promise.all([
+    metaApi.get(`/${pixelId}/stats`, { params: { access_token: token } }).catch(() => ({ data: { data: [] } })),
+    metaApi.get(`/${pixelId}/da_checks`, { params: { access_token: token } }).catch(() => ({ data: { data: [] } })),
+  ]);
+  return {
+    events: statsRes.data?.data || [],
+    diagnostics: checksRes.data?.data || [],
+  };
 };
 
 export const sendConversionEvent = async (token, pixelId, eventData) => {
@@ -1226,6 +1228,13 @@ export const getLeadFormLeads = async (token, formId) => {
 export const createLeadForm = async (token, pageId, params) => {
   const { data } = await metaApi.post(`/${pageId}/leadgen_forms`, null, {
     params: { access_token: token, ...params }
+  });
+  return data;
+};
+
+export const archiveLeadForm = async (token, formId) => {
+  const { data } = await metaApi.post(`/${formId}`, null, {
+    params: { access_token: token, status: 'ARCHIVED' }
   });
   return data;
 };

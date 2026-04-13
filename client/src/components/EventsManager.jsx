@@ -61,7 +61,15 @@ const EVENT_COLORS = {
 const getEventColor = (name) => EVENT_COLORS[name] || { bg: 'bg-slate-50', text: 'text-slate-600', border: 'border-slate-200', icon: '📊' };
 
 // ── Pixel card with inline events ──
-const PixelCard = ({ pixel, expanded, onToggle, events, eventsLoading }) => {
+// ── Diagnostic check result ──
+const DIAG_ICONS = { passed: '✅', failed: '❌', warning: '⚠️' };
+const DIAG_COLORS = {
+  passed: 'bg-emerald-50 border-emerald-200 text-emerald-700',
+  failed: 'bg-red-50 border-red-200 text-red-700',
+  warning: 'bg-amber-50 border-amber-200 text-amber-700',
+};
+
+const PixelCard = ({ pixel, expanded, onToggle, events, diagnostics, eventsLoading }) => {
   const [showCode, setShowCode] = useState(false);
   const totalEvents = events?.reduce((sum, e) => sum + (Number(e.count ?? e.value ?? 0)), 0) || 0;
 
@@ -107,9 +115,27 @@ const PixelCard = ({ pixel, expanded, onToggle, events, eventsLoading }) => {
                 <span className="text-[11px] text-slate-400">Loading events...</span>
               </div>
             ) : !events || events.length === 0 ? (
-              <div className="py-4 text-center">
-                <p className="text-[12px] text-slate-400">No events received yet</p>
-                <p className="text-[10px] text-slate-300 mt-1">Install the pixel code on your website to start tracking</p>
+              <div className="py-2">
+                <p className="text-[12px] text-slate-400 mb-3">No event data from stats API</p>
+                {diagnostics && diagnostics.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Pixel Diagnostics</p>
+                    <div className="space-y-1.5">
+                      {diagnostics.map((d, i) => (
+                        <div key={i} className={`flex items-start gap-2.5 px-3 py-2 rounded-lg border ${DIAG_COLORS[d.result] || DIAG_COLORS.warning}`}>
+                          <span className="text-[13px] mt-0.5">{DIAG_ICONS[d.result] || '?'}</span>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[11px] font-semibold">{d.title}</p>
+                            <p className="text-[10px] opacity-70 mt-0.5 line-clamp-2">{d.description}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {(!diagnostics || diagnostics.length === 0) && (
+                  <p className="text-[10px] text-slate-300">Install the pixel code on your website to start tracking events</p>
+                )}
               </div>
             ) : (
               <div className="space-y-2">
@@ -210,6 +236,7 @@ export const EventsManager = ({ adAccountId, token, onLogin, onLogout, selectedA
   const [error, setError] = useState(null);
   const [expandedPixel, setExpandedPixel] = useState(null);
   const [pixelEvents, setPixelEvents] = useState({}); // { [pixelId]: events[] }
+  const [pixelDiagnostics, setPixelDiagnostics] = useState({}); // { [pixelId]: diagnostics[] }
   const [eventsLoading, setEventsLoading] = useState({});
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
@@ -245,18 +272,21 @@ export const EventsManager = ({ adAccountId, token, onLogin, onLogout, selectedA
 
   useEffect(() => { fetchPixels(); fetchConversions(); }, [fetchPixels, fetchConversions]);
 
-  // Fetch events when a pixel is expanded
+  // Fetch events + diagnostics when a pixel is expanded
   useEffect(() => {
     if (!expandedPixel || pixelEvents[expandedPixel]) return;
     setEventsLoading(prev => ({ ...prev, [expandedPixel]: true }));
     api.get(`/pixels/${expandedPixel}/stats`).then(({ data }) => {
-      const events = Array.isArray(data) ? data : data?.data || [data];
-      // Filter out empty/invalid entries
+      // New format: { events: [...], diagnostics: [...] }
+      const events = Array.isArray(data) ? data : (data?.events || []);
+      const diagnostics = data?.diagnostics || [];
       const valid = events.filter(e => e && (e.event || e.name || e.event_name));
       setPixelEvents(prev => ({ ...prev, [expandedPixel]: valid }));
+      setPixelDiagnostics(prev => ({ ...prev, [expandedPixel]: diagnostics }));
     }).catch(err => {
       console.error('Failed to load pixel events:', err);
       setPixelEvents(prev => ({ ...prev, [expandedPixel]: [] }));
+      setPixelDiagnostics(prev => ({ ...prev, [expandedPixel]: [] }));
     }).finally(() => {
       setEventsLoading(prev => ({ ...prev, [expandedPixel]: false }));
     });
@@ -278,7 +308,8 @@ export const EventsManager = ({ adAccountId, token, onLogin, onLogout, selectedA
   }, [deleteConfirm]);
 
   const handleRefresh = useCallback(() => {
-    setPixelEvents({}); // clear cached events
+    setPixelEvents({});
+    setPixelDiagnostics({});
     fetchPixels();
     fetchConversions();
   }, [fetchPixels, fetchConversions]);
@@ -349,6 +380,7 @@ export const EventsManager = ({ adAccountId, token, onLogin, onLogout, selectedA
                   expanded={expandedPixel === pixel.id}
                   onToggle={() => handleTogglePixel(pixel.id)}
                   events={pixelEvents[pixel.id]}
+                  diagnostics={pixelDiagnostics[pixel.id]}
                   eventsLoading={eventsLoading[pixel.id]} />
               ))}
             </div>

@@ -26,6 +26,33 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /ad-library - Fetch ads with full creative data + campaign/adset names for the Ad Library view
+router.get('/ad-library', async (req, res) => {
+  try {
+    const { adAccountId, limit, after } = req.query;
+    if (!adAccountId) return res.status(400).json({ error: 'adAccountId is required' });
+    const fields = [
+      'id', 'name', 'status', 'effective_status', 'created_time',
+      'campaign_id', 'campaign{id,name,objective,status}',
+      'adset_id', 'adset{id,name,status}',
+      'creative{id,name,title,body,image_url,image_hash,thumbnail_url,video_id,object_story_spec,call_to_action_type,asset_feed_spec}',
+      'preview_shareable_link',
+    ].join(',');
+    const params = {
+      access_token: req.token,
+      fields,
+      limit: limit ? parseInt(limit) : 24,
+    };
+    if (after) params.after = after;
+    const { data } = await metaClient.metaApi.get(`/${adAccountId}/ads`, { params });
+    res.json({ data: data?.data || [], paging: data?.paging || null });
+  } catch (err) {
+    const metaErr = err.response?.data?.error;
+    console.error('[creatives] GET /ad-library error:', metaErr || err.message);
+    res.status(err.response?.status || 500).json({ error: metaErr?.message || err.message, code: metaErr?.code });
+  }
+});
+
 // GET /:id/previews - Preview creative (must be before /:id to avoid param collision)
 router.get('/:id/previews', async (req, res) => {
   try {
