@@ -324,7 +324,7 @@ export const Sidebar = ({
 
   return (
     <aside style={{ width: open ? 260 : 52 }}
-      className="shrink-0 bg-white/70 backdrop-blur-xl border-r border-slate-200 flex flex-col h-screen transition-all duration-200 ease-in-out z-20 relative overflow-hidden">
+      className={`shrink-0 bg-white/70 backdrop-blur-xl border-r border-slate-200 flex flex-col h-screen transition-all duration-200 ease-in-out z-20 relative ${open ? 'overflow-hidden' : 'overflow-visible'}`}>
 
       {/* Collapsed overlay — icon rail */}
       <div className={`absolute inset-0 flex flex-col items-center transition-opacity duration-150 ${open ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
