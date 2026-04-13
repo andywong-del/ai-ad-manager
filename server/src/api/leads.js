@@ -14,11 +14,11 @@ const getPageToken = async (userToken, pageId) => {
 // GET /forms - List lead forms for a page
 router.get('/forms', async (req, res) => {
   try {
-    const { pageId } = req.query;
+    const { pageId, limit, after } = req.query;
     if (!pageId) return res.status(400).json({ error: 'pageId is required' });
     const pageToken = await getPageToken(req.token, pageId);
-    const data = await metaClient.getLeadForms(pageToken, pageId);
-    res.json(data);
+    const result = await metaClient.getLeadForms(pageToken, pageId, { limit: limit ? parseInt(limit) : 20, after });
+    res.json(result);
   } catch (err) {
     const metaErr = err.response?.data?.error;
     console.error('[leads] GET /forms error:', metaErr || err.message);

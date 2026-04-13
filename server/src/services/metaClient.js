@@ -1209,14 +1209,15 @@ export const deleteCustomConversion = async (token, conversionId) => {
 
 // ─── Lead Ads ────────────────────────────────────────────────────────
 
-export const getLeadForms = async (token, pageId) => {
-  const { data } = await metaApi.get(`/${pageId}/leadgen_forms`, {
-    params: {
-      access_token: token,
-      fields: 'id,name,status,locale,created_time,questions,privacy_policy_url'
-    }
-  });
-  return data?.data || [];
+export const getLeadForms = async (token, pageId, { limit = 20, after } = {}) => {
+  const params = {
+    access_token: token,
+    fields: 'id,name,status,locale,created_time,questions,privacy_policy_url,leads_count',
+    limit,
+  };
+  if (after) params.after = after;
+  const { data } = await metaApi.get(`/${pageId}/leadgen_forms`, { params });
+  return { data: data?.data || [], paging: data?.paging || null };
 };
 
 export const getLeadFormLeads = async (token, formId) => {

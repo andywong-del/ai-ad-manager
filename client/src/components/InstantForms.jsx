@@ -380,7 +380,126 @@ const LeadsModal = ({ form, pageId, onClose }) => {
   );
 };
 
-// ── Interactive phone preview (multi-step like Facebook) ──
+// ── Form detail panel (right side) ──
+const FormDetailPanel = ({ form, pageId, pageName, onClose, onArchive }) => {
+  const [downloading, setDownloading] = useState(false);
+  const questions = form.questions || [];
+
+  const downloadCSV = async () => {
+    setDownloading(true);
+    try {
+      const { data: leads } = await api.get(`/leads/forms/${form.id}/leads`, { params: { pageId } });
+      const rows = leads || [];
+      if (!rows.length) { alert('No leads to download'); return; }
+      const allFields = new Set();
+      rows.forEach(l => (l.field_data || []).forEach(f => allFields.add(f.name)));
+      const headers = ['Date', 'Campaign', 'Ad', ...allFields];
+      const csvRows = rows.map(l => {
+        const fm = {};
+        (l.field_data || []).forEach(f => { fm[f.name] = (f.values || []).join(', '); });
+        return [fmtDateTime(l.created_time), l.campaign_name || '', l.ad_name || '', ...[...allFields].map(f => fm[f] || '')];
+      });
+      const csv = [headers.join(','), ...csvRows.map(r => r.map(c => `"${c}"`).join(','))].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = `${form.name || 'leads'}.csv`; a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('CSV download failed:', err);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  return (
+    <div className="flex-1 overflow-auto bg-slate-50/50 p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <h2 className="text-[16px] font-bold text-slate-800">{form.name}</h2>
+          <div className="flex items-center gap-3 mt-1">
+            <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full
+              ${form.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-slate-100 text-slate-400 border border-slate-200'}`}>
+              {form.status || 'Active'}
+            </span>
+            <span className="text-[11px] text-slate-400">{fmtDate(form.created_time)}</span>
+            {form.locale && <span className="text-[11px] text-slate-400">Locale: {form.locale}</span>}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={downloadCSV} disabled={downloading}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50">
+            <Download size={12} /> {downloading ? 'Downloading...' : 'Download CSV'}
+          </button>
+          {form.status === 'ACTIVE' && (
+            <button onClick={onArchive}
+              className="flex items-center gap-1 px-3 py-1.5 text-[11px] font-medium text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg border border-slate-200 transition-colors">
+              <Archive size={12} /> Archive
+            </button>
+          )}
+          <button onClick={onClose}
+            className="w-7 h-7 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-400">
+            <X size={14} />
+          </button>
+        </div>
+      </div>
+
+      {/* Lead count card */}
+      <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4 flex items-center gap-4">
+        <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center">
+          <Users size={20} className="text-blue-500" />
+        </div>
+        <div>
+          <p className="text-[24px] font-bold text-slate-800 leading-none">
+            {form.leads_count != null ? Number(form.leads_count).toLocaleString() : '—'}
+          </p>
+          <p className="text-[11px] text-slate-400 mt-0.5">Total leads collected</p>
+        </div>
+      </div>
+
+      {/* Form fields */}
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden mb-4">
+        <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50">
+          <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+            Form Fields ({questions.length})
+          </h3>
+        </div>
+        <div className="divide-y divide-slate-100">
+          {questions.map((q, i) => (
+            <div key={i} className="flex items-center gap-3 px-4 py-3">
+              <span className="w-6 h-6 rounded-md bg-orange-50 flex items-center justify-center shrink-0">
+                <span className="text-[10px] font-bold text-orange-500">{i + 1}</span>
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-[12px] font-medium text-slate-700">{q.label || q.key}</p>
+                {q.type && <p className="text-[10px] text-slate-400 mt-0.5">{q.type}</p>}
+              </div>
+              {q.key && (
+                <span className="text-[9px] font-mono text-slate-300 bg-slate-50 px-1.5 py-0.5 rounded">{q.key}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Form info */}
+      <div className="bg-white rounded-xl border border-slate-200 p-4">
+        <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3">Details</h3>
+        <div className="space-y-2 text-[11px]">
+          <div className="flex justify-between"><span className="text-slate-400">Form ID</span><span className="font-mono text-slate-600">{form.id}</span></div>
+          <div className="flex justify-between"><span className="text-slate-400">Page</span><span className="text-slate-600">{pageName || '—'}</span></div>
+          {form.privacy_policy_url && (
+            <div className="flex justify-between"><span className="text-slate-400">Privacy Policy</span>
+              <a href={form.privacy_policy_url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline truncate max-w-[200px]">{form.privacy_policy_url}</a>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── Multi-step phone preview (kept for reference but not used in main UI) ──
 const FormPhonePreview = ({ form, pageName }) => {
   const questions = form.questions || [];
   // Steps: 0=intro, 1..N=one question per step, N+1=privacy+submit, N+2=thank you
@@ -584,22 +703,30 @@ export const InstantForms = ({ adAccountId, token, onLogin, onLogout, selectedAc
     }
   }, [adAccountId]);
 
-  const fetchForms = useCallback(async () => {
+  const [formsPaging, setFormsPaging] = useState(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  const fetchForms = useCallback(async (after) => {
     if (!selectedPage) return;
-    setLoading(true);
-    setError(null);
+    if (after) setLoadingMore(true); else { setLoading(true); setError(null); }
     try {
-      const { data } = await api.get('/leads/forms', { params: { pageId: selectedPage.id } });
-      setForms(data || []);
+      const params = { pageId: selectedPage.id, limit: 20 };
+      if (after) params.after = after;
+      const { data } = await api.get('/leads/forms', { params });
+      const items = data?.data || data || [];
+      if (after) setForms(prev => [...prev, ...items]);
+      else setForms(items);
+      setFormsPaging(data?.paging || null);
     } catch (err) {
       setError(err.response?.data?.error || err.message);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }, [selectedPage]);
 
   useEffect(() => { fetchPages(); }, [fetchPages]);
-  useEffect(() => { fetchForms(); }, [fetchForms]);
+  useEffect(() => { setForms([]); setSelectedForm(null); fetchForms(); }, [fetchForms]);
 
   const handleArchive = useCallback(async () => {
     if (!archiveTarget) return;
@@ -714,69 +841,52 @@ export const InstantForms = ({ adAccountId, token, onLogin, onLogout, selectedAc
                 )}
               </div>
             ) : (
-              filtered.map(form => (
-                <button key={form.id} onClick={() => setSelectedForm(form)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 text-left border-b border-slate-100 transition-colors
-                    ${selectedForm?.id === form.id ? 'bg-blue-50 border-l-2 border-l-blue-500' : 'hover:bg-slate-50 border-l-2 border-l-transparent'}`}>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[12px] font-semibold text-slate-800 truncate">{form.name}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className={`inline-flex items-center gap-1 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full
-                        ${form.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
-                        {form.status || 'Active'}
-                      </span>
-                      <span className="text-[10px] text-slate-400">{(form.questions || []).length} fields</span>
-                      <span className="text-[10px] text-slate-300">{fmtDate(form.created_time)}</span>
+              <>
+                {filtered.map(form => (
+                  <button key={form.id} onClick={() => setSelectedForm(form)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-left border-b border-slate-100 transition-colors
+                      ${selectedForm?.id === form.id ? 'bg-blue-50 border-l-2 border-l-blue-500' : 'hover:bg-slate-50 border-l-2 border-l-transparent'}`}>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[12px] font-semibold text-slate-800 truncate">{form.name}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className={`inline-flex items-center gap-1 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full
+                          ${form.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+                          {form.status || 'Active'}
+                        </span>
+                        <span className="text-[10px] text-slate-400">{(form.questions || []).length} fields</span>
+                        {form.leads_count != null && (
+                          <span className="text-[10px] text-blue-500 font-medium">{Number(form.leads_count).toLocaleString()} leads</span>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-slate-300 mt-0.5 block">{fmtDate(form.created_time)}</span>
                     </div>
-                  </div>
-                  <ChevronDown size={14} className="text-slate-300 -rotate-90 shrink-0" />
-                </button>
-              ))
+                    <ChevronDown size={14} className="text-slate-300 -rotate-90 shrink-0" />
+                  </button>
+                ))}
+                {formsPaging?.next && (
+                  <button onClick={() => fetchForms(formsPaging?.cursors?.after)} disabled={loadingMore}
+                    className="w-full py-3 text-center text-[11px] font-medium text-blue-500 hover:bg-blue-50 transition-colors">
+                    {loadingMore ? 'Loading...' : 'Load More Forms'}
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>
 
-        {/* Right: Form preview */}
+        {/* Right: Form detail panel */}
         {selectedForm && (
-          <div className="flex-1 overflow-auto bg-slate-50/50 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-[15px] font-bold text-slate-800">{selectedForm.name}</h2>
-                <p className="text-[11px] text-slate-400 mt-0.5">Form preview — may not exactly match Facebook</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button onClick={() => setViewingForm(selectedForm)}
-                  className="flex items-center gap-1 px-3 py-1.5 text-[11px] font-medium text-blue-600 hover:bg-blue-50 rounded-lg border border-blue-200 transition-colors">
-                  <Eye size={12} /> View Leads
-                </button>
-                {selectedForm.status === 'ACTIVE' && (
-                  <button onClick={() => setArchiveTarget(selectedForm)}
-                    className="flex items-center gap-1 px-3 py-1.5 text-[11px] font-medium text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg border border-slate-200 transition-colors">
-                    <Archive size={12} /> Archive
-                  </button>
-                )}
-                <button onClick={() => setSelectedForm(null)}
-                  className="w-7 h-7 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-400">
-                  <X size={14} />
-                </button>
-              </div>
-            </div>
-
-            {/* Interactive phone mockup */}
-            <FormPhonePreview form={selectedForm} pageName={selectedPage?.name} />
-
-            {/* Form metadata */}
-            <div className="mt-4 flex items-center justify-center gap-4 text-[10px] text-slate-400">
-              {selectedForm.locale && <span>Locale: {selectedForm.locale}</span>}
-              <span className="font-mono">ID: {selectedForm.id}</span>
-              <span>Created: {fmtDate(selectedForm.created_time)}</span>
-            </div>
-          </div>
+          <FormDetailPanel
+            form={selectedForm}
+            pageId={selectedPage?.id}
+            pageName={selectedPage?.name}
+            onClose={() => setSelectedForm(null)}
+            onArchive={() => setArchiveTarget(selectedForm)}
+          />
         )}
       </div>
 
       {/* Modals */}
-      {viewingForm && <LeadsModal form={viewingForm} pageId={selectedPage?.id} onClose={() => setViewingForm(null)} />}
       {showCreate && selectedPage && <CreateFormModal pageId={selectedPage.id} onClose={() => setShowCreate(false)} onCreated={fetchForms} />}
 
       {/* Archive confirmation */}
