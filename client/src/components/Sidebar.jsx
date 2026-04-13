@@ -315,18 +315,18 @@ export const Sidebar = ({
     ...modules,
   ];
 
-  if (!open) {
-    return (
-      <aside style={{ width: 52 }} className="shrink-0 bg-white/70 backdrop-blur-xl border-r border-slate-200 flex flex-col h-screen items-center transition-all duration-200 ease-in-out z-20 relative">
-        {/* Header — same height as expanded (px-4 py-4 = 64px total) */}
+  return (
+    <aside style={{ width: open ? 260 : 52 }} className="shrink-0 bg-white/70 backdrop-blur-xl border-r border-slate-200 flex flex-col h-screen transition-all duration-200 ease-in-out z-20 relative overflow-hidden">
+
+      {/* Collapsed overlay — icon rail, absolutely positioned so it doesn't affect expanded layout */}
+      <div className={`absolute inset-0 flex flex-col items-center transition-opacity duration-150 ${open ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+        {/* Header */}
         <div className="h-[64px] w-full flex items-center justify-center shrink-0">
-          <button onClick={onToggle} title="Expand sidebar"
-            className="w-9 h-9 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
+          <button onClick={onToggle} className="w-9 h-9 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
             <Menu size={18} />
           </button>
         </div>
-
-        {/* New Chat — taller to match expanded button with mb-2 */}
+        {/* New Chat */}
         <div className="w-full px-1.5 mb-1.5 shrink-0">
           <button onClick={onNewChat}
             className="group relative w-full h-[40px] rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors border border-slate-200">
@@ -334,8 +334,7 @@ export const Sidebar = ({
             <span className="absolute left-full ml-2 px-2.5 py-1 text-[11px] font-medium text-white bg-slate-800 rounded-lg whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-[60] shadow-lg">New Chat</span>
           </button>
         </div>
-
-        {/* All module items */}
+        {/* Module icons */}
         <div className="flex flex-col items-center w-full px-1.5 gap-0.5 shrink-0">
           {allItems.map(({ icon: Icon, type, action, label }) => {
             const isActive = type && activeView?.type === type;
@@ -349,11 +348,8 @@ export const Sidebar = ({
             );
           })}
         </div>
-
-        {/* Divider */}
+        {/* Divider + History */}
         <div className="w-6 h-px bg-slate-200 my-2" />
-
-        {/* History — single icon, click to show flyout with folders + recent chats */}
         <div className="relative w-full px-1.5 shrink-0">
           <button onClick={() => setCollapsedHistoryOpen(v => !v)}
             className={`group w-full h-[36px] rounded-xl flex items-center justify-center transition-colors
@@ -363,16 +359,12 @@ export const Sidebar = ({
               <span className="absolute left-full ml-2 px-2.5 py-1 text-[11px] font-medium text-white bg-slate-800 rounded-lg whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-[60] shadow-lg">Chats & Folders</span>
             )}
           </button>
-
-          {/* Flyout menu */}
           {collapsedHistoryOpen && (
             <div className="absolute left-full top-0 ml-2 w-[240px] bg-white border border-slate-200 rounded-xl shadow-xl z-[60] overflow-hidden max-h-[400px] flex flex-col">
               <div className="px-3 py-2 border-b border-slate-100">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Chats & Folders</p>
               </div>
-
               <div className="flex-1 overflow-auto">
-                {/* Folders */}
                 {sortedFolders.length > 0 && (
                   <div className="px-2 py-1.5">
                     <p className="text-[9px] font-bold text-slate-300 uppercase tracking-wider px-2 mb-1">Folders</p>
@@ -381,13 +373,10 @@ export const Sidebar = ({
                         className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 text-left transition-colors">
                         <FolderOpen size={13} className="text-slate-400 shrink-0" />
                         <span className="text-[11px] text-slate-600 truncate">{folder.name}</span>
-                        <span className="text-[9px] text-slate-300 ml-auto shrink-0">{(folder.sessionIds || []).length}</span>
                       </button>
                     ))}
                   </div>
                 )}
-
-                {/* Recent conversations */}
                 <div className="px-2 py-1.5">
                   <p className="text-[9px] font-bold text-slate-300 uppercase tracking-wider px-2 mb-1">Recent</p>
                   {sessions.slice(0, 10).map(s => (
@@ -398,31 +387,23 @@ export const Sidebar = ({
                       <span className="text-[11px] truncate">{s.title || 'Untitled'}</span>
                     </button>
                   ))}
-                  {sessions.length === 0 && (
-                    <p className="text-[10px] text-slate-400 px-2 py-2">No conversations yet</p>
-                  )}
+                  {sessions.length === 0 && <p className="text-[10px] text-slate-400 px-2 py-2">No conversations yet</p>}
                 </div>
               </div>
             </div>
           )}
         </div>
-
-        {/* Spacer */}
         <div className="flex-1" />
-
-        {/* User avatar */}
         <div className="pb-4">
           <div className="group relative w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shrink-0 shadow-sm">
             <span className="text-white text-[10px] font-bold">A</span>
             <span className="absolute left-full ml-2 px-2.5 py-1 text-[11px] font-medium text-white bg-slate-800 rounded-lg whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-[60] shadow-lg">Andy Wong</span>
           </div>
         </div>
-      </aside>
-    );
-  }
+      </div>
 
-  return (
-    <aside style={{ width: 260 }} className="shrink-0 bg-white/70 backdrop-blur-xl border-r border-slate-200 flex flex-col h-screen transition-all duration-200 ease-in-out z-20 relative overflow-hidden">
+      {/* Expanded content — fades in/out */}
+      <div className={`flex flex-col h-full transition-opacity duration-150 ${open ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
 
       {/* Header */}
       <div className="px-4 py-4 flex items-center justify-between">
@@ -786,6 +767,7 @@ export const Sidebar = ({
         </div>
       )}
 
+      </div>
     </aside>
   );
 };
