@@ -125,8 +125,8 @@ const AdCard = ({ ad, onPreview }) => {
   const displayLink = linkData.link || creative.object_url || '';
   const displayCta = ctaLabel || fmtCta(linkData.call_to_action?.type) || '';
 
-  // Prefer full-res: link_data.picture > image_url > full video thumb > thumbnail
-  const imageUrl = linkData.picture || linkData.image_url || creative.image_url || creative._full_thumb || creative.thumbnail_url;
+  // Prefer full-res: link_data sources > creative.image_url > video thumb > thumbnail
+  const imageUrl = linkData.picture || linkData.image_url || linkData.image_url || creative.image_url || creative._full_thumb || creative.thumbnail_url;
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-lg transition-all w-full">
