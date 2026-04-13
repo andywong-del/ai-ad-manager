@@ -299,25 +299,25 @@ export const Sidebar = ({
     setEditFolderName('');
   };
 
-  // Collapsed icon rail — hover to expand
+  const modules = [
+    { icon: BarChart3, type: 'campaigns', action: onOpenCampaigns, label: 'Campaigns' },
+    { icon: Users, type: 'audiences', action: onOpenAudiences, label: 'Audiences' },
+    { icon: Image, type: 'creativeLibrary', action: onOpenCreativeLibrary, label: 'Asset Library' },
+    { icon: Palette, type: 'adLibrary', action: onOpenAdLibrary, label: 'Ad Library' },
+    { icon: ClipboardList, type: 'instantForms', action: onOpenInstantForms, label: 'Instant Forms' },
+    { icon: TrendingUp, type: 'eventsManager', action: onOpenEventsManager, label: 'Events Manager' },
+    { icon: Settings, type: 'automationRules', action: onOpenAutomationRules, label: 'Automation Rules' },
+    { icon: Zap, type: 'optimizations', action: () => {}, label: 'Optimizations' },
+    { icon: FileText, type: 'report', action: () => {}, label: 'Report' },
+  ];
+  const allItems = [
+    { icon: Sparkles, label: 'Skills', action: onOpenSkillsLibrary, type: 'skillsLibrary' },
+    ...modules,
+  ];
+
   if (!open) {
-    const modules = [
-      { icon: BarChart3, type: 'campaigns', action: onOpenCampaigns, label: 'Campaigns' },
-      { icon: Users, type: 'audiences', action: onOpenAudiences, label: 'Audiences' },
-      { icon: Image, type: 'creativeLibrary', action: onOpenCreativeLibrary, label: 'Asset Library' },
-      { icon: Palette, type: 'adLibrary', action: onOpenAdLibrary, label: 'Ad Library' },
-      { icon: ClipboardList, type: 'instantForms', action: onOpenInstantForms, label: 'Instant Forms' },
-      { icon: TrendingUp, type: 'eventsManager', action: onOpenEventsManager, label: 'Events Manager' },
-      { icon: Settings, type: 'automationRules', action: onOpenAutomationRules, label: 'Automation Rules' },
-      { icon: Zap, type: 'optimizations', action: () => {}, label: 'Optimizations' },
-      { icon: FileText, type: 'report', action: () => {}, label: 'Report' },
-    ];
-    const allItems = [
-      { icon: Sparkles, label: 'Skills', action: onOpenSkillsLibrary, type: 'skillsLibrary' },
-      ...modules,
-    ];
     return (
-      <aside className="w-[52px] shrink-0 bg-white/70 backdrop-blur-xl border-r border-slate-200 flex flex-col h-screen items-center">
+      <aside style={{ width: 52 }} className="shrink-0 bg-white/70 backdrop-blur-xl border-r border-slate-200 flex flex-col h-screen items-center transition-all duration-200 ease-in-out z-20 relative">
         {/* Header — same height as expanded (px-4 py-4 = 64px total) */}
         <div className="h-[64px] w-full flex items-center justify-center shrink-0">
           <button onClick={onToggle} title="Expand sidebar"
@@ -331,7 +331,7 @@ export const Sidebar = ({
           <button onClick={onNewChat}
             className="group relative w-full h-[40px] rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors border border-slate-200">
             <Plus size={16} />
-            <span className="absolute left-full ml-2 px-2.5 py-1 text-[11px] font-medium text-white bg-slate-800 rounded-lg whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-lg">New Chat</span>
+            <span className="absolute left-full ml-2 px-2.5 py-1 text-[11px] font-medium text-white bg-slate-800 rounded-lg whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-[60] shadow-lg">New Chat</span>
           </button>
         </div>
 
@@ -344,7 +344,7 @@ export const Sidebar = ({
                 className={`group relative w-full h-[36px] rounded-xl flex items-center justify-center transition-colors
                   ${isActive ? 'bg-blue-50 text-blue-600' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'}`}>
                 <Icon size={16} />
-                <span className="absolute left-full ml-2 px-2.5 py-1 text-[11px] font-medium text-white bg-slate-800 rounded-lg whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-lg">{label}</span>
+                <span className="absolute left-full ml-2 px-2.5 py-1 text-[11px] font-medium text-white bg-slate-800 rounded-lg whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-[60] shadow-lg">{label}</span>
               </button>
             );
           })}
@@ -360,13 +360,13 @@ export const Sidebar = ({
               ${collapsedHistoryOpen ? 'bg-slate-100 text-slate-600' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'}`}>
             <MessageSquare size={16} />
             {!collapsedHistoryOpen && (
-              <span className="absolute left-full ml-2 px-2.5 py-1 text-[11px] font-medium text-white bg-slate-800 rounded-lg whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-lg">Chats & Folders</span>
+              <span className="absolute left-full ml-2 px-2.5 py-1 text-[11px] font-medium text-white bg-slate-800 rounded-lg whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-[60] shadow-lg">Chats & Folders</span>
             )}
           </button>
 
           {/* Flyout menu */}
           {collapsedHistoryOpen && (
-            <div className="absolute left-full top-0 ml-2 w-[240px] bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden max-h-[400px] flex flex-col">
+            <div className="absolute left-full top-0 ml-2 w-[240px] bg-white border border-slate-200 rounded-xl shadow-xl z-[60] overflow-hidden max-h-[400px] flex flex-col">
               <div className="px-3 py-2 border-b border-slate-100">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Chats & Folders</p>
               </div>
@@ -414,7 +414,7 @@ export const Sidebar = ({
         <div className="pb-4">
           <div className="group relative w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shrink-0 shadow-sm">
             <span className="text-white text-[10px] font-bold">A</span>
-            <span className="absolute left-full ml-2 px-2.5 py-1 text-[11px] font-medium text-white bg-slate-800 rounded-lg whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-lg">Andy Wong</span>
+            <span className="absolute left-full ml-2 px-2.5 py-1 text-[11px] font-medium text-white bg-slate-800 rounded-lg whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-[60] shadow-lg">Andy Wong</span>
           </div>
         </div>
       </aside>
@@ -422,7 +422,7 @@ export const Sidebar = ({
   }
 
   return (
-    <aside className="w-[260px] shrink-0 bg-white/70 backdrop-blur-xl border-r border-slate-200 flex flex-col h-screen">
+    <aside style={{ width: 260 }} className="shrink-0 bg-white/70 backdrop-blur-xl border-r border-slate-200 flex flex-col h-screen transition-all duration-200 ease-in-out z-20 relative overflow-hidden">
 
       {/* Header */}
       <div className="px-4 py-4 flex items-center justify-between">
