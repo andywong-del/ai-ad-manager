@@ -219,6 +219,9 @@ export const Sidebar = ({
   onDeleteFolder,
   onRenameFolder,
   onReorderFolders,
+  projects = [],
+  onCreateProject,
+  onOpenProject,
   onOpenAudiences,
   onOpenCampaigns,
   onOpenCreativeLibrary,
@@ -367,14 +370,14 @@ export const Sidebar = ({
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">All Tasks</p>
               </div>
               <div className="flex-1 overflow-auto">
-                {sortedFolders.length > 0 && (
+                {projects.length > 0 && (
                   <div className="px-2 py-1.5">
                     <p className="text-[9px] font-bold text-slate-300 uppercase tracking-wider px-2 mb-1">Projects</p>
-                    {sortedFolders.map(folder => (
-                      <button key={folder.id} onClick={() => { setCollapsedHistoryOpen(false); onToggle(); }}
+                    {projects.map(proj => (
+                      <button key={proj.id} onClick={() => { setCollapsedHistoryOpen(false); onOpenProject(proj.id); }}
                         className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 text-left transition-colors">
                         <FolderOpen size={13} className="text-slate-400 shrink-0" />
-                        <span className="text-[11px] text-slate-600 truncate">{folder.name}</span>
+                        <span className="text-[11px] text-slate-600 truncate">{proj.name}</span>
                       </button>
                     ))}
                   </div>
@@ -566,93 +569,34 @@ export const Sidebar = ({
       {/* Scrollable area: Projects first, then All Tasks */}
       <div className="flex-1 overflow-y-auto px-2 pb-2">
 
-        {/* Projects Section */}
+        {/* Projects Section (Manus-style) */}
         <div className="mb-3">
           <div className="flex items-center justify-between px-3 py-1.5">
             <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Projects</p>
-            <button onClick={handleAddFolder} className="text-slate-300 hover:text-blue-500 transition-colors" title="Add project">
-              <FolderPlus size={13} />
+            <button onClick={() => {
+              const name = prompt('Project name:');
+              if (name?.trim()) onCreateProject(name.trim());
+            }} className="text-slate-300 hover:text-blue-500 transition-colors" title="New project">
+              <Plus size={13} />
             </button>
           </div>
 
-          {sortedFolders.map(folder => {
-            const folderItems = savedItems.filter(i => (i.folderId || (i.type === 'report' ? 'reports' : i.type === 'strategy' ? 'strategies' : '')) === folder.id);
-            const open = openFolders[folder.id] ?? true;
-            const isDefault = folder.id === 'reports' || folder.id === 'strategies';
-            const folderIcon = folder.id === 'reports' ? <FileText size={13} className="text-blue-400" />
-              : folder.id === 'strategies' ? <Lightbulb size={13} className="text-amber-400" />
-              : <FolderOpen size={13} className="text-slate-400" />;
-
-            return (
-              <div
-                key={folder.id}
-                draggable
-                onDragStart={(e) => handleFolderDragStart(e, folder.id)}
-                onDragOver={(e) => handleFolderDragOver(e, folder.id)}
-                onDrop={(e) => handleFolderDrop(e, folder.id)}
-                onDragEnd={handleFolderDragEnd}
-                className={`mb-0.5 transition-all ${dragOverFolderId === folder.id && dragFolderId !== folder.id ? 'border-t-2 border-blue-400' : 'border-t-2 border-transparent'} ${dragFolderId === folder.id ? 'opacity-40' : ''}`}
-              >
-                <div className="flex items-center gap-1.5 group px-1">
-                  <GripVertical size={14} className="text-slate-300 cursor-grab shrink-0 hover:text-slate-500 transition-colors" />
-                  <button
-                    onClick={() => setOpenFolders(prev => ({ ...prev, [folder.id]: !open }))}
-                    className="flex-1 flex items-center gap-2 px-2 py-2 text-[12px] font-medium text-slate-500 hover:text-slate-700 transition-colors min-w-0"
-                  >
-                    {folderIcon}
-                    {editingFolderId === folder.id ? (
-                      <input
-                        value={editFolderName}
-                        onChange={(e) => setEditFolderName(e.target.value)}
-                        onBlur={finishRenaming}
-                        onKeyDown={(e) => { if (e.key === 'Enter') finishRenaming(); if (e.key === 'Escape') setEditingFolderId(null); }}
-                        className="text-[12px] font-medium bg-blue-50 border border-blue-200 rounded px-1 py-0.5 w-full min-w-0 focus:outline-none"
-                        autoFocus
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    ) : (
-                      <span className="flex-1 truncate text-left" onDoubleClick={(e) => { e.stopPropagation(); startRenaming(folder); }}>
-                        {folder.name} ({folderItems.length})
-                      </span>
-                    )}
-                    {open ? <ChevronDown size={12} className="shrink-0 text-slate-300" /> : <ChevronRight size={12} className="shrink-0 text-slate-300" />}
-                  </button>
-                  {!isDefault && editingFolderId !== folder.id && (
-                    <button onClick={() => onDeleteFolder?.(folder.id)}
-                      className="text-slate-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all p-1 shrink-0"
-                      title="Delete folder">
-                      <X size={10} />
-                    </button>
-                  )}
-                </div>
-                {open && folderItems.length > 0 && folderItems.map(item => (
-                  <button key={item.id} onClick={() => onViewSavedItem(item)}
-                    className={`w-full flex items-center gap-2 pl-10 pr-3 py-1.5 text-[12px] text-slate-500 hover:bg-slate-50 hover:text-slate-700 rounded-lg transition-colors text-left
-                      ${activeView?.type === 'saved' && activeView?.itemId === item.id ? 'bg-blue-50 text-blue-700' : ''}`}>
-                    <span className="truncate">{item.title}</span>
-                  </button>
-                ))}
-                {open && folderItems.length === 0 && (
-                  <p className="pl-10 pr-3 py-1 text-[11px] text-slate-300 italic">Empty</p>
+          {projects.length === 0 ? (
+            <p className="px-3 py-2 text-[11px] text-slate-300 italic">No projects yet</p>
+          ) : (
+            projects.map(project => (
+              <button key={project.id} onClick={() => onOpenProject(project.id)}
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors
+                  ${activeView?.type === 'projectDetail' && activeView?.projectId === project.id
+                    ? 'bg-blue-50 text-blue-700'
+                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-700'}`}>
+                <FolderOpen size={14} className={`shrink-0 ${activeView?.type === 'projectDetail' && activeView?.projectId === project.id ? 'text-blue-500' : 'text-slate-400'}`} />
+                <span className="flex-1 text-[12px] font-medium truncate">{project.name}</span>
+                {(project.tasks || []).length > 0 && (
+                  <span className="text-[9px] text-slate-300 shrink-0">{(project.tasks || []).filter(t => t.completed).length}/{(project.tasks || []).length}</span>
                 )}
-              </div>
-            );
-          })}
-
-          {/* Add folder inline input */}
-          {addingFolder && (
-            <div className="flex items-center gap-1.5 px-3 py-1.5">
-              <FolderPlus size={13} className="text-blue-400 shrink-0" />
-              <input
-                ref={newFolderRef}
-                value={newFolderName}
-                onChange={(e) => setNewFolderName(e.target.value)}
-                onBlur={handleCreateFolder}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleCreateFolder(); if (e.key === 'Escape') { setAddingFolder(false); setNewFolderName(''); } }}
-                placeholder="Folder name..."
-                className="text-[12px] font-medium bg-blue-50 border border-blue-200 rounded-lg px-2 py-1 w-full focus:outline-none focus:ring-1 focus:ring-blue-300"
-              />
-            </div>
+              </button>
+            ))
           )}
         </div>
 

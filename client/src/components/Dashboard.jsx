@@ -16,6 +16,8 @@ import { InstantForms } from './InstantForms.jsx';
 import { EventsManager } from './EventsManager.jsx';
 import { Optimizations } from './Optimizations.jsx';
 import { AdLibrary } from './AdLibrary.jsx';
+import { ProjectDetail } from './ProjectDetail.jsx';
+import { useProjects } from '../hooks/useProjects.js';
 
 const CARD_CATEGORIES = [];
 const QUICK_CHIPS = [];
@@ -51,6 +53,15 @@ export const Dashboard = ({
     savedItems, saveItem, deleteSavedItem,
     folders, createFolder, deleteFolder, renameFolder, reorderFolders,
   } = useChatSessions({ token, adAccountId, accountName: selectedAccount?.name, language: chatLanguage });
+
+  const {
+    projects, createProject, updateProject, deleteProject,
+    addTask, toggleTask, deleteTask, updateInstructions, addFile, deleteFile, toggleSkill: toggleProjectSkill,
+  } = useProjects();
+
+  const handleOpenProject = useCallback((projectId) => {
+    setActiveView({ type: 'projectDetail', projectId });
+  }, []);
 
   const handleLanguageChange = useCallback((lang) => {
     setChatLanguage(lang);
@@ -238,6 +249,9 @@ export const Dashboard = ({
         onDeleteFolder={deleteFolder}
         onRenameFolder={renameFolder}
         onReorderFolders={reorderFolders}
+        projects={projects}
+        onCreateProject={createProject}
+        onOpenProject={handleOpenProject}
         skills={skills}
         activeSkill={activeSkill}
         activeSkills={activeSkills}
@@ -349,7 +363,26 @@ export const Dashboard = ({
               selectedBusiness={selectedBusiness}
               onSelectAccount={handleAccountSelect}
             />
-          ) : activeView.type === 'optimizations' ? (
+          ) : activeView.type === 'projectDetail' ? (() => {
+            const proj = projects.find(p => p.id === activeView.projectId);
+            if (!proj) return <div className="flex-1 flex items-center justify-center text-slate-400">Project not found</div>;
+            return (
+              <ProjectDetail
+                project={proj}
+                skills={skills}
+                onUpdate={(updates) => updateProject(proj.id, updates)}
+                onDelete={() => { deleteProject(proj.id); setActiveView({ type: 'chat' }); }}
+                onAddTask={(title) => addTask(proj.id, title)}
+                onToggleTask={(taskId) => toggleTask(proj.id, taskId)}
+                onDeleteTask={(taskId) => deleteTask(proj.id, taskId)}
+                onUpdateInstructions={(text) => updateInstructions(proj.id, text)}
+                onAddFile={(file) => addFile(proj.id, file)}
+                onDeleteFile={(fileId) => deleteFile(proj.id, fileId)}
+                onToggleSkill={(skillId) => toggleProjectSkill(proj.id, skillId)}
+                onOpenChat={() => setActiveView({ type: 'chat' })}
+              />
+            );
+          })() : activeView.type === 'optimizations' ? (
             <Optimizations
               adAccountId={adAccountId}
               token={token}
