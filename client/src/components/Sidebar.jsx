@@ -328,12 +328,12 @@ export const Sidebar = ({
             <Menu size={18} />
           </button>
         </div>
-        {/* New Chat */}
+        {/* New Task */}
         <div className="w-full px-1.5 mb-1.5 shrink-0">
           <button onClick={onNewChat}
             className="group relative w-full h-[40px] rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors border border-slate-200">
             <Plus size={16} />
-            <span className="absolute left-full ml-2 px-2.5 py-1 text-[11px] font-medium text-white bg-slate-800 rounded-lg whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-[60] shadow-lg">New Chat</span>
+            <span className="absolute left-full ml-2 px-2.5 py-1 text-[11px] font-medium text-white bg-slate-800 rounded-lg whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-[60] shadow-lg">New Task</span>
           </button>
         </div>
         {/* Module icons */}
@@ -420,14 +420,14 @@ export const Sidebar = ({
         </button>
       </div>
 
-      {/* New Chat */}
+      {/* New Task */}
       <div className="px-3 mb-2">
         <button
           onClick={onNewChat}
           className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-medium text-slate-700 hover:text-slate-900 transition-all hover:shadow-sm"
         >
           <Plus size={16} className="text-slate-400" />
-          New Chat
+          New Task
         </button>
       </div>
 
