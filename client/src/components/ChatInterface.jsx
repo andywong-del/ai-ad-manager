@@ -2607,16 +2607,16 @@ const useSuggestedSkill = (input, skills, activeSkill, slashSkills) => {
 const ACTION_PILLS = [
   { icon: '📊', label: 'Campaign', prompt: 'I want to create a new ad campaign. Help me set it up.' },
   { icon: '👥', label: 'Audience', prompt: 'I want to build a custom audience for my campaigns.' },
-  { icon: '⚡', label: 'Automation', prompt: 'I want to create an automation rule for my campaigns. Help me set it up.' },
+  { icon: '⚡', label: 'Automation Rules', prompt: 'I want to create an automation rule for my campaigns. Help me set it up.' },
   { icon: '📈', label: 'Performance', prompt: 'Analyze the performance of my ad campaigns and give me insights.' },
   { icon: '📋', label: 'Lead Form', prompt: 'I want to create a new lead generation form for my campaigns.' },
-  { icon: '🔍', label: 'Ad Library', prompt: 'Search competitor ads in the Ad Library for my industry.' },
+  { icon: '🔍', label: 'Ad Library', prompt: 'Show me the ads running in my ad account from the Ad Library.' },
   { icon: '🎯', label: 'Pixel Setup', prompt: 'Help me set up tracking for my website with Meta Pixel.' },
   { icon: '🎨', label: 'Creative', prompt: 'I want to upload new creative assets for my ad campaigns.' },
 ];
 
 const ActionPills = ({ onSelect }) => (
-  <div className="flex flex-wrap items-center justify-center gap-2.5 mt-6">
+  <div className="flex flex-wrap items-center justify-center gap-2.5 mt-6 relative z-0">
     {ACTION_PILLS.map(pill => (
       <button key={pill.label} onClick={() => onSelect(pill.prompt)}
         className="group flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-white/70 backdrop-blur-xl border border-white/80 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] text-[12px] font-semibold text-slate-600 hover:shadow-[0_4px_12px_rgba(251,146,60,0.15)] hover:border-orange-200 hover:text-orange-700 transition-all duration-200 hover:-translate-y-0.5">
