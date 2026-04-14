@@ -401,48 +401,79 @@ const buildHumanSummary = (rule) => {
   return sentence;
 };
 
+// ── Toggle switch ──
+const Toggle = ({ active, onChange, loading }) => (
+  <button onClick={(e) => { e.stopPropagation(); if (!loading) onChange(!active); }}
+    disabled={loading}
+    className={`w-9 h-[20px] rounded-full transition-colors duration-200 relative shrink-0 ${loading ? 'opacity-50' : ''} ${active ? 'bg-emerald-500' : 'bg-slate-200'}`}>
+    <span className={`absolute top-[2px] left-[2px] w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${active ? 'translate-x-[16px]' : ''}`} />
+  </button>
+);
+
 const RuleCard = ({ rule, onToggle, onEdit, onDelete, onViewHistory, updating }) => {
   const isActive = rule.status === 'ENABLED';
+  const isInvalid = rule.status === 'INVALID' || rule.status === 'HAS_ISSUES';
   const summary = buildHumanSummary(rule);
 
+  // Extract entity type from filters
+  const entityFilter = (rule.evaluation_spec?.filters || []).find(f => f.field === 'entity_type');
+  const appliedTo = entityFilter ? { CAMPAIGN: 'All active campaigns', ADSET: 'All active ad sets', AD: 'All active ads' }[entityFilter.value] || 'All active campaigns' : 'All active campaigns';
+
+  // Schedule
+  const scheduleLabel = SCHEDULE_OPTIONS.find(s => s.value === rule.schedule_spec?.schedule_type)?.label || 'Daily';
+
   return (
-    <div className={`group relative bg-white rounded-xl border transition-all hover:shadow-md ${isActive ? 'border-slate-200' : 'border-slate-200/60 opacity-70'}`}>
-      {/* Left color bar */}
-      <div className={`absolute left-0 top-3 bottom-3 w-1 rounded-full ${isActive ? 'bg-emerald-400' : 'bg-slate-200'}`} />
-
-      <div className="px-5 pl-6 py-4">
-        <div className="flex items-start justify-between">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-3 mb-1.5">
-              <h4 className="text-[14px] font-bold text-slate-800 truncate">{rule.name}</h4>
-              <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${isActive ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
-                {isActive ? 'Active' : 'Paused'}
+    <div className={`group bg-white rounded-xl border transition-all hover:shadow-md ${isInvalid ? 'border-red-200' : 'border-slate-200'}`}>
+      <div className="px-5 py-4">
+        {/* Top row: toggle + name + status + actions */}
+        <div className="flex items-center gap-3 mb-2">
+          <Toggle active={isActive && !isInvalid} onChange={() => onToggle(rule.id, isActive)} loading={updating} />
+          <h4 className="text-[14px] font-bold text-slate-800 truncate flex-1">{rule.name}</h4>
+          {isInvalid ? (
+            <span className="relative group/tip text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-red-50 text-red-600 shrink-0 cursor-help">
+              Invalid
+              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-3 py-2 bg-slate-900 text-white text-[10px] font-normal normal-case tracking-normal rounded-lg whitespace-nowrap opacity-0 group-hover/tip:opacity-100 transition-opacity pointer-events-none shadow-lg">
+                This rule has issues and is not being checked. Edit to fix.
               </span>
-            </div>
-            {/* Human-readable summary */}
-            <p className="text-[12px] text-slate-500 leading-relaxed mb-1.5">{summary}</p>
-            {/* Meta */}
-            <div className="flex items-center gap-3 text-[10px] text-slate-400">
-              {rule.created_time && <span>Created {fmtDate(rule.created_time)}</span>}
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button onClick={() => onToggle(rule.id, isActive)} disabled={updating}
-              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${isActive ? 'hover:bg-amber-50 text-slate-400 hover:text-amber-600' : 'hover:bg-emerald-50 text-slate-400 hover:text-emerald-600'}`}>
-              {isActive ? <Pause size={14} /> : <Play size={14} />}
-            </button>
-            <button onClick={() => onEdit(rule)} className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
+            </span>
+          ) : (
+            <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0 ${isActive ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+              {isActive ? 'Active' : 'Paused'}
+            </span>
+          )}
+          {/* Actions — always visible, clean icons */}
+          <div className="flex items-center gap-0.5 shrink-0">
+            <button onClick={() => onEdit(rule)} title="Edit rule"
+              className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-300 hover:text-slate-600 transition-colors">
               <Edit3 size={14} />
             </button>
-            <button onClick={() => onViewHistory(rule.id)} className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
+            <button onClick={() => onViewHistory(rule.id)} title="View history"
+              className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-300 hover:text-slate-600 transition-colors">
               <Eye size={14} />
             </button>
-            <button onClick={() => onDelete(rule.id)} className="w-8 h-8 rounded-lg hover:bg-red-50 flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors">
+            <button onClick={() => onDelete(rule.id)} title="Delete rule"
+              className="w-8 h-8 rounded-lg hover:bg-red-50 flex items-center justify-center text-slate-300 hover:text-red-500 transition-colors">
               <Trash2 size={14} />
             </button>
           </div>
+        </div>
+
+        {/* Action & condition summary */}
+        <p className="text-[12px] text-slate-500 leading-relaxed mb-2.5 ml-12">{summary}</p>
+
+        {/* Info row */}
+        <div className="flex items-center gap-4 text-[10px] ml-12">
+          <div className="flex items-center gap-1.5 text-slate-400">
+            <Target size={10} className="shrink-0" />
+            <span>{appliedTo}</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-slate-400">
+            <Clock size={10} className="shrink-0" />
+            <span>{scheduleLabel}</span>
+          </div>
+          {rule.created_time && (
+            <span className="text-slate-300">Created {fmtDate(rule.created_time)}</span>
+          )}
         </div>
       </div>
     </div>
@@ -544,15 +575,18 @@ export const AutomationRules = ({ adAccountId, token, onLogin, onLogout, selecte
     catch (err) { console.error('Delete failed:', err); }
   }, []);
 
-  const filtered = rules.filter(r => {
+  // Filter out third-party webhook rules (PING_ENDPOINT) — not user-created
+  const userRules = rules.filter(r => r.execution_spec?.execution_type !== 'PING_ENDPOINT');
+
+  const filtered = userRules.filter(r => {
     if (statusFilter === 'active' && r.status !== 'ENABLED') return false;
     if (statusFilter === 'paused' && r.status === 'ENABLED') return false;
     if (search && !r.name.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
 
-  const activeCount = rules.filter(r => r.status === 'ENABLED').length;
-  const pausedCount = rules.filter(r => r.status !== 'ENABLED').length;
+  const activeCount = userRules.filter(r => r.status === 'ENABLED').length;
+  const pausedCount = userRules.filter(r => r.status !== 'ENABLED').length;
 
   const handleTemplateSelect = (t) => {
     setEditingRule({
@@ -581,7 +615,7 @@ export const AutomationRules = ({ adAccountId, token, onLogin, onLogout, selecte
                 Automation Rules
               </h1>
               <p className="text-xs text-slate-400 mt-0.5">
-                {loading ? 'Loading...' : rules.length > 0 ? `${activeCount} active · ${pausedCount} paused` : 'Automate your ad management'}
+                {loading ? 'Loading...' : userRules.length > 0 ? `${activeCount} active · ${pausedCount} paused` : 'Automate your ad management'}
               </p>
             </div>
             <AccountSelector token={token} onLogin={onLogin} onLogout={onLogout}
@@ -609,7 +643,7 @@ export const AutomationRules = ({ adAccountId, token, onLogin, onLogout, selecte
             <p className="text-sm font-semibold text-slate-700 mb-1">{!token ? 'Connect an ad platform' : 'Select an ad account'}</p>
             <p className="text-xs text-slate-400">Use the account selector above to get started.</p>
           </div>
-        ) : rules.length === 0 && !loading ? (
+        ) : userRules.length === 0 && !loading ? (
           /* Empty state — hero + full template cards */
           <>
             <div className="text-center mb-8">
@@ -662,7 +696,7 @@ export const AutomationRules = ({ adAccountId, token, onLogin, onLogout, selecte
             </div>
 
             {/* Rules list */}
-            {loading && rules.length === 0 ? (
+            {loading && userRules.length === 0 ? (
               <div className="flex items-center justify-center py-16">
                 <Loader2 size={24} className="animate-spin text-slate-400" />
               </div>
