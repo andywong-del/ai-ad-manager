@@ -690,7 +690,7 @@ export const AutomationRules = ({ adAccountId, token, onLogin, onLogout, selecte
                   className="w-full px-5 pt-4 pb-2 text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none bg-transparent"
                   onKeyDown={e => {
                     if (e.key === 'Enter' && e.target.value.trim()) {
-                      onSendToChat?.(`[Context: Automation Rules]\n${e.target.value.trim()}`);
+                      onPrefillChat?.(e.target.value.trim());
                       e.target.value = '';
                     }
                   }}
@@ -704,7 +704,7 @@ export const AutomationRules = ({ adAccountId, token, onLogin, onLogout, selecte
                   <button onClick={() => {
                     const input = document.querySelector('[data-rule-input]');
                     if (input?.value?.trim()) {
-                      onSendToChat?.(`[Context: Automation Rules]\n${input.value.trim()}`);
+                      onPrefillChat?.(input.value.trim());
                       input.value = '';
                     }
                   }}
