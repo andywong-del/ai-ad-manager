@@ -21,53 +21,52 @@ const ACTION_TYPES = [
   { value: 'SEND_NOTIFICATION', label: 'Notify me', desc: 'Send email notification only', icon: AlertTriangle },
 ];
 
-const METRIC_FIELDS = [
-  // Cost metrics
-  { value: 'spent', label: 'Amount spent' },
-  { value: 'cost_per_result', label: 'Cost per result (CPA)' },
-  { value: 'cost_per_action_type', label: 'Cost per action' },
-  { value: 'cpm', label: 'CPM' },
-  { value: 'cpc', label: 'CPC (cost per click)' },
-  { value: 'cost_per_15_sec_video_view', label: 'Cost per 15s video view' },
-  { value: 'cost_per_thruplay', label: 'Cost per ThruPlay' },
-  // Rate metrics
-  { value: 'ctr', label: 'CTR (click-through rate)' },
-  { value: 'website_ctr', label: 'Website CTR' },
-  // Volume metrics
-  { value: 'impressions', label: 'Impressions' },
-  { value: 'lifetime_impressions', label: 'Lifetime impressions' },
-  { value: 'reach', label: 'Reach' },
-  { value: 'clicks', label: 'Clicks' },
-  { value: 'frequency', label: 'Frequency' },
-  { value: 'results', label: 'Results' },
-  { value: 'leads', label: 'Leads' },
-  { value: 'app_installs', label: 'App installs' },
-  // Value metrics
-  { value: 'roas', label: 'ROAS' },
-  { value: 'purchase_roas', label: 'Purchase ROAS' },
-  { value: 'revenue', label: 'Revenue' },
-  // Video metrics
-  { value: 'video_views', label: 'Video views' },
-  { value: 'video_thruplay_watched_actions', label: 'ThruPlays' },
-  { value: 'video_p75_watched_actions', label: 'Video watched 75%' },
-  // Delivery metrics
-  { value: 'active_time', label: 'Active time (seconds)' },
-  { value: 'daily_budget', label: 'Daily budget' },
-  { value: 'lifetime_budget', label: 'Lifetime budget' },
-  { value: 'budget_remaining', label: 'Budget remaining' },
-  // Quality metrics
-  { value: 'quality_score', label: 'Quality ranking' },
-  { value: 'engagement_rate_ranking', label: 'Engagement rate ranking' },
-  { value: 'conversion_rate_ranking', label: 'Conversion rate ranking' },
-  // Name filters
-  { value: 'campaign.name', label: 'Campaign name' },
-  { value: 'adset.name', label: 'Ad set name' },
-  { value: 'ad.name', label: 'Ad name' },
-  // ID filters
-  { value: 'campaign.id', label: 'Campaign ID' },
-  { value: 'adset.id', label: 'Ad set ID' },
-  { value: 'ad.id', label: 'Ad ID' },
+// Grouped for optgroup display + flat for lookups
+const METRIC_GROUPS = [
+  { group: 'Cost', fields: [
+    { value: 'spent', label: 'Amount spent' },
+    { value: 'cost_per_result', label: 'Cost per result (CPA)' },
+    { value: 'cost_per_action_type', label: 'Cost per action' },
+    { value: 'cpm', label: 'CPM' },
+    { value: 'cpc', label: 'CPC' },
+    { value: 'cost_per_thruplay', label: 'Cost per ThruPlay' },
+  ]},
+  { group: 'Performance', fields: [
+    { value: 'impressions', label: 'Impressions' },
+    { value: 'lifetime_impressions', label: 'Lifetime impressions' },
+    { value: 'reach', label: 'Reach' },
+    { value: 'clicks', label: 'Clicks' },
+    { value: 'ctr', label: 'CTR' },
+    { value: 'frequency', label: 'Frequency' },
+    { value: 'results', label: 'Results' },
+    { value: 'leads', label: 'Leads' },
+  ]},
+  { group: 'Value', fields: [
+    { value: 'roas', label: 'ROAS' },
+    { value: 'purchase_roas', label: 'Purchase ROAS' },
+    { value: 'revenue', label: 'Revenue' },
+  ]},
+  { group: 'Video', fields: [
+    { value: 'video_thruplay_watched_actions', label: 'ThruPlays' },
+    { value: 'video_views', label: 'Video views' },
+    { value: 'video_p75_watched_actions', label: 'Video 75% watched' },
+  ]},
+  { group: 'Budget & Delivery', fields: [
+    { value: 'daily_budget', label: 'Daily budget' },
+    { value: 'lifetime_budget', label: 'Lifetime budget' },
+    { value: 'budget_remaining', label: 'Budget remaining' },
+    { value: 'active_time', label: 'Active time' },
+  ]},
+  { group: 'Targeting', fields: [
+    { value: 'campaign.name', label: 'Campaign name' },
+    { value: 'adset.name', label: 'Ad set name' },
+    { value: 'ad.name', label: 'Ad name' },
+    { value: 'campaign.id', label: 'Campaign ID' },
+    { value: 'adset.id', label: 'Ad set ID' },
+    { value: 'ad.id', label: 'Ad ID' },
+  ]},
 ];
+const METRIC_FIELDS = METRIC_GROUPS.flatMap(g => g.fields);
 
 const OPERATORS = [
   { value: 'GREATER_THAN', label: 'is greater than' },
@@ -96,7 +95,6 @@ const SCHEDULE_OPTIONS = [
   { value: 'SEMI_HOURLY', label: 'Every 30 minutes' },
   { value: 'HOURLY', label: 'Every hour' },
   { value: 'DAILY', label: 'Once daily' },
-  { value: 'CUSTOM', label: 'Custom schedule' },
 ];
 
 // ── Rule Templates ──
@@ -191,13 +189,23 @@ const TemplateChips = ({ onSelect, onCreateAI }) => (
 );
 
 // ── Styled form components ──
-const FormSelect = ({ label, value, options, onChange, className = '' }) => (
+const selectStyle = { backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2364748b' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center' };
+
+const FormSelect = ({ label, value, options, onChange, grouped, className = '' }) => (
   <div className={className}>
     {label && <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">{label}</label>}
     <select value={value || ''} onChange={e => onChange(e.target.value)}
       className="w-full text-[13px] font-medium text-slate-800 bg-white border border-slate-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-300 transition-all appearance-none cursor-pointer"
-      style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2364748b' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center' }}>
-      {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      style={selectStyle}>
+      {grouped ? (
+        METRIC_GROUPS.map(g => (
+          <optgroup key={g.group} label={g.group}>
+            {g.fields.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </optgroup>
+        ))
+      ) : (
+        options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)
+      )}
     </select>
   </div>
 );
@@ -322,7 +330,7 @@ const RuleModal = ({ rule, onSave, onClose }) => {
         </div>
 
         {/* Compact form */}
-        <div className="px-6 py-4 space-y-4">
+        <div className="px-6 py-4 space-y-4 max-h-[65vh] overflow-y-auto">
           {/* Rule name */}
           <FormInput label="Rule name" value={name} onChange={setName} placeholder="e.g. Pause high CPA campaigns" />
 
@@ -333,7 +341,7 @@ const RuleModal = ({ rule, onSave, onClose }) => {
               {conditions.map((cond, idx) => (
                 <div key={idx} className="flex items-center gap-2">
                   {idx > 0 && <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">AND</span>}
-                  <FormSelect value={cond.field} options={METRIC_FIELDS} onChange={v => updateCondition(idx, 'field', v)} className="flex-1" />
+                  <FormSelect value={cond.field} options={METRIC_FIELDS} grouped onChange={v => updateCondition(idx, 'field', v)} className="flex-1" />
                   <FormSelect value={cond.operator} options={OPERATORS} onChange={v => updateCondition(idx, 'operator', v)} className="flex-1" />
                   <div className={`relative ${cond.field?.includes('.name') ? 'w-36' : 'w-28'}`}>
                     {CURRENCY_FIELDS.has(cond.field) && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[12px] text-slate-400">$</span>}
