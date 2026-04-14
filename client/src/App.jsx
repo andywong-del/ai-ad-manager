@@ -25,6 +25,7 @@ const DEV_BYPASS = import.meta.env.DEV && import.meta.env.VITE_DEV_BYPASS === 't
 
 export default function App() {
   const { longLivedToken, isLoading, error, login, logout, setTokenDirect } = useAuth();
+  const [userName, setUserName] = useState(() => localStorage.getItem('aam_user_first_name') || '');
   const [selectedBusiness, setSelectedBusiness] = useState(() => {
     try { return JSON.parse(localStorage.getItem('aam_selected_business')); } catch { return null; }
   });
@@ -46,7 +47,13 @@ export default function App() {
         }
       })
       .catch(() => {})
-      .finally(() => setDevTokenReady(true));
+      .finally(() => {
+        setDevTokenReady(true);
+        // Fetch user name
+        fetch('/api/auth/me').then(r => r.ok ? r.json() : null).then(data => {
+          if (data?.firstName) { localStorage.setItem('aam_user_first_name', data.firstName); setUserName(data.firstName); }
+        }).catch(() => {});
+      });
 
     // Also auto-refresh on token errors
     const handleTokenError = () => {
@@ -74,6 +81,7 @@ export default function App() {
         adAccountId={selectedAccount?.id || null}
         selectedAccount={selectedAccount}
         selectedBusiness={selectedBusiness}
+        userName={userName}
         onSwitchAccount={(account) => { setSelectedAccount(account); localStorage.setItem('aam_selected_account', JSON.stringify(account)); }}
         onSwitchBusiness={(business) => { setSelectedAccount(null); setSelectedBusiness(business || null); localStorage.removeItem('aam_selected_account'); localStorage.setItem('aam_selected_business', JSON.stringify(business || null)); }}
         onLogout={() => { logout(); setSelectedBusiness(null); setSelectedAccount(null); localStorage.removeItem('aam_selected_account'); localStorage.removeItem('aam_selected_business'); }}

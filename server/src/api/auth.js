@@ -30,4 +30,18 @@ router.get('/demo-token', (req, res) => {
   res.json({ longLivedToken: token });
 });
 
+// Get current user's name from Meta
+router.get('/me', async (req, res) => {
+  const auth = req.headers.authorization;
+  const token = auth?.startsWith('Bearer ') ? auth.slice(7) : process.env.META_DEMO_TOKEN;
+  if (!token) return res.status(401).json({ error: 'No token' });
+  try {
+    const response = await fetch(`https://graph.facebook.com/v25.0/me?access_token=${token}&fields=first_name,name`);
+    const data = await response.json();
+    res.json({ firstName: data.first_name, name: data.name, id: data.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

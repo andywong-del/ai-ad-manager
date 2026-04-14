@@ -2806,7 +2806,7 @@ const ChatInput = ({ input, setInput, onKeyDown, onSend, onStop, onFilesAdded, a
 };
 
 // ── Main component ────────────────────────────────────────────────────────────
-export const ChatInterface = ({ messages, isTyping, thinkingText, activityLog = [], onSend, onStop, suggestedActions = [], cardCategories = [], quickChips = [], adAccountId, onSaveItem, folders = [], activeSkill = null, activeSkills = [], activeSkillIds, onDeactivateSkill, skills = [], onToggleSkill, onManageSkills, onNavigate, onOpenCanvas, token, onLogin, onLogout, isLoginLoading, loginError, selectedAccount, selectedBusiness, onSelectAccount, initialInput, initialSlashSkill, enabledSkillIds = [], onCreateSkill, generateSkill, brandEnabledCount = 0, onSaveToBrand }) => {
+export const ChatInterface = ({ messages, isTyping, thinkingText, activityLog = [], onSend, onStop, suggestedActions = [], cardCategories = [], quickChips = [], adAccountId, onSaveItem, folders = [], activeSkill = null, activeSkills = [], activeSkillIds, onDeactivateSkill, skills = [], onToggleSkill, onManageSkills, onNavigate, onOpenCanvas, token, onLogin, onLogout, isLoginLoading, loginError, selectedAccount, selectedBusiness, onSelectAccount, initialInput, initialSlashSkill, enabledSkillIds = [], onCreateSkill, generateSkill, brandEnabledCount = 0, onSaveToBrand, userName = '' }) => {
   const [input, setInput] = useState('');
   // Package as Skill state
   const [packagingMessage, setPackagingMessage] = useState(null);
@@ -3186,7 +3186,7 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, activityLog = 
           <div className="w-full max-w-2xl mx-auto">
 
             <h1 className="text-3xl font-extrabold text-slate-900 mb-6 text-center tracking-tight">
-              What can I help you optimize today?
+              Hi{userName ? ` ${userName}` : ''}, ready to <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-amber-500">optimize</span> your ads?
             </h1>
             <div className="relative z-10">
               <ChatInput

@@ -38,6 +38,7 @@ export const Dashboard = ({
   onLogin,
   isLoginLoading,
   loginError,
+  userName = '',
 }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [chatLanguage, setChatLanguage] = useState('en');
@@ -503,6 +504,7 @@ export const Dashboard = ({
               generateSkill={generateSkill}
               brandEnabledCount={brandEnabledCount}
               onSaveToBrand={createBrandItem}
+              userName={userName}
             />
           )}
         </div>
