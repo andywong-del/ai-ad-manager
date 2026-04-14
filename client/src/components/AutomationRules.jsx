@@ -61,11 +61,13 @@ const OPERATORS = [
 
 const TIME_PRESETS = [
   { value: 'TODAY', label: 'Today' },
+  { value: 'YESTERDAY', label: 'Yesterday' },
   { value: 'LAST_3_DAYS', label: 'Last 3 days' },
   { value: 'LAST_7_DAYS', label: 'Last 7 days' },
   { value: 'LAST_14_DAYS', label: 'Last 14 days' },
   { value: 'LAST_30_DAYS', label: 'Last 30 days' },
   { value: 'LIFETIME', label: 'Lifetime' },
+  { value: 'MAXIMUM', label: 'All time' },
 ];
 
 const SCHEDULE_OPTIONS = [
@@ -227,7 +229,10 @@ const RuleModal = ({ rule, onSave, onClose }) => {
       rule.evaluation_spec.filters.forEach(f => {
         if (f.field === 'entity_type') { setEntityType(f.value || 'CAMPAIGN'); return; }
         if (f.field === 'time_preset') { tp = f.value || 'LAST_7_DAYS'; return; }
-        conds.push({ field: f.field, operator: f.operator || 'GREATER_THAN', value: f.value || '', time_preset: tp });
+        // Convert cents to dollars for display in currency fields
+        let val = f.value || '';
+        if (CURRENCY_FIELDS.has(f.field) && val) val = String(Number(val) / 100);
+        conds.push({ field: f.field, operator: f.operator || 'GREATER_THAN', value: val, time_preset: tp });
       });
       if (conds.length) setConditions(conds);
       else setConditions([{ field: 'cost_per_result', operator: 'GREATER_THAN', value: '', time_preset: tp }]);
@@ -249,7 +254,11 @@ const RuleModal = ({ rule, onSave, onClose }) => {
     try {
       const evaluation_spec = {
         evaluation_type: 'SCHEDULE',
-        filters: conditions.map(c => ({ field: c.field, operator: c.operator, value: c.value })),
+        filters: conditions.map(c => ({
+          field: c.field, operator: c.operator,
+          // Convert dollars back to cents for currency fields
+          value: CURRENCY_FIELDS.has(c.field) ? String(Math.round(Number(c.value) * 100)) : c.value,
+        })),
         time_preset: conditions[0]?.time_preset || 'LAST_7_DAYS',
         entity_type: entityType,
       };
@@ -301,10 +310,14 @@ const RuleModal = ({ rule, onSave, onClose }) => {
                   {idx > 0 && <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">AND</span>}
                   <FormSelect value={cond.field} options={METRIC_FIELDS} onChange={v => updateCondition(idx, 'field', v)} className="flex-1" />
                   <FormSelect value={cond.operator} options={OPERATORS} onChange={v => updateCondition(idx, 'operator', v)} className="flex-1" />
-                  <FormInput type={cond.field?.includes('.name') || cond.field?.includes('.id') || cond.operator === 'CONTAIN' || cond.operator === 'NOT_CONTAIN' ? 'text' : 'number'}
-                    value={cond.value} onChange={v => updateCondition(idx, 'value', v)}
-                    placeholder={cond.field?.includes('.name') ? 'Name...' : 'Value'}
-                    className={cond.field?.includes('.name') ? 'w-36' : 'w-24'} />
+                  <div className={`relative ${cond.field?.includes('.name') ? 'w-36' : 'w-28'}`}>
+                    {CURRENCY_FIELDS.has(cond.field) && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[12px] text-slate-400">$</span>}
+                    <FormInput
+                      type={cond.field?.includes('.name') || cond.field?.includes('.id') || cond.operator === 'CONTAIN' || cond.operator === 'NOT_CONTAIN' ? 'text' : 'number'}
+                      value={cond.value} onChange={v => updateCondition(idx, 'value', v)}
+                      placeholder={cond.field?.includes('.name') ? 'Name...' : CURRENCY_FIELDS.has(cond.field) ? '0.00' : 'Value'}
+                      className={`w-full ${CURRENCY_FIELDS.has(cond.field) ? 'pl-7' : ''}`} />
+                  </div>
                   {conditions.length > 1 && (
                     <button onClick={() => removeCondition(idx)} className="w-6 h-6 rounded-md hover:bg-red-50 flex items-center justify-center text-slate-300 hover:text-red-500 transition-colors">
                       <X size={12} />
@@ -390,7 +403,7 @@ const buildHumanSummary = (rule) => {
   filters.forEach(f => {
     if (f.field === 'entity_type') return;
     if (f.field === 'time_preset') {
-      timeWindow = { TODAY: 'Today', YESTERDAY: 'Yesterday', LAST_3_DAYS: 'Last 3 days', LAST_7_DAYS: 'Last 7 days', LAST_14_DAYS: 'Last 14 days', LAST_30_DAYS: 'Last 30 days', LIFETIME: 'Lifetime' }[f.value] || f.value;
+      timeWindow = { TODAY: 'Today', YESTERDAY: 'Yesterday', LAST_3_DAYS: 'Last 3 days', LAST_7_DAYS: 'Last 7 days', LAST_14_DAYS: 'Last 14 days', LAST_30_DAYS: 'Last 30 days', LIFETIME: 'Lifetime', MAXIMUM: 'All time' }[f.value] || f.value;
       return;
     }
     conditionFilters.push(f);
