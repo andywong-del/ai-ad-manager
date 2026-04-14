@@ -2630,27 +2630,28 @@ const ActionPills = ({ onSelect }) => {
   }, []);
 
   return (
-    <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
+    <div className="flex flex-wrap items-center justify-center gap-2.5 mt-6">
       {primary.map(pill => (
-        <button key={pill.label} onClick={() => { onSelect(pill.prompt); }}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-full border border-slate-200/80 bg-white/50 backdrop-blur-sm text-[12px] font-medium text-slate-500 hover:bg-orange-50 hover:border-orange-300 hover:text-orange-700 transition-all">
-          <span className="text-[13px]">{pill.icon}</span>
+        <button key={pill.label} onClick={() => onSelect(pill.prompt)}
+          className="group flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-white/70 backdrop-blur-xl border border-white/80 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] text-[12px] font-semibold text-slate-600 hover:shadow-[0_4px_12px_rgba(251,146,60,0.15)] hover:border-orange-200 hover:text-orange-700 transition-all duration-200 hover:-translate-y-0.5">
+          <span className="text-[15px] group-hover:scale-110 transition-transform duration-200">{pill.icon}</span>
           {pill.label}
         </button>
       ))}
       <div className="relative" ref={moreRef}>
         <button onClick={() => setShowMore(!showMore)}
-          className={`flex items-center gap-1 px-4 py-2 rounded-full border text-[12px] font-medium transition-all ${showMore ? 'border-orange-300 bg-orange-50 text-orange-700' : 'border-slate-200/80 bg-white/50 backdrop-blur-sm text-slate-500 hover:bg-orange-50 hover:border-orange-300 hover:text-orange-700'}`}>
+          className={`flex items-center gap-1.5 px-5 py-2.5 rounded-2xl text-[12px] font-semibold transition-all duration-200 ${showMore ? 'bg-orange-50 border-orange-200 text-orange-700 shadow-[0_4px_12px_rgba(251,146,60,0.15)]' : 'bg-white/70 backdrop-blur-xl border border-white/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)] text-slate-500 hover:shadow-[0_4px_12px_rgba(251,146,60,0.15)] hover:border-orange-200 hover:text-orange-700 hover:-translate-y-0.5'}`}>
           More
+          <ChevronDown size={13} className={`transition-transform duration-200 ${showMore ? 'rotate-180' : ''}`} />
         </button>
         {showMore && (
           <>
             <div className="fixed inset-0 z-[90]" onClick={() => setShowMore(false)} />
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-[200px] bg-white border border-slate-200 rounded-2xl shadow-2xl shadow-slate-200/60 z-[100] py-2">
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-[220px] bg-white/95 backdrop-blur-xl border border-slate-200/80 rounded-2xl shadow-2xl shadow-slate-900/10 z-[100] py-2 overflow-hidden">
               {secondary.map(pill => (
                 <button key={pill.label} onClick={() => { onSelect(pill.prompt); setShowMore(false); }}
-                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[12px] text-slate-600 hover:bg-orange-50 hover:text-orange-700 transition-colors">
-                  <span className="text-[14px]">{pill.icon}</span>
+                  className="w-full flex items-center gap-3 px-4 py-3 text-[13px] font-medium text-slate-600 hover:bg-gradient-to-r hover:from-orange-50 hover:to-amber-50 hover:text-orange-700 transition-all">
+                  <span className="text-[16px]">{pill.icon}</span>
                   {pill.label}
                 </button>
               ))}
