@@ -467,117 +467,59 @@ const FormDetailPanel = ({ form, pageId, pageName, onClose, onArchive }) => {
 
   return (
     <div className="flex-1 overflow-auto bg-slate-50/50 p-6">
-      <div className="flex gap-6">
-        {/* Left: Form details */}
-        <div className="flex-1 min-w-0">
-          {/* Header */}
-          <div className="flex items-start justify-between mb-5">
-            <div>
-              <h2 className="text-[16px] font-bold text-slate-800">{form.name}</h2>
-              <div className="flex items-center gap-2 mt-1.5">
-                {form.status === 'ACTIVE' && (
-                  <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-600 font-medium">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    Live on Meta Ads · {pageName || 'Your Page'}
-                  </span>
-                )}
-                {form.status !== 'ACTIVE' && (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-400 border border-slate-200">
-                    {form.status || 'Active'}
-                  </span>
-                )}
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <button onClick={downloadCSV} disabled={downloading}
-                className="flex items-center gap-1.5 px-3.5 py-2 text-[11px] font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 shadow-sm">
-                <Download size={12} /> {downloading ? 'Downloading...' : 'Download CSV'}
-              </button>
-              <button className="w-8 h-8 rounded-lg hover:bg-slate-200 flex items-center justify-center text-slate-400 border border-slate-200">
-                <Clock size={14} />
-              </button>
-            </div>
-          </div>
-
-          {/* Lead count card */}
-          <div className="bg-white rounded-xl border border-slate-200 p-5 mb-4 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center">
-              <Users size={20} className="text-blue-500" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <p className="text-[28px] font-bold text-slate-800 leading-none">
-                  {form.leads_count != null ? Number(form.leads_count).toLocaleString() : '—'}
-                </p>
-                <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                  <Zap size={9} /> +12%
-                </span>
-              </div>
-              <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider mt-1">Total Leads Collected</p>
-            </div>
-          </div>
-
-          {/* Form fields */}
-          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden mb-4">
-            <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-              <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                Form Fields ({questions.length})
-              </h3>
-              <button className="flex items-center gap-1 text-[10px] font-medium text-orange-500 hover:text-orange-600">
-                <Plus size={11} /> Add Field
-              </button>
-            </div>
-            <div className="divide-y divide-slate-100">
-              {questions.map((q, i) => (
-                <div key={i} className="flex items-center gap-3 px-4 py-3">
-                  <span className="w-6 h-6 rounded-md bg-orange-50 flex items-center justify-center shrink-0">
-                    <span className="text-[10px] font-bold text-orange-500">{i + 1}</span>
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-[12px] font-semibold text-slate-700">{q.label || q.key}</p>
-                      {q.type && (
-                        <span className={`text-[8px] font-bold uppercase px-1.5 py-0.5 rounded ${FIELD_TYPE_COLORS[q.type] || 'bg-slate-100 text-slate-500'}`}>
-                          {q.type}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[10px] text-slate-400 mt-0.5 italic">
-                      Preview Placeholder: {FIELD_PLACEHOLDERS[q.type] || `"${q.label || 'Enter your answer'}"`}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Technical Metadata */}
-          <div className="bg-white rounded-xl border border-slate-200 p-4">
-            <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3">Technical Metadata</h3>
-            <div className="grid grid-cols-3 gap-4 text-[11px]">
-              <div>
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Form ID</p>
-                <p className="font-mono text-slate-600">{form.id}</p>
-              </div>
-              <div>
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Connected Account</p>
-                <p className="text-slate-600">{pageName || '—'}</p>
-              </div>
-              <div>
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Privacy Policy</p>
-                {form.privacy_policy_url ? (
-                  <a href={form.privacy_policy_url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline font-medium">View Active URL</a>
-                ) : <p className="text-slate-400">—</p>}
-              </div>
-            </div>
+      {/* Header bar */}
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <h2 className="text-[16px] font-bold text-slate-800">{form.name}</h2>
+          <div className="flex items-center gap-2 mt-1">
+            {form.status === 'ACTIVE' ? (
+              <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-600 font-medium">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Live on Meta Ads · {pageName || 'Your Page'}
+              </span>
+            ) : (
+              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-400">
+                {form.status || 'Active'}
+              </span>
+            )}
+            <span className="text-[10px] text-slate-300">·</span>
+            <span className="text-[10px] text-slate-400">{questions.length} fields</span>
           </div>
         </div>
+        <div className="flex items-center gap-2">
+          <button onClick={downloadCSV} disabled={downloading}
+            className="flex items-center gap-1.5 px-3 py-2 text-[11px] font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 shadow-sm">
+            <Download size={12} /> {downloading ? '...' : 'Download Leads'}
+          </button>
+          <button onClick={() => onClose?.()}
+            className="w-8 h-8 rounded-lg hover:bg-slate-200 flex items-center justify-center text-slate-400">
+            <X size={14} />
+          </button>
+        </div>
+      </div>
 
-        {/* Right: Device Preview */}
-        <div className="w-[340px] shrink-0">
+      {/* Stats row */}
+      <div className="grid grid-cols-3 gap-3 mb-5">
+        <div className="bg-white rounded-xl border border-slate-200 p-4">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Leads</p>
+          <p className="text-[22px] font-bold text-slate-800">{form.leads_count != null ? Number(form.leads_count).toLocaleString() : '0'}</p>
+        </div>
+        <div className="bg-white rounded-xl border border-slate-200 p-4">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Fields</p>
+          <p className="text-[22px] font-bold text-slate-800">{questions.length}</p>
+        </div>
+        <div className="bg-white rounded-xl border border-slate-200 p-4">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Page</p>
+          <p className="text-[13px] font-semibold text-slate-700 truncate">{pageName || '—'}</p>
+        </div>
+      </div>
+
+      {/* Phone preview — the main visual */}
+      <div className="flex justify-center">
+        <div className="w-[360px]">
           <div className="flex items-center gap-1.5 mb-3">
             <Smartphone size={12} className="text-slate-400" />
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Device Preview</span>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Form Preview</span>
           </div>
           <FormPhonePreview form={form} pageName={pageName} />
         </div>
