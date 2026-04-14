@@ -521,10 +521,10 @@ export const CreativeLibrary = ({ adAccountId, token, onLogin, onLogout, selecte
             className="w-full pl-9 pr-3 py-2 text-[12px] rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 placeholder:text-slate-300" />
         </div>
         <div className="flex rounded-lg border border-slate-200 bg-white overflow-hidden">
-          {[['all', 'All'], ['images', 'Images'], ['videos', 'Videos'], ['sets', 'Sets']].map(([val, label]) => (
-            <button key={val} onClick={() => { setFilter(val); if (val !== 'sets') setSelectedSet(null); }}
+          {[['all', 'All'], ['images', 'Images'], ['videos', 'Videos']].map(([val, label]) => (
+            <button key={val} onClick={() => setFilter(val)}
               className={`px-3.5 py-2 text-[11px] font-medium transition-colors ${filter === val ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
-              {label}{val === 'sets' && sets.length > 0 ? ` (${sets.length})` : ''}
+              {label}
             </button>
           ))}
         </div>
