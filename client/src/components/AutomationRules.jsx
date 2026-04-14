@@ -301,7 +301,10 @@ const RuleModal = ({ rule, onSave, onClose }) => {
                   {idx > 0 && <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">AND</span>}
                   <FormSelect value={cond.field} options={METRIC_FIELDS} onChange={v => updateCondition(idx, 'field', v)} className="flex-1" />
                   <FormSelect value={cond.operator} options={OPERATORS} onChange={v => updateCondition(idx, 'operator', v)} className="flex-1" />
-                  <FormInput type="number" value={cond.value} onChange={v => updateCondition(idx, 'value', v)} placeholder="Value" className="w-24" />
+                  <FormInput type={cond.field?.includes('.name') || cond.field?.includes('.id') || cond.operator === 'CONTAIN' || cond.operator === 'NOT_CONTAIN' ? 'text' : 'number'}
+                    value={cond.value} onChange={v => updateCondition(idx, 'value', v)}
+                    placeholder={cond.field?.includes('.name') ? 'Name...' : 'Value'}
+                    className={cond.field?.includes('.name') ? 'w-36' : 'w-24'} />
                   {conditions.length > 1 && (
                     <button onClick={() => removeCondition(idx)} className="w-6 h-6 rounded-md hover:bg-red-50 flex items-center justify-center text-slate-300 hover:text-red-500 transition-colors">
                       <X size={12} />
@@ -684,7 +687,7 @@ export const AutomationRules = ({ adAccountId, token, onLogin, onLogout, selecte
           <>
             {/* Chat input — ask AI to create a rule */}
             <div className="mb-5">
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm focus-within:ring-2 focus-within:ring-orange-500/20 focus-within:border-orange-300 transition-all overflow-hidden">
+              <div className="bg-white rounded-2xl border border-orange-200 shadow-sm ring-1 ring-orange-500/10 focus-within:ring-2 focus-within:ring-orange-500/20 focus-within:border-orange-300 transition-all overflow-hidden">
                 <input data-rule-input
                   placeholder="Describe a rule you want... e.g. 'Pause campaigns spending over $100 with no results'"
                   className="w-full px-5 pt-4 pb-2 text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none bg-transparent"
