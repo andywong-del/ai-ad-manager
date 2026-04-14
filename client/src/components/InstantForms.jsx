@@ -503,7 +503,7 @@ const FormDetailPanel = ({ form, pageId, pageName, onClose, onArchive }) => {
       {/* Phone preview — fills remaining height, no scroll */}
       <div className="flex-1 flex items-center justify-center p-4 overflow-hidden">
         <div className="h-full flex items-start justify-center" style={{ maxHeight: '100%' }}>
-          <div className="transform origin-top" style={{ transform: 'scale(0.75)' }}>
+          <div className="transform origin-top" style={{ transform: 'scale(0.8)' }}>
             <FormPhonePreview form={form} pageName={pageName} />
           </div>
         </div>
@@ -833,7 +833,7 @@ export const InstantForms = ({ adAccountId, token, onLogin, onLogout, selectedAc
       {/* Content — master-detail layout */}
       <div className="flex-1 flex min-h-0">
         {/* Left: Form list sidebar */}
-        <div className="w-[320px] shrink-0 border-r border-slate-200 overflow-auto bg-white">
+        <div className="flex-1 min-w-0 border-r border-slate-200 overflow-auto bg-white">
           <div className="py-2">
             {!token || !adAccountId ? (
               <div className="flex flex-col items-center justify-center py-20 px-6">
@@ -915,7 +915,7 @@ export const InstantForms = ({ adAccountId, token, onLogin, onLogout, selectedAc
             onArchive={() => setArchiveTarget(selectedForm)}
           />
         ) : (
-          <div className="flex-1 overflow-hidden bg-slate-50/50 flex items-center justify-center">
+          <div className="w-[380px] shrink-0 overflow-hidden bg-slate-50/50 flex items-center justify-center">
             <div className="text-center">
               <div className="w-14 h-14 rounded-2xl bg-orange-100 flex items-center justify-center mx-auto mb-3">
                 <FileText size={24} className="text-orange-500" />
