@@ -498,32 +498,19 @@ const FormDetailPanel = ({ form, pageId, pageName, onClose, onArchive }) => {
         </div>
       </div>
 
-      {/* Stats row */}
-      <div className="grid grid-cols-3 gap-3 mb-5">
-        <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Leads</p>
-          <p className="text-[22px] font-bold text-slate-800">{form.leads_count != null ? Number(form.leads_count).toLocaleString() : '0'}</p>
-        </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Fields</p>
-          <p className="text-[22px] font-bold text-slate-800">{questions.length}</p>
-        </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Page</p>
-          <p className="text-[13px] font-semibold text-slate-700 truncate">{pageName || '—'}</p>
-        </div>
+      {/* Inline stats */}
+      <div className="flex items-center gap-4 mb-4 text-[11px]">
+        <span className="text-slate-500"><strong className="text-slate-800">{form.leads_count != null ? Number(form.leads_count).toLocaleString() : '0'}</strong> leads</span>
+        <span className="text-slate-300">·</span>
+        <span className="text-slate-500"><strong className="text-slate-800">{questions.length}</strong> fields</span>
+        <span className="text-slate-300">·</span>
+        <span className="text-slate-500 truncate">{pageName || '—'}</span>
       </div>
 
-      {/* Phone preview — scaled down to fit without scrolling */}
+      {/* Phone preview — fits without scrolling */}
       <div className="flex justify-center">
-        <div className="w-[300px]">
-          <div className="flex items-center gap-1.5 mb-2">
-            <Smartphone size={11} className="text-slate-400" />
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Form Preview</span>
-          </div>
-          <div className="transform scale-[0.85] origin-top">
-            <FormPhonePreview form={form} pageName={pageName} />
-          </div>
+        <div className="transform scale-[0.75] origin-top">
+          <FormPhonePreview form={form} pageName={pageName} />
         </div>
       </div>
     </div>
