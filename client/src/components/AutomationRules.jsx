@@ -224,15 +224,18 @@ const RuleModal = ({ rule, onSave, onClose }) => {
   useEffect(() => {
     if (!rule) return;
     if (rule.evaluation_spec?.filters?.length) {
+      const filters = rule.evaluation_spec.filters;
+      // First pass: extract entity_type and time_preset
       let tp = 'LAST_7_DAYS';
-      const conds = [];
-      rule.evaluation_spec.filters.forEach(f => {
-        if (f.field === 'entity_type') { setEntityType(f.value || 'CAMPAIGN'); return; }
-        if (f.field === 'time_preset') { tp = f.value || 'LAST_7_DAYS'; return; }
-        // Convert cents to dollars for display in currency fields
+      filters.forEach(f => {
+        if (f.field === 'entity_type') setEntityType(f.value || 'CAMPAIGN');
+        if (f.field === 'time_preset') tp = f.value || 'LAST_7_DAYS';
+      });
+      // Second pass: build conditions (skip entity_type and time_preset)
+      const conds = filters.filter(f => f.field !== 'entity_type' && f.field !== 'time_preset').map(f => {
         let val = f.value || '';
         if (CURRENCY_FIELDS.has(f.field) && val) val = String(Number(val) / 100);
-        conds.push({ field: f.field, operator: f.operator || 'GREATER_THAN', value: val, time_preset: tp });
+        return { field: f.field, operator: f.operator || 'GREATER_THAN', value: val, time_preset: tp };
       });
       if (conds.length) setConditions(conds);
       else setConditions([{ field: 'cost_per_result', operator: 'GREATER_THAN', value: '', time_preset: tp }]);
