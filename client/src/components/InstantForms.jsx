@@ -801,31 +801,32 @@ export const InstantForms = ({ adAccountId, token, onLogin, onLogout, selectedAc
             </button>
             <button onClick={() => onPrefillChat?.('I want to create a new lead generation form for my campaigns.')}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 transition-all shadow-sm">
-              <Sparkles size={13} /> New Form
+              <Sparkles size={13} /> Create with AI
             </button>
           </div>
         </div>
       </div>
 
 
-      {/* Template chips + Filters */}
-      <div className="px-6 py-3 shrink-0 bg-white border-b border-slate-100 space-y-2.5">
-        <FormTemplates onCreateFromTemplate={() => setShowCreate(true)} />
-      </div>
-      <div className="px-6 py-3 flex items-center gap-3 shrink-0 bg-white border-b border-slate-100">
-        <div className="relative flex-1 max-w-sm">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+      {/* Filters + Template chips */}
+      <div className="px-6 py-3 flex items-center justify-between shrink-0 bg-white border-b border-slate-100">
+        <div className="relative max-w-[280px] w-full">
+          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search forms..."
-            className="w-full pl-9 pr-3 py-2 text-[12px] rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 placeholder:text-slate-300" />
+            className="w-full pl-9 pr-3 py-2 text-[12px] rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-300 placeholder:text-slate-300" />
         </div>
         <div className="flex rounded-lg border border-slate-200 bg-white overflow-hidden">
           {[['all', `All (${forms.length})`], ['ACTIVE', `Active (${activeCount})`], ['ARCHIVED', `Archived (${archivedCount})`]].map(([val, label]) => (
             <button key={val} onClick={() => setStatusFilter(val)}
-              className={`px-3 py-2 text-[11px] font-medium transition-colors ${statusFilter === val ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
+              className={`px-3 py-1.5 text-[10px] font-medium transition-colors ${statusFilter === val ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
               {label}
             </button>
           ))}
         </div>
+      </div>
+      {/* Template chips below filters */}
+      <div className="px-6 py-2.5 shrink-0 bg-white border-b border-slate-100">
+        <FormTemplates onCreateFromTemplate={() => setShowCreate(true)} />
       </div>
 
       {error && <div className="mx-6 mt-3 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg">{error}</div>}

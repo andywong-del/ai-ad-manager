@@ -737,23 +737,6 @@ export const AutomationRules = ({ adAccountId, token, onLogin, onLogout, selecte
           </>
         ) : (
           <>
-            {/* Quick-add template chips */}
-            <div className="flex flex-wrap items-center gap-2 mb-5">
-              <span className="text-[11px] font-semibold text-slate-400 mr-1">Quick add:</span>
-              {RULE_TEMPLATES.map(t => {
-                const Icon = t.icon;
-                return (
-                  <button key={t.id} onClick={() => handleTemplateSelect(t)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-orange-50 hover:border-orange-200 transition-all group">
-                    <div className={`w-5 h-5 rounded-md ${t.iconBg} flex items-center justify-center shrink-0`}>
-                      <Icon size={11} />
-                    </div>
-                    <span className="text-[11px] font-medium text-slate-600 group-hover:text-orange-700 transition-colors">{t.name}</span>
-                  </button>
-                );
-              })}
-            </div>
-
             {/* Rules list header — search left, filters right */}
             <div className="flex items-center justify-between mb-3">
               <div className="relative flex-1 max-w-sm">
@@ -769,6 +752,23 @@ export const AutomationRules = ({ adAccountId, token, onLogin, onLogout, selecte
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Quick-add template chips */}
+            <div className="flex flex-wrap items-center gap-2 mb-4">
+              <span className="text-[11px] font-semibold text-slate-400 mr-1">Quick add:</span>
+              {RULE_TEMPLATES.map(t => {
+                const Icon = t.icon;
+                return (
+                  <button key={t.id} onClick={() => handleTemplateSelect(t)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-orange-50 hover:border-orange-200 transition-all group">
+                    <div className={`w-5 h-5 rounded-md ${t.iconBg} flex items-center justify-center shrink-0`}>
+                      <Icon size={11} />
+                    </div>
+                    <span className="text-[11px] font-medium text-slate-600 group-hover:text-orange-700 transition-colors">{t.name}</span>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Rules list */}
