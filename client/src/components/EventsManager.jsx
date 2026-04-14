@@ -229,7 +229,7 @@ const ConversionCard = ({ conversion, onDelete }) => (
 );
 
 // ── Main Component ──
-export const EventsManager = ({ adAccountId, token, onLogin, onLogout, selectedAccount, selectedBusiness, onSelectAccount, onSendToChat }) => {
+export const EventsManager = ({ adAccountId, token, onLogin, onLogout, selectedAccount, selectedBusiness, onSelectAccount, onSendToChat, onPrefillChat }) => {
   const [showAskAI, setShowAskAI] = useState(false);
   const [activeTab, setActiveTab] = useState('pixels'); // 'pixels' | 'conversions'
   const [pixels, setPixels] = useState([]);
@@ -337,7 +337,10 @@ export const EventsManager = ({ adAccountId, token, onLogin, onLogout, selectedA
               selectedAccount={selectedAccount} selectedBusiness={selectedBusiness} onSelectAccount={onSelectAccount} />
           </div>
           <div className="flex items-center gap-2">
-            <AskAIButton onClick={() => setShowAskAI(true)} />
+            <button onClick={() => onPrefillChat?.('Help me set up tracking for my website. I need to configure my Meta Pixel and Conversions API.')}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 transition-colors">
+              <Plus size={13} /> Setup Tracking
+            </button>
             <button onClick={handleRefresh} disabled={loading}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-500 hover:bg-slate-100 border border-slate-200 transition-colors disabled:opacity-50">
               <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
@@ -430,7 +433,6 @@ export const EventsManager = ({ adAccountId, token, onLogin, onLogout, selectedA
         </>
       )}
 
-      {showAskAI && <AskAIPopup onSubmit={onSendToChat} onClose={() => setShowAskAI(false)} context="Events Manager" />}
     </div>
   );
 };

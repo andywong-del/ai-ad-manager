@@ -348,6 +348,7 @@ export const Dashboard = ({
               selectedBusiness={selectedBusiness}
               onSelectAccount={handleAccountSelect}
               onSendToChat={handleAudienceToChat}
+              onPrefillChat={handlePrefillChat}
             />
           ) : activeView.type === 'automationRules' ? (
             <AutomationRules
@@ -372,6 +373,7 @@ export const Dashboard = ({
               selectedBusiness={selectedBusiness}
               onSelectAccount={handleAccountSelect}
               onSendToChat={handleAudienceToChat}
+              onPrefillChat={handlePrefillChat}
             />
           ) : activeView.type === 'eventsManager' ? (
             <EventsManager
@@ -383,6 +385,7 @@ export const Dashboard = ({
               selectedBusiness={selectedBusiness}
               onSelectAccount={handleAccountSelect}
               onSendToChat={handleAudienceToChat}
+              onPrefillChat={handlePrefillChat}
             />
           ) : activeView.type === 'adLibrary' ? (
             <AdLibrary
@@ -395,6 +398,7 @@ export const Dashboard = ({
               selectedBusiness={selectedBusiness}
               onSendToChat={handleAudienceToChat}
               onSelectAccount={handleAccountSelect}
+              onPrefillChat={handlePrefillChat}
             />
           ) : activeView.type === 'brandLibrary' ? (
             <BrandLibrary

@@ -773,7 +773,7 @@ const FormPhonePreview = ({ form, pageName }) => {
 };
 
 // ── Main Component ──
-export const InstantForms = ({ adAccountId, token, onLogin, onLogout, selectedAccount, selectedBusiness, onSelectAccount, onSendToChat }) => {
+export const InstantForms = ({ adAccountId, token, onLogin, onLogout, selectedAccount, selectedBusiness, onSelectAccount, onSendToChat, onPrefillChat }) => {
   const [showAskAI, setShowAskAI] = useState(false);
   const [forms, setForms] = useState([]);
   const [pages, setPages] = useState([]);
@@ -873,9 +873,8 @@ export const InstantForms = ({ adAccountId, token, onLogin, onLogout, selectedAc
               selectedAccount={selectedAccount} selectedBusiness={selectedBusiness} onSelectAccount={onSelectAccount} />
           </div>
           <div className="flex items-center gap-2">
-            <AskAIButton onClick={() => setShowAskAI(true)} />
-            <button onClick={() => setShowCreate(true)} disabled={!selectedPage}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-white bg-orange-500 hover:bg-orange-600 transition-colors disabled:opacity-50">
+            <button onClick={() => onPrefillChat?.('I want to create a new lead generation form (Instant Form) for my campaigns. Help me set it up.')}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-white bg-orange-500 hover:bg-orange-600 transition-colors">
               <Plus size={13} /> New Form
             </button>
             <button onClick={fetchForms} disabled={loading}
@@ -1018,7 +1017,6 @@ export const InstantForms = ({ adAccountId, token, onLogin, onLogout, selectedAc
         </>
       )}
 
-      {showAskAI && <AskAIPopup onSubmit={onSendToChat} onClose={() => setShowAskAI(false)} context="Instant Forms" />}
     </div>
   );
 };

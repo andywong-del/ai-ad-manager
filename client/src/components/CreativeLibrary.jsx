@@ -1,7 +1,8 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
-import { Search, RefreshCw, Image as ImageIcon, Film, Loader2, Trash2, X, Download, Clock, Maximize2, Grid, List } from 'lucide-react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { Search, RefreshCw, Image as ImageIcon, Film, Loader2, Trash2, X, Download, Clock, Maximize2, Grid, List, Plus, Layers, Edit3, Check, Upload } from 'lucide-react';
 import { AccountSelector } from './AccountSelector.jsx';
 import { AskAIButton, AskAIPopup } from './AskAIPopup.jsx';
+import { useCreativeSets } from '../hooks/useCreativeSets.js';
 import api from '../services/api.js';
 
 // ── Helpers ──
@@ -146,8 +147,135 @@ const AssetCard = ({ asset, isVideo, selected, onSelect, onPreview, onDelete, vi
 };
 
 // ── Main Component ──
-export const CreativeLibrary = ({ adAccountId, token, onLogin, onLogout, selectedAccount, selectedBusiness, onSelectAccount, onBack, onSendToChat }) => {
+// ── Create Set Modal (inline) ──
+const CreateSetModal = ({ onClose, onSave }) => {
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [saving, setSaving] = useState(false);
+  const nameRef = useRef(null);
+  useEffect(() => { nameRef.current?.focus(); }, []);
+  const handleSave = async () => {
+    if (!name.trim()) return;
+    setSaving(true);
+    try { await onSave({ name: name.trim(), description: description.trim() }); } catch {} finally { setSaving(false); }
+  };
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40" onClick={onClose} />
+      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[420px] bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+          <h3 className="text-sm font-bold text-slate-800">New Creative Set</h3>
+          <button onClick={onClose} className="w-7 h-7 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400"><X size={15} /></button>
+        </div>
+        <div className="px-5 py-4 space-y-3">
+          <div>
+            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Name</label>
+            <input ref={nameRef} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Q2 Product Launch" onKeyDown={e => e.key === 'Enter' && handleSave()}
+              className="w-full text-sm text-slate-700 border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 placeholder:text-slate-300" />
+          </div>
+          <div>
+            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Description (optional)</label>
+            <input value={description} onChange={e => setDescription(e.target.value)} placeholder="What is this set for?"
+              className="w-full text-sm text-slate-700 border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 placeholder:text-slate-300" />
+          </div>
+        </div>
+        <div className="px-5 py-3 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 text-[12px] text-slate-500 hover:bg-slate-100 rounded-lg font-medium">Cancel</button>
+          <button onClick={handleSave} disabled={!name.trim() || saving}
+            className="px-5 py-2 text-[12px] text-white bg-blue-600 hover:bg-blue-500 rounded-lg font-semibold shadow-sm disabled:opacity-40 transition-colors">
+            {saving ? 'Creating...' : 'Create'}
+          </button>
+        </div>
+      </div>
+    </>
+  );
+};
+
+// ── Browse Creatives for Set Modal ──
+const BrowseForSetModal = ({ adAccountId, existingIds, onClose, onAdd }) => {
+  const [creatives, setCreatives] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [selected, setSelected] = useState(new Set());
+  useEffect(() => {
+    if (!adAccountId) return;
+    setLoading(true);
+    api.get('/creatives', { params: { adAccountId, limit: 50 } })
+      .then(({ data }) => setCreatives(data?.data || data || []))
+      .catch(() => {}).finally(() => setLoading(false));
+  }, [adAccountId]);
+  const existingSet = new Set(existingIds || []);
+  const filtered = creatives.filter(c => !search || (c.name || c.title || '').toLowerCase().includes(search.toLowerCase()));
+  const handleAdd = () => {
+    const items = creatives.filter(c => selected.has(c.id)).map(c => ({
+      creative_id: c.id, image_hash: c.image_hash || '', image_url: c.image_url || c.thumbnail_url || '',
+      video_id: c.video_id || '', thumbnail: c.thumbnail_url || c.image_url || '',
+      name: c.name || c.title || `Creative ${c.id}`, type: c.video_id ? 'video' : 'image',
+    }));
+    onAdd(items);
+  };
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40" onClick={onClose} />
+      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[600px] max-h-[80vh] bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 shrink-0">
+          <h3 className="text-sm font-bold text-slate-800">Browse Creatives</h3>
+          <button onClick={onClose} className="w-7 h-7 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400"><X size={15} /></button>
+        </div>
+        <div className="px-5 py-2 border-b border-slate-100 shrink-0">
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..."
+              className="w-full pl-9 pr-3 py-2 text-[12px] rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 placeholder:text-slate-300" />
+          </div>
+        </div>
+        <div className="flex-1 overflow-auto p-4">
+          {loading ? <div className="flex items-center justify-center py-16"><Loader2 size={20} className="animate-spin text-slate-400" /></div>
+          : filtered.length === 0 ? <p className="text-center text-sm text-slate-400 py-16">No creatives found</p>
+          : (
+            <div className="grid grid-cols-4 gap-2">
+              {filtered.map(c => {
+                const thumb = c.thumbnail_url || c.image_url || '';
+                const alreadyAdded = existingSet.has(c.id);
+                const isSel = selected.has(c.id);
+                return (
+                  <button key={c.id} onClick={() => !alreadyAdded && setSelected(prev => { const n = new Set(prev); n.has(c.id) ? n.delete(c.id) : n.add(c.id); return n; })} disabled={alreadyAdded}
+                    className={`relative rounded-lg border overflow-hidden text-left transition-all ${alreadyAdded ? 'opacity-40 cursor-not-allowed border-slate-200' : isSel ? 'border-blue-500 ring-2 ring-blue-200' : 'border-slate-200 hover:border-slate-300'}`}>
+                    <div className="aspect-square bg-slate-100 flex items-center justify-center">
+                      {thumb ? <img src={thumb} alt="" className="w-full h-full object-cover" /> : <ImageIcon size={20} className="text-slate-300" />}
+                    </div>
+                    {isSel && <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center"><Check size={9} className="text-white" /></div>}
+                    {alreadyAdded && <div className="absolute top-1.5 right-1.5 text-[7px] font-bold bg-slate-500 text-white px-1 rounded">Added</div>}
+                    <p className="text-[9px] text-slate-600 truncate px-1.5 py-1">{c.name || c.title || `Creative ${c.id}`}</p>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        <div className="px-5 py-2.5 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between shrink-0">
+          <span className="text-[11px] text-slate-400">{selected.size} selected</span>
+          <button onClick={handleAdd} disabled={selected.size === 0}
+            className="px-4 py-1.5 text-[11px] text-white bg-blue-600 hover:bg-blue-500 rounded-lg font-semibold shadow-sm disabled:opacity-40 transition-colors">
+            Add Selected
+          </button>
+        </div>
+      </div>
+    </>
+  );
+};
+
+export const CreativeLibrary = ({ adAccountId, token, onLogin, onLogout, selectedAccount, selectedBusiness, onSelectAccount, onBack, onSendToChat, onPrefillChat }) => {
   const [showAskAI, setShowAskAI] = useState(false);
+  // Creative Sets
+  const { sets, loading: setsLoading, fetchSets, createSet, updateSet, deleteSet, addItems: addSetItems, removeItem: removeSetItem } = useCreativeSets(adAccountId);
+  const [selectedSet, setSelectedSet] = useState(null);
+  const [showCreateSet, setShowCreateSet] = useState(false);
+  const [showBrowseForSet, setShowBrowseForSet] = useState(false);
+  const [addToSetOpen, setAddToSetOpen] = useState(false);
+  const [setUploading, setSetUploading] = useState(false);
+  const setFileRef = useRef(null);
+
   const [images, setImages] = useState([]);
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -325,7 +453,10 @@ export const CreativeLibrary = ({ adAccountId, token, onLogin, onLogout, selecte
               selectedAccount={selectedAccount} selectedBusiness={selectedBusiness} onSelectAccount={onSelectAccount} />
           </div>
           <div className="flex items-center gap-2">
-            <AskAIButton onClick={() => setShowAskAI(true)} />
+            <button onClick={() => onPrefillChat?.('I want to upload new creative assets for my ad campaigns. Help me manage my images and videos.')}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 transition-colors">
+              <Plus size={13} /> Upload Assets
+            </button>
             <button onClick={fetchAssets} disabled={loading}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-500 hover:bg-slate-100 border border-slate-200 transition-colors disabled:opacity-50">
               <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
@@ -342,6 +473,40 @@ export const CreativeLibrary = ({ adAccountId, token, onLogin, onLogout, selecte
             className="flex items-center gap-1 px-3 py-1.5 text-[11px] font-medium bg-white/20 hover:bg-red-500/60 rounded-lg transition-colors ml-4">
             <Trash2 size={12} /> Delete
           </button>
+          {sets.length > 0 && filter !== 'sets' && (
+            <div className="relative">
+              <button onClick={() => setAddToSetOpen(!addToSetOpen)}
+                className="flex items-center gap-1 px-3 py-1.5 text-[11px] font-medium bg-white/20 hover:bg-white/30 rounded-lg transition-colors">
+                <Layers size={12} /> Add to Set
+              </button>
+              {addToSetOpen && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setAddToSetOpen(false)} />
+                  <div className="absolute bottom-full left-0 mb-1 w-48 bg-white rounded-lg shadow-xl border border-slate-200 z-40 py-1">
+                    {sets.map(s => (
+                      <button key={s.id} onClick={async () => {
+                        const items = allAssets.filter(a => selectedIds.has(a.id || a.hash)).map(a => ({
+                          creative_id: a.id || '',
+                          image_hash: a.hash || '',
+                          image_url: a.url || a.url_128 || '',
+                          video_id: a._type === 'video' ? a.id : '',
+                          thumbnail: a._type === 'video' ? a.picture : (a.url || a.url_128 || ''),
+                          name: a.name || a.title || 'Untitled',
+                          type: a._type || 'image',
+                        }));
+                        await addSetItems(s.id, items);
+                        setAddToSetOpen(false);
+                        setSelectedIds(new Set());
+                      }}
+                        className="w-full text-left px-3 py-2 text-[11px] font-medium text-slate-700 hover:bg-blue-50 truncate">
+                        {s.name}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
           <button onClick={() => setSelectedIds(new Set())} className="ml-auto text-white/70 hover:text-white transition-colors">
             <X size={16} />
           </button>
@@ -356,10 +521,10 @@ export const CreativeLibrary = ({ adAccountId, token, onLogin, onLogout, selecte
             className="w-full pl-9 pr-3 py-2 text-[12px] rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 placeholder:text-slate-300" />
         </div>
         <div className="flex rounded-lg border border-slate-200 bg-white overflow-hidden">
-          {[['all', 'All'], ['images', 'Images'], ['videos', 'Videos']].map(([val, label]) => (
-            <button key={val} onClick={() => setFilter(val)}
+          {[['all', 'All'], ['images', 'Images'], ['videos', 'Videos'], ['sets', 'Sets']].map(([val, label]) => (
+            <button key={val} onClick={() => { setFilter(val); if (val !== 'sets') setSelectedSet(null); }}
               className={`px-3.5 py-2 text-[11px] font-medium transition-colors ${filter === val ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
-              {label}
+              {label}{val === 'sets' && sets.length > 0 ? ` (${sets.length})` : ''}
             </button>
           ))}
         </div>
@@ -414,6 +579,165 @@ export const CreativeLibrary = ({ adAccountId, token, onLogin, onLogout, selecte
       )}
 
       {/* Content */}
+      {filter === 'sets' ? (
+        /* ── Sets Tab ── */
+        <div className="flex-1 flex min-h-0">
+          <input ref={setFileRef} type="file" accept="image/*,video/*" multiple onChange={async (e) => {
+            if (!selectedSet || !adAccountId) return;
+            const files = Array.from(e.target.files || []);
+            setSetUploading(true);
+            try {
+              for (const file of files) {
+                const reader = new FileReader();
+                const base64 = await new Promise((resolve) => { reader.onload = () => resolve(reader.result.split(',')[1]); reader.readAsDataURL(file); });
+                const isVideo = file.type.startsWith('video/');
+                let item;
+                if (isVideo) {
+                  const { data } = await api.post('/assets/videos', { adAccountId, bytes: base64, name: file.name });
+                  item = { video_id: data?.id || '', thumbnail: '', name: file.name, type: 'video' };
+                } else {
+                  const { data } = await api.post('/assets/images', { adAccountId, bytes: base64, name: file.name });
+                  const img = data?.images ? Object.values(data.images)[0] : data;
+                  item = { image_hash: img?.hash || '', image_url: img?.url || '', name: file.name, type: 'image' };
+                }
+                await addSetItems(selectedSet.id, [item]);
+              }
+            } catch (err) { console.error('Upload failed:', err); }
+            finally { setSetUploading(false); e.target.value = ''; }
+          }} className="hidden" />
+
+          {/* Left: set list */}
+          <div className="w-[260px] shrink-0 border-r border-slate-200 overflow-auto bg-white">
+            <div className="p-3">
+              <button onClick={() => setShowCreateSet(true)}
+                className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-semibold text-cyan-600 bg-cyan-50 border border-cyan-200 hover:bg-cyan-100 transition-colors mb-2">
+                <Plus size={12} /> New Set
+              </button>
+            </div>
+            {setsLoading && sets.length === 0 ? (
+              <div className="flex items-center justify-center py-16"><Loader2 size={20} className="animate-spin text-slate-400" /></div>
+            ) : sets.length === 0 ? (
+              <div className="text-center py-12 px-4">
+                <Layers size={24} className="text-slate-200 mx-auto mb-2" />
+                <p className="text-[11px] text-slate-400">No creative sets yet</p>
+              </div>
+            ) : (
+              sets.map(set => {
+                const items = set.items || [];
+                const thumbs = items.slice(0, 4).map(i => i.image_url || i.thumbnail).filter(Boolean);
+                return (
+                  <button key={set.id} onClick={() => setSelectedSet(set)}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left border-b border-slate-100 transition-colors
+                      ${selectedSet?.id === set.id ? 'bg-blue-50/60 border-l-2 border-l-blue-500' : 'hover:bg-slate-50 border-l-2 border-l-transparent'}`}>
+                    <div className="w-9 h-9 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden grid grid-cols-2 shrink-0">
+                      {thumbs.length > 0 ? thumbs.map((t, i) => (
+                        <img key={i} src={t} alt="" className="w-full h-full object-cover" />
+                      )) : (
+                        <div className="col-span-2 row-span-2 flex items-center justify-center"><Layers size={12} className="text-slate-300" /></div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] font-semibold text-slate-800 truncate">{set.name}</p>
+                      <p className="text-[9px] text-slate-400">{items.length} item{items.length !== 1 ? 's' : ''}</p>
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
+
+          {/* Right: set detail or empty */}
+          {selectedSet ? (() => {
+            const currentSet = sets.find(s => s.id === selectedSet.id) || selectedSet;
+            const setItems = currentSet.items || [];
+            return (
+              <div className="flex-1 overflow-auto bg-slate-50/50 p-5">
+                {/* Set header */}
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h2 className="text-[15px] font-bold text-slate-800">{currentSet.name}</h2>
+                    {currentSet.description && <p className="text-[11px] text-slate-400 mt-0.5">{currentSet.description}</p>}
+                    <p className="text-[10px] text-slate-300 mt-1">{setItems.length} creative{setItems.length !== 1 ? 's' : ''}</p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button onClick={() => { if (confirm('Delete this set?')) { deleteSet(currentSet.id); setSelectedSet(null); } }}
+                      className="w-7 h-7 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition-colors">
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
+                {/* Add actions */}
+                <div className="flex items-center gap-2 mb-4">
+                  <button onClick={() => setShowBrowseForSet(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium text-slate-600 bg-white border border-slate-200 hover:border-blue-300 hover:text-blue-600 transition-colors">
+                    <Search size={11} /> Browse Existing
+                  </button>
+                  <button onClick={() => setFileRef.current?.click()} disabled={setUploading}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium text-slate-600 bg-white border border-slate-200 hover:border-emerald-300 hover:text-emerald-600 transition-colors disabled:opacity-50">
+                    {setUploading ? <Loader2 size={11} className="animate-spin" /> : <Upload size={11} />} Upload New
+                  </button>
+                </div>
+                {/* Creative grid */}
+                {setItems.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-14 bg-white rounded-xl border border-dashed border-slate-200">
+                    <Layers size={28} className="text-slate-200 mb-2" />
+                    <p className="text-[11px] text-slate-400">No creatives in this set</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {setItems.map((item, idx) => (
+                      <div key={idx} className="bg-white rounded-xl border border-slate-200 overflow-hidden group hover:shadow-md transition-all relative">
+                        <div className="aspect-square bg-slate-100 flex items-center justify-center">
+                          {(item.image_url || item.thumbnail) ? (
+                            <img src={item.image_url || item.thumbnail} alt="" className="w-full h-full object-cover" />
+                          ) : item.type === 'video' ? <Film size={24} className="text-slate-300" /> : <ImageIcon size={24} className="text-slate-300" />}
+                        </div>
+                        <div className={`absolute top-1.5 left-1.5 text-[8px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5
+                          ${item.type === 'video' ? 'bg-purple-500 text-white' : 'bg-blue-500 text-white'}`}>
+                          {item.type === 'video' ? <><Film size={8} /> Video</> : <><ImageIcon size={8} /> Image</>}
+                        </div>
+                        <button onClick={() => removeSetItem(currentSet.id, idx)}
+                          className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-500 transition-all">
+                          <X size={10} />
+                        </button>
+                        <div className="px-2 py-1.5">
+                          <p className="text-[10px] font-medium text-slate-700 truncate">{item.name || 'Untitled'}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })() : (
+            <div className="flex-1 flex items-center justify-center bg-slate-50/50">
+              <div className="text-center">
+                <Layers size={36} className="text-slate-200 mx-auto mb-2" />
+                <p className="text-sm text-slate-400">Select a set or create a new one</p>
+              </div>
+            </div>
+          )}
+
+          {/* Browse Creatives Modal for Sets */}
+          {showBrowseForSet && selectedSet && (
+            <BrowseForSetModal
+              adAccountId={adAccountId}
+              existingIds={(selectedSet.items || []).map(i => i.creative_id).filter(Boolean)}
+              onClose={() => setShowBrowseForSet(false)}
+              onAdd={async (items) => { await addSetItems(selectedSet.id, items); setShowBrowseForSet(false); }}
+            />
+          )}
+
+          {/* Create Set Modal */}
+          {showCreateSet && (
+            <CreateSetModal onClose={() => setShowCreateSet(false)} onSave={async ({ name, description }) => {
+              const newSet = await createSet({ name, description });
+              setSelectedSet(newSet);
+              setShowCreateSet(false);
+            }} />
+          )}
+        </div>
+      ) : (
       <div className="flex-1 overflow-auto px-6 py-4">
         {!token || !adAccountId ? (
           <div className="flex flex-col items-center justify-center py-20">
@@ -502,6 +826,7 @@ export const CreativeLibrary = ({ adAccountId, token, onLogin, onLogout, selecte
           </>
         )}
       </div>
+      )}
 
       {/* Preview modal */}
       {previewAsset && <PreviewModal asset={previewAsset} onClose={() => setPreviewAsset(null)} />}
@@ -532,7 +857,6 @@ export const CreativeLibrary = ({ adAccountId, token, onLogin, onLogout, selecte
         </>
       )}
 
-      {showAskAI && <AskAIPopup onSubmit={onSendToChat} onClose={() => setShowAskAI(false)} context="Asset Library" />}
     </div>
   );
 };
