@@ -67,7 +67,6 @@ const TIME_PRESETS = [
   { value: 'LAST_14_DAYS', label: 'Last 14 days' },
   { value: 'LAST_30_DAYS', label: 'Last 30 days' },
   { value: 'LIFETIME', label: 'Lifetime' },
-  { value: 'MAXIMUM', label: 'All time' },
 ];
 
 const SCHEDULE_OPTIONS = [
@@ -229,7 +228,7 @@ const RuleModal = ({ rule, onSave, onClose }) => {
       let tp = 'LAST_7_DAYS';
       filters.forEach(f => {
         if (f.field === 'entity_type') setEntityType(f.value || 'CAMPAIGN');
-        if (f.field === 'time_preset') tp = f.value || 'LAST_7_DAYS';
+        if (f.field === 'time_preset') tp = f.value === 'MAXIMUM' ? 'LIFETIME' : (f.value || 'LAST_7_DAYS');
       });
       // Second pass: build conditions (skip entity_type and time_preset)
       const conds = filters.filter(f => f.field !== 'entity_type' && f.field !== 'time_preset').map(f => {
@@ -406,7 +405,7 @@ const buildHumanSummary = (rule) => {
   filters.forEach(f => {
     if (f.field === 'entity_type') return;
     if (f.field === 'time_preset') {
-      timeWindow = { TODAY: 'Today', YESTERDAY: 'Yesterday', LAST_3_DAYS: 'Last 3 days', LAST_7_DAYS: 'Last 7 days', LAST_14_DAYS: 'Last 14 days', LAST_30_DAYS: 'Last 30 days', LIFETIME: 'Lifetime', MAXIMUM: 'All time' }[f.value] || f.value;
+      timeWindow = { TODAY: 'Today', YESTERDAY: 'Yesterday', LAST_3_DAYS: 'Last 3 days', LAST_7_DAYS: 'Last 7 days', LAST_14_DAYS: 'Last 14 days', LAST_30_DAYS: 'Last 30 days', LIFETIME: 'Lifetime', MAXIMUM: 'Lifetime' }[f.value] || f.value;
       return;
     }
     conditionFilters.push(f);
