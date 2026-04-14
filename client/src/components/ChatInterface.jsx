@@ -3188,19 +3188,21 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, activityLog = 
             <h1 className="text-3xl font-extrabold text-slate-900 mb-6 text-center tracking-tight">
               What can I help you optimize today?
             </h1>
-            <ChatInput
-              input={input} setInput={setInput} onKeyDown={handleKeyDown}
-              onSend={() => handleSend()} onStop={onStop} onFilesAdded={addFiles}
-              attachments={attachments} onRemoveAttachment={removeAttachment} onRetryUpload={uploadFile}
-              fileRef={fileRef} isTyping={isTyping}
-              handleFileUpload={handleFileInput} isOver={isDragOver}
-              activeSkill={activeSkill} activeSkills={activeSkills} activeSkillIds={activeSkillIds} onDeactivateSkill={onDeactivateSkill}
-              skills={skills} onSlashSelect={handleSlashSelect} slashSkills={slashSkills} onRemoveSlashSkill={handleRemoveSlashSkill} onClearAllSlash={() => setSlashSkills([])} enabledSkillIds={enabledSkillIds}
-              onToggleSkill={onToggleSkill} onManageSkills={onManageSkills}
-              token={token} onLogin={onLogin} onLogout={onLogout} isLoginLoading={isLoginLoading} loginError={loginError} selectedAccount={selectedAccount} selectedBusiness={selectedBusiness} onSelectAccount={onSelectAccount}
-              brandEnabledCount={brandEnabledCount}
-              isEmptyState={true}
-            />
+            <div className="relative z-10">
+              <ChatInput
+                input={input} setInput={setInput} onKeyDown={handleKeyDown}
+                onSend={() => handleSend()} onStop={onStop} onFilesAdded={addFiles}
+                attachments={attachments} onRemoveAttachment={removeAttachment} onRetryUpload={uploadFile}
+                fileRef={fileRef} isTyping={isTyping}
+                handleFileUpload={handleFileInput} isOver={isDragOver}
+                activeSkill={activeSkill} activeSkills={activeSkills} activeSkillIds={activeSkillIds} onDeactivateSkill={onDeactivateSkill}
+                skills={skills} onSlashSelect={handleSlashSelect} slashSkills={slashSkills} onRemoveSlashSkill={handleRemoveSlashSkill} onClearAllSlash={() => setSlashSkills([])} enabledSkillIds={enabledSkillIds}
+                onToggleSkill={onToggleSkill} onManageSkills={onManageSkills}
+                token={token} onLogin={onLogin} onLogout={onLogout} isLoginLoading={isLoginLoading} loginError={loginError} selectedAccount={selectedAccount} selectedBusiness={selectedBusiness} onSelectAccount={onSelectAccount}
+                brandEnabledCount={brandEnabledCount}
+                isEmptyState={true}
+              />
+            </div>
 
             {/* Action pills */}
             <ActionPills onSelect={(prompt) => setInput(prompt)} />
