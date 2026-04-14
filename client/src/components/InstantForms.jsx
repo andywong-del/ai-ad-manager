@@ -503,7 +503,7 @@ const FormDetailPanel = ({ form, pageId, pageName, onClose, onArchive }) => {
       {/* Phone preview — fills remaining height, no scroll */}
       <div className="flex-1 flex items-center justify-center p-4 overflow-hidden">
         <div className="h-full flex items-start justify-center" style={{ maxHeight: '100%' }}>
-          <div className="transform origin-top" style={{ transform: 'scale(0.65)' }}>
+          <div className="transform origin-top" style={{ transform: 'scale(0.75)' }}>
             <FormPhonePreview form={form} pageName={pageName} />
           </div>
         </div>
@@ -555,26 +555,22 @@ const FormPhonePreview = ({ form, pageName }) => {
             {/* Step 0: Intro */}
             {step === 0 && (
               <div className="flex-1 flex flex-col">
-                {/* Ad creative placeholder */}
-                <div className="w-full h-28 bg-gradient-to-br from-slate-100 to-slate-50 flex items-center justify-center">
-                  <div className="text-center">
-                    <Palette size={28} className="text-slate-300 mx-auto" />
-                    <p className="text-[9px] text-slate-400 mt-1">The image creative used in your ad will appear</p>
+                {/* Meta-style form intro */}
+                <div className="bg-slate-50 px-4 py-3 flex items-center gap-2 border-b border-slate-100">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+                    <span className="text-white text-[11px] font-bold">{(pageName || 'P')[0]}</span>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-semibold text-slate-700">{pageName || 'Your Page'}</p>
+                    <p className="text-[9px] text-slate-400">Sponsored · <span className="text-blue-500">Meta</span></p>
                   </div>
                 </div>
-                {/* Page info + form name */}
-                <div className="p-5 flex-1 flex flex-col">
-                  <div className="flex items-center gap-2.5 mb-4">
-                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                      <FileText size={16} className="text-blue-500" />
-                    </div>
-                    <div>
-                      <p className="text-[12px] font-semibold text-slate-700">{pageName || 'Your Page'}</p>
-                    </div>
+                <div className="flex-1 flex flex-col items-center justify-center p-5 text-center">
+                  <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center mb-3">
+                    <FileText size={20} className="text-blue-500" />
                   </div>
-                  <h3 className="text-[16px] font-bold text-slate-800 leading-snug">{form.name}</h3>
-                  <p className="text-[11px] text-slate-500 mt-2">{questions.length} question{questions.length !== 1 ? 's' : ''} to complete</p>
-                  <div className="flex-1" />
+                  <h3 className="text-[14px] font-bold text-slate-800 mb-1">{form.name}</h3>
+                  <p className="text-[11px] text-slate-400">{questions.length} question{questions.length !== 1 ? 's' : ''} to complete</p>
                 </div>
               </div>
             )}
@@ -837,7 +833,7 @@ export const InstantForms = ({ adAccountId, token, onLogin, onLogout, selectedAc
       {/* Content — master-detail layout */}
       <div className="flex-1 flex min-h-0">
         {/* Left: Form list sidebar */}
-        <div className="flex-[2] min-w-0 border-r border-slate-200 overflow-auto bg-white">
+        <div className="w-[320px] shrink-0 border-r border-slate-200 overflow-auto bg-white">
           <div className="py-2">
             {!token || !adAccountId ? (
               <div className="flex flex-col items-center justify-center py-20 px-6">
@@ -919,7 +915,7 @@ export const InstantForms = ({ adAccountId, token, onLogin, onLogout, selectedAc
             onArchive={() => setArchiveTarget(selectedForm)}
           />
         ) : (
-          <div className="flex-[1] overflow-hidden bg-slate-50/50 flex items-center justify-center">
+          <div className="flex-1 overflow-hidden bg-slate-50/50 flex items-center justify-center">
             <div className="text-center">
               <div className="w-14 h-14 rounded-2xl bg-orange-100 flex items-center justify-center mx-auto mb-3">
                 <FileText size={24} className="text-orange-500" />
