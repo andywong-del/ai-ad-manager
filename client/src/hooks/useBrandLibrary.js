@@ -1,33 +1,34 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import api from '../services/api.js';
 
-export const useBrandLibrary = () => {
+export const useBrandLibrary = (adAccountId) => {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const fetchItems = useCallback(async () => {
+    if (!adAccountId) { setItems([]); return; }
     setLoading(true);
     setError(null);
     try {
-      const { data } = await api.get('/brand-library');
+      const { data } = await api.get('/brand-library', { params: { adAccountId } });
       setItems(Array.isArray(data) ? data : []);
     } catch (err) {
-      // Silently handle missing table — show empty state
       console.warn('[brand-library] fetch error:', err.response?.data?.error || err.message);
       setItems([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [adAccountId]);
 
+  // Re-fetch when ad account changes
   useEffect(() => { fetchItems(); }, [fetchItems]);
 
   const createItem = useCallback(async ({ name, type, content, metadata }) => {
-    const { data } = await api.post('/brand-library', { name, type, content, metadata });
+    const { data } = await api.post('/brand-library', { name, type, content, metadata, adAccountId });
     setItems(prev => [data, ...prev]);
     return data;
-  }, []);
+  }, [adAccountId]);
 
   const updateItem = useCallback(async (id, updates) => {
     const { data } = await api.put(`/brand-library/${id}`, updates);
@@ -47,7 +48,7 @@ export const useBrandLibrary = () => {
 
   const crawlUrl = useCallback(async (url) => {
     const { data } = await api.post('/brand-library/crawl-url', { url });
-    return data; // { name, description, content, metadata, type }
+    return data;
   }, []);
 
   const crawlSocial = useCallback(async (pageId) => {
@@ -55,7 +56,7 @@ export const useBrandLibrary = () => {
     return data;
   }, []);
 
-  // Build brand context for chat injection (all enabled items)
+  // Build brand context for chat injection (only enabled items for current account)
   const getBrandContext = useCallback(() => {
     const enabled = items.filter(item => item.enabled);
     if (enabled.length === 0) return null;

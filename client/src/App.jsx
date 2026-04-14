@@ -32,21 +32,39 @@ export default function App() {
     try { return JSON.parse(localStorage.getItem('aam_selected_account')); } catch { return null; }
   });
 
-  // Dev: sync demo token from server when current token is missing or expired
+  // Dev: sync demo token from server BEFORE rendering anything
+  const [devTokenReady, setDevTokenReady] = useState(!import.meta.env.DEV);
+
   useEffect(() => {
     if (!import.meta.env.DEV) return;
-    // Try to sync demo token from server
-    const syncToken = () => {
-      fetch('/api/auth/demo-token').then(r => r.ok ? r.json() : null).then(data => {
-        if (!data?.longLivedToken) return;
-        const current = localStorage.getItem('fb_long_lived_token');
-        if (current !== data.longLivedToken) {
+    fetch('/api/auth/demo-token')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.longLivedToken) {
+          localStorage.setItem('fb_long_lived_token', data.longLivedToken);
           setTokenDirect(data.longLivedToken);
         }
-      }).catch(() => {});
+      })
+      .catch(() => {})
+      .finally(() => setDevTokenReady(true));
+
+    // Also auto-refresh on token errors
+    const handleTokenError = () => {
+      fetch('/api/auth/demo-token')
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (data?.longLivedToken) {
+            localStorage.setItem('fb_long_lived_token', data.longLivedToken);
+            setTokenDirect(data.longLivedToken);
+          }
+        }).catch(() => {});
     };
-    syncToken();
+    window.addEventListener('fb_token_error', handleTokenError);
+    return () => window.removeEventListener('fb_token_error', handleTokenError);
   }, []);
+
+  // Block rendering until dev token is synced
+  if (!devTokenReady) return null;
 
   // Always show Dashboard — soft wall prompts login when needed
   return (
