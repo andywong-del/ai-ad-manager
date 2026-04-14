@@ -58,37 +58,37 @@ const SCHEDULE_OPTIONS = [
   { value: 'CUSTOM', label: 'Custom schedule' },
 ];
 
-// ── Rule Templates (problem-oriented) ──
+// ── Rule Templates (problem-oriented, with prefill for quick apply) ──
 const RULE_TEMPLATES = [
   {
     id: 'waste', icon: Shield, category: 'Protection', categoryColor: 'text-red-600 bg-red-50 border-red-100',
     name: 'Stop Wasting Budget',
     desc: 'Auto-pause campaigns that are spending money but generating zero results',
-    chatPrompt: 'Set up an automation rule to pause campaigns that are spending budget but getting no conversions. Help me configure the right spend threshold and time window.',
+    prefill: { name: 'Stop Wasting Budget', actionType: 'PAUSE', conditions: [{ field: 'spent', operator: 'GREATER_THAN', value: '50', time_preset: 'LAST_7_DAYS' }, { field: 'results', operator: 'LESS_THAN', value: '1', time_preset: 'LAST_7_DAYS' }], schedule: 'DAILY' },
   },
   {
     id: 'cpa', icon: AlertTriangle, category: 'Protection', categoryColor: 'text-red-600 bg-red-50 border-red-100',
     name: 'Protect Your CPA',
-    desc: 'Get alerted or auto-pause when your cost per result spikes above your target',
-    chatPrompt: 'Set up an automation rule to protect my CPA. I want to pause or get notified when cost per result exceeds my target. Help me set the right threshold.',
+    desc: 'Auto-pause when your cost per result spikes above your target',
+    prefill: { name: 'Protect Your CPA', actionType: 'PAUSE', conditions: [{ field: 'cost_per_result', operator: 'GREATER_THAN', value: '50', time_preset: 'LAST_7_DAYS' }], schedule: 'DAILY' },
   },
   {
     id: 'scale', icon: TrendingUp, category: 'Growth', categoryColor: 'text-emerald-600 bg-emerald-50 border-emerald-100',
     name: 'Scale What\'s Working',
     desc: 'Auto-increase budget on your best performing campaigns when ROAS is strong',
-    chatPrompt: 'Set up an automation rule to automatically scale budget on my best performing campaigns. I want to increase budget when ROAS is above my target. Help me configure it.',
+    prefill: { name: 'Scale Winners', actionType: 'CHANGE_BUDGET', budgetAction: 'INCREASE', budgetAmount: '20', budgetUnit: 'PERCENTAGE', conditions: [{ field: 'roas', operator: 'GREATER_THAN', value: '3', time_preset: 'LAST_7_DAYS' }], schedule: 'DAILY' },
   },
   {
     id: 'fatigue', icon: Target, category: 'Protection', categoryColor: 'text-red-600 bg-red-50 border-red-100',
     name: 'Fight Ad Fatigue',
-    desc: 'Pause ads automatically before your audience gets tired of seeing them repeatedly',
-    chatPrompt: 'Set up an automation rule to fight ad fatigue. I want to auto-pause ads when frequency gets too high. Help me decide the right frequency threshold.',
+    desc: 'Pause ads automatically before your audience gets tired of seeing them',
+    prefill: { name: 'Anti-Fatigue Guard', actionType: 'PAUSE', conditions: [{ field: 'frequency', operator: 'GREATER_THAN', value: '4', time_preset: 'LAST_7_DAYS' }], schedule: 'DAILY' },
   },
   {
     id: 'overspend', icon: DollarSign, category: 'Safety', categoryColor: 'text-blue-600 bg-blue-50 border-blue-100',
     name: 'Budget Overspend Guard',
     desc: 'Get notified immediately when daily spend exceeds your budget limit',
-    chatPrompt: 'Set up an automation rule to alert me when my daily ad spend exceeds a certain amount. I want a budget overspend guard as a safety net.',
+    prefill: { name: 'Overspend Alert', actionType: 'SEND_NOTIFICATION', conditions: [{ field: 'spent', operator: 'GREATER_THAN', value: '500', time_preset: 'TODAY' }], schedule: 'HOURLY' },
   },
 ];
 
@@ -97,7 +97,7 @@ const QuickTemplates = ({ onSelect }) => (
   <div className="mb-6">
     <div className="mb-4">
       <h3 className="text-[13px] font-bold text-slate-800 mb-1">Quick Setup</h3>
-      <p className="text-[11px] text-slate-400">Choose a common rule to get started — we'll help you configure the details.</p>
+      <p className="text-[11px] text-slate-400">Pick a template, adjust the threshold, and enable — takes under 30 seconds.</p>
     </div>
     <div className="grid grid-cols-2 gap-3">
       {RULE_TEMPLATES.map(t => {
@@ -606,7 +606,18 @@ export const AutomationRules = ({ adAccountId, token, onLogin, onLogout, selecte
         ) : (
           <>
             {/* Quick Setup Templates */}
-            <QuickTemplates onSelect={(t) => onPrefillChat?.(t.chatPrompt)} />
+            <QuickTemplates onSelect={(t) => {
+              setEditingRule({
+                name: t.prefill.name,
+                execution_spec: { execution_type: t.prefill.actionType },
+                evaluation_spec: { filters: t.prefill.conditions },
+                schedule_spec: { schedule_type: t.prefill.schedule || 'DAILY' },
+                _budgetAction: t.prefill.budgetAction,
+                _budgetAmount: t.prefill.budgetAmount,
+                _budgetUnit: t.prefill.budgetUnit,
+              });
+              setShowCreate(true);
+            }} />
 
             {/* YOUR RULES section */}
             <div className="flex items-center justify-between mb-3">
