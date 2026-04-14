@@ -374,12 +374,12 @@ const buildHumanSummary = (rule) => {
     }
   });
 
-  // Action verb
+  // Action verb — marketer-friendly, no technical jargon
   const actionVerb = {
     PAUSE: 'Pause', UNPAUSE: 'Activate', CHANGE_BUDGET: 'Adjust budget for',
     CHANGE_BID: 'Adjust bid for', SEND_NOTIFICATION: 'Notify me about',
-    PING_ENDPOINT: 'Trigger webhook for',
-  }[action] || action;
+    PING_ENDPOINT: 'Run automation on', ADGROUP_BID: 'Adjust bid for',
+  }[action] || 'Manage';
 
   // Build condition phrases
   const condParts = conditionFilters.map(f => {
