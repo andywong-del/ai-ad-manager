@@ -466,51 +466,46 @@ const FormDetailPanel = ({ form, pageId, pageName, onClose, onArchive }) => {
   };
 
   return (
-    <div className="flex-1 overflow-auto bg-slate-50/50 p-6">
-      {/* Header bar */}
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h2 className="text-[16px] font-bold text-slate-800">{form.name}</h2>
-          <div className="flex items-center gap-2 mt-1">
-            {form.status === 'ACTIVE' ? (
-              <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-600 font-medium">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Live on Meta Ads · {pageName || 'Your Page'}
-              </span>
-            ) : (
-              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-400">
-                {form.status || 'Active'}
-              </span>
-            )}
-            <span className="text-[10px] text-slate-300">·</span>
-            <span className="text-[10px] text-slate-400">{questions.length} fields</span>
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50/50">
+      {/* Header bar — compact */}
+      <div className="px-5 py-3 bg-white border-b border-slate-100 shrink-0">
+        <div className="flex items-center justify-between">
+          <div className="min-w-0">
+            <h2 className="text-[14px] font-bold text-slate-800 truncate">{form.name}</h2>
+            <div className="flex items-center gap-2 mt-0.5 text-[10px]">
+              {form.status === 'ACTIVE' ? (
+                <span className="inline-flex items-center gap-1 text-emerald-600 font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Live
+                </span>
+              ) : (
+                <span className="font-bold uppercase text-slate-400">{form.status}</span>
+              )}
+              <span className="text-slate-300">·</span>
+              <span className="text-slate-500"><strong>{form.leads_count || 0}</strong> leads</span>
+              <span className="text-slate-300">·</span>
+              <span className="text-slate-500">{questions.length} fields</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button onClick={downloadCSV} disabled={downloading}
+              className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50">
+              <Download size={11} /> {downloading ? '...' : 'Leads CSV'}
+            </button>
+            <button onClick={() => onClose?.()}
+              className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400">
+              <X size={13} />
+            </button>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={downloadCSV} disabled={downloading}
-            className="flex items-center gap-1.5 px-3 py-2 text-[11px] font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 shadow-sm">
-            <Download size={12} /> {downloading ? '...' : 'Download Leads'}
-          </button>
-          <button onClick={() => onClose?.()}
-            className="w-8 h-8 rounded-lg hover:bg-slate-200 flex items-center justify-center text-slate-400">
-            <X size={14} />
-          </button>
-        </div>
       </div>
 
-      {/* Inline stats */}
-      <div className="flex items-center gap-4 mb-4 text-[11px]">
-        <span className="text-slate-500"><strong className="text-slate-800">{form.leads_count != null ? Number(form.leads_count).toLocaleString() : '0'}</strong> leads</span>
-        <span className="text-slate-300">·</span>
-        <span className="text-slate-500"><strong className="text-slate-800">{questions.length}</strong> fields</span>
-        <span className="text-slate-300">·</span>
-        <span className="text-slate-500 truncate">{pageName || '—'}</span>
-      </div>
-
-      {/* Phone preview — fits without scrolling */}
-      <div className="flex justify-center">
-        <div className="transform scale-[0.75] origin-top">
-          <FormPhonePreview form={form} pageName={pageName} />
+      {/* Phone preview — fills remaining height, no scroll */}
+      <div className="flex-1 flex items-center justify-center p-4 overflow-hidden">
+        <div className="h-full flex items-start justify-center" style={{ maxHeight: '100%' }}>
+          <div className="transform origin-top" style={{ transform: 'scale(0.65)' }}>
+            <FormPhonePreview form={form} pageName={pageName} />
+          </div>
         </div>
       </div>
     </div>
@@ -855,7 +850,7 @@ export const InstantForms = ({ adAccountId, token, onLogin, onLogout, selectedAc
       {/* Content — master-detail layout */}
       <div className="flex-1 flex min-h-0">
         {/* Left: Form list sidebar */}
-        <div className="w-[340px] shrink-0 border-r border-slate-200 overflow-auto bg-white">
+        <div className="flex-[2] min-w-0 border-r border-slate-200 overflow-auto bg-white">
           <div className="py-2">
             {!token || !adAccountId ? (
               <div className="flex flex-col items-center justify-center py-20 px-6">
@@ -937,7 +932,7 @@ export const InstantForms = ({ adAccountId, token, onLogin, onLogout, selectedAc
             onArchive={() => setArchiveTarget(selectedForm)}
           />
         ) : (
-          <div className="flex-1 overflow-auto bg-slate-50/50 flex items-center justify-center">
+          <div className="flex-[1] overflow-hidden bg-slate-50/50 flex items-center justify-center">
             <div className="text-center">
               <div className="w-14 h-14 rounded-2xl bg-orange-100 flex items-center justify-center mx-auto mb-3">
                 <FileText size={24} className="text-orange-500" />
