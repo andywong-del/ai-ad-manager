@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { Search, RefreshCw, Image as ImageIcon, Film, Loader2, Trash2, X, Download, Clock, Maximize2, Grid, List, Plus, Layers, Edit3, Check, Upload } from 'lucide-react';
+import { Search, RefreshCw, Image as ImageIcon, Film, Loader2, Trash2, X, Download, Clock, Maximize2, Grid, List, Plus, Layers, Edit3, Check, Upload, Sparkles } from 'lucide-react';
 import { AccountSelector } from './AccountSelector.jsx';
 import { AskAIButton, AskAIPopup } from './AskAIPopup.jsx';
 import { useCreativeSets } from '../hooks/useCreativeSets.js';
@@ -454,8 +454,8 @@ export const CreativeLibrary = ({ adAccountId, token, onLogin, onLogout, selecte
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => onPrefillChat?.('I want to upload new creative assets for my ad campaigns. Help me manage my images and videos.')}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 transition-colors">
-              <Plus size={13} /> Upload Assets
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 transition-all shadow-sm">
+              <Sparkles size={13} /> Create with AI
             </button>
             <button onClick={fetchAssets} disabled={loading}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-500 hover:bg-slate-100 border border-slate-200 transition-colors disabled:opacity-50">
