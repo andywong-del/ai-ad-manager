@@ -786,6 +786,8 @@ export const InstantForms = ({ adAccountId, token, onLogin, onLogout, selectedAc
                 )}
               </h1>
             </div>
+            <AccountSelector token={token} onLogin={onLogin} onLogout={onLogout}
+              selectedAccount={selectedAccount} selectedBusiness={selectedBusiness} onSelectAccount={onSelectAccount} />
             {pages.length > 0 && (
               <select value={selectedPage?.id || ''} onChange={e => setSelectedPage(pages.find(p => p.id === e.target.value))}
                 className="text-[12px] font-medium text-slate-700 border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20">
