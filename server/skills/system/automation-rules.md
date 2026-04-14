@@ -23,13 +23,13 @@ Be conversational — NOT a wizard. Parse what the user already provided.
 If the user describes what they want (e.g. "pause campaigns with high CPA"), map it directly to a rule config. If vague, show the 6 common templates as options:
 
 ```options
-{"title":"Choose a rule template","options":[
-  {"id":"scale","title":"Scale Winning Ads","desc":"Increase budget +20% when ROAS > 3.0","tag":"Growth"},
-  {"id":"pause_roas","title":"Pause Low ROAS","desc":"Stop ads when ROAS drops below 1.2","tag":"Protection"},
-  {"id":"fatigue","title":"Anti-Fatigue","desc":"Pause when frequency exceeds 5","tag":"Protection"},
-  {"id":"cost_cap","title":"Cost Cap Protection","desc":"Decrease bid when CPA exceeds threshold","tag":"Efficiency"},
-  {"id":"cleanup","title":"Nightly Cleanup","desc":"Pause ads with 0 conversions in 7 days","tag":"Cleanup"},
-  {"id":"custom","title":"Custom Rule","desc":"Define your own trigger and action","tag":"Advanced"}
+{"title":"What do you want to automate?","options":[
+  {"id":"pause_low","title":"Pause low performers","desc":"Spending money but no results","tag":"Protection"},
+  {"id":"pause_cpa","title":"Pause high CPA","desc":"Cost per result too expensive","tag":"Protection"},
+  {"id":"scale","title":"Scale top campaigns","desc":"Increase budget on strong ROAS","tag":"Growth"},
+  {"id":"fatigue","title":"Pause fatigued ads","desc":"Audience seeing ads too often","tag":"Protection"},
+  {"id":"alert","title":"Alert overspend","desc":"Daily spend exceeds your limit","tag":"Safety"},
+  {"id":"custom","title":"Something else","desc":"Describe what you need","tag":"Custom"}
 ]}
 ```
 

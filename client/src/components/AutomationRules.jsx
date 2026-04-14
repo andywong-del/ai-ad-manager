@@ -61,39 +61,39 @@ const SCHEDULE_OPTIONS = [
 const RULE_TEMPLATES = [
   {
     id: 'waste', icon: Shield, category: 'Protection', gradient: 'from-red-500/10 to-orange-500/5', borderColor: 'border-red-200/60', iconBg: 'bg-red-100 text-red-600',
-    name: 'Stop Wasting Budget', desc: 'Auto-pause campaigns spending money with zero results',
+    name: 'Pause low performers', desc: 'Spending money but no results',
     stat: 'Most popular rule',
-    prefill: { name: 'Stop Wasting Budget', actionType: 'PAUSE', conditions: [{ field: 'spend', operator: 'GREATER_THAN', value: '50', time_preset: 'LAST_7_DAYS' }, { field: 'results', operator: 'LESS_THAN', value: '1', time_preset: 'LAST_7_DAYS' }], schedule: 'DAILY' },
+    prefill: { name: 'Pause Low Performers', actionType: 'PAUSE', conditions: [{ field: 'spend', operator: 'GREATER_THAN', value: '50', time_preset: 'LAST_7_DAYS' }, { field: 'results', operator: 'LESS_THAN', value: '1', time_preset: 'LAST_7_DAYS' }], schedule: 'DAILY' },
   },
   {
     id: 'cpa', icon: AlertTriangle, category: 'Protection', gradient: 'from-amber-500/10 to-red-500/5', borderColor: 'border-amber-200/60', iconBg: 'bg-amber-100 text-amber-600',
-    name: 'Protect Your CPA', desc: 'Auto-pause when cost per result exceeds your target',
+    name: 'Pause high CPA', desc: 'Cost per result too expensive',
     stat: 'Avg. saves 23% budget',
-    prefill: { name: 'CPA Protection', actionType: 'PAUSE', conditions: [{ field: 'cost_per_result', operator: 'GREATER_THAN', value: '50', time_preset: 'LAST_7_DAYS' }], schedule: 'DAILY' },
+    prefill: { name: 'Pause High CPA', actionType: 'PAUSE', conditions: [{ field: 'cost_per_result', operator: 'GREATER_THAN', value: '50', time_preset: 'LAST_7_DAYS' }], schedule: 'DAILY' },
   },
   {
     id: 'scale', icon: TrendingUp, category: 'Growth', gradient: 'from-emerald-500/10 to-teal-500/5', borderColor: 'border-emerald-200/60', iconBg: 'bg-emerald-100 text-emerald-600',
-    name: 'Scale Winners', desc: 'Auto-increase budget when ROAS is above your goal',
+    name: 'Scale top campaigns', desc: 'Increase budget on strong ROAS',
     stat: 'Top performers only',
-    prefill: { name: 'Scale Winners', actionType: 'CHANGE_BUDGET', budgetAction: 'INCREASE', budgetAmount: '20', budgetUnit: 'PERCENTAGE', conditions: [{ field: 'roas', operator: 'GREATER_THAN', value: '3', time_preset: 'LAST_7_DAYS' }], schedule: 'DAILY' },
+    prefill: { name: 'Scale Top Campaigns', actionType: 'CHANGE_BUDGET', budgetAction: 'INCREASE', budgetAmount: '20', budgetUnit: 'PERCENTAGE', conditions: [{ field: 'roas', operator: 'GREATER_THAN', value: '3', time_preset: 'LAST_7_DAYS' }], schedule: 'DAILY' },
   },
   {
     id: 'fatigue', icon: Target, category: 'Protection', gradient: 'from-violet-500/10 to-blue-500/5', borderColor: 'border-violet-200/60', iconBg: 'bg-orange-100 text-orange-600',
-    name: 'Fight Ad Fatigue', desc: 'Pause ads before your audience gets tired of them',
+    name: 'Pause fatigued ads', desc: 'Audience seeing ads too often',
     stat: 'Keeps creatives fresh',
-    prefill: { name: 'Anti-Fatigue Guard', actionType: 'PAUSE', conditions: [{ field: 'frequency', operator: 'GREATER_THAN', value: '4', time_preset: 'LAST_7_DAYS' }], schedule: 'DAILY' },
+    prefill: { name: 'Pause Fatigued Ads', actionType: 'PAUSE', conditions: [{ field: 'frequency', operator: 'GREATER_THAN', value: '4', time_preset: 'LAST_7_DAYS' }], schedule: 'DAILY' },
   },
   {
     id: 'overspend', icon: DollarSign, category: 'Safety', gradient: 'from-blue-500/10 to-indigo-500/5', borderColor: 'border-blue-200/60', iconBg: 'bg-blue-100 text-blue-600',
-    name: 'Overspend Guard', desc: 'Get notified when daily spend exceeds your limit',
+    name: 'Alert overspend', desc: 'Daily spend exceeds your limit',
     stat: 'Real-time alerts',
-    prefill: { name: 'Overspend Alert', actionType: 'SEND_NOTIFICATION', conditions: [{ field: 'spend', operator: 'GREATER_THAN', value: '500', time_preset: 'TODAY' }], schedule: 'HOURLY' },
+    prefill: { name: 'Alert Overspend', actionType: 'SEND_NOTIFICATION', conditions: [{ field: 'spend', operator: 'GREATER_THAN', value: '500', time_preset: 'TODAY' }], schedule: 'HOURLY' },
   },
   {
     id: 'low_ctr', icon: BarChart3, category: 'Protection', gradient: 'from-rose-500/10 to-pink-500/5', borderColor: 'border-rose-200/60', iconBg: 'bg-rose-100 text-rose-600',
-    name: 'Low Engagement', desc: 'Pause ads with poor CTR before wasting more budget',
+    name: 'Pause low CTR', desc: 'Nobody clicking your ads',
     stat: 'Catches underperformers',
-    prefill: { name: 'Low CTR Guard', actionType: 'PAUSE', conditions: [{ field: 'ctr', operator: 'LESS_THAN', value: '0.5', time_preset: 'LAST_7_DAYS' }, { field: 'impressions', operator: 'GREATER_THAN', value: '1000', time_preset: 'LAST_7_DAYS' }], schedule: 'DAILY' },
+    prefill: { name: 'Pause Low CTR', actionType: 'PAUSE', conditions: [{ field: 'ctr', operator: 'LESS_THAN', value: '0.5', time_preset: 'LAST_7_DAYS' }, { field: 'impressions', operator: 'GREATER_THAN', value: '1000', time_preset: 'LAST_7_DAYS' }], schedule: 'DAILY' },
   },
 ];
 
@@ -352,12 +352,58 @@ const RuleModal = ({ rule, onSave, onClose }) => {
 };
 
 // ── Rule Card (existing rules) ──
+// ── Human-readable rule summary ──
+const CURRENCY_FIELDS = new Set(['spent', 'cost_per_action_type', 'cpm', 'cpc', 'action_values:offsite_conversion.fb_pixel_purchase']);
+const buildHumanSummary = (rule) => {
+  const action = rule.execution_spec?.execution_type || '';
+  const filters = rule.evaluation_spec?.filters || [];
+  const schedule = rule.schedule_spec?.schedule_type;
+
+  // Find entity type and time preset from filters
+  let entityType = 'campaigns';
+  let timeWindow = '';
+  const conditionFilters = [];
+
+  filters.forEach(f => {
+    if (f.field === 'entity_type') {
+      entityType = { CAMPAIGN: 'campaigns', ADSET: 'ad sets', AD: 'ads' }[f.value] || f.value?.toLowerCase() || 'campaigns';
+    } else if (f.field === 'time_preset') {
+      timeWindow = { TODAY: 'today', YESTERDAY: 'yesterday', LAST_3_DAYS: 'last 3 days', LAST_7_DAYS: 'last 7 days', LAST_14_DAYS: 'last 14 days', LAST_30_DAYS: 'last 30 days', LIFETIME: 'lifetime' }[f.value] || f.value;
+    } else {
+      conditionFilters.push(f);
+    }
+  });
+
+  // Action verb
+  const actionVerb = {
+    PAUSE: 'Pause', UNPAUSE: 'Activate', CHANGE_BUDGET: 'Adjust budget for',
+    CHANGE_BID: 'Adjust bid for', SEND_NOTIFICATION: 'Notify me about',
+    PING_ENDPOINT: 'Trigger webhook for',
+  }[action] || action;
+
+  // Build condition phrases
+  const condParts = conditionFilters.map(f => {
+    const fieldLabel = METRIC_FIELDS.find(m => m.value === f.field)?.label || f.field?.replace(/_/g, ' ');
+    const op = { GREATER_THAN: 'above', LESS_THAN: 'below', EQUAL: 'at', IN_RANGE: 'between', NOT_IN_RANGE: 'outside' }[f.operator] || f.operator?.toLowerCase();
+    let val = f.value;
+    if (CURRENCY_FIELDS.has(f.field) && val) val = '$' + (Number(val) / 100).toFixed(0);
+    return `${fieldLabel} ${op} ${val}`;
+  });
+
+  let sentence = `${actionVerb} ${entityType}`;
+  if (condParts.length) sentence += ` when ${condParts.join(' and ')}`;
+  if (timeWindow) sentence += ` (${timeWindow})`;
+
+  // Schedule
+  const scheduleLabel = { SEMI_HOURLY: 'every 30 min', HOURLY: 'hourly', DAILY: 'daily', CUSTOM: 'custom' }[schedule];
+  if (scheduleLabel) sentence += ` · Checks ${scheduleLabel}`;
+
+  return sentence;
+};
+
 const RuleCard = ({ rule, onToggle, onEdit, onDelete, onViewHistory, updating }) => {
   const isActive = rule.status === 'ENABLED';
-  const actionType = rule.execution_spec?.execution_type || '';
-  const filters = rule.evaluation_spec?.filters || [];
-  const scheduleLabel = SCHEDULE_OPTIONS.find(s => s.value === rule.schedule_spec?.schedule_type)?.label || 'Daily';
-  const actionLabel = ACTION_TYPES.find(a => a.value === actionType)?.label || actionType;
+  const summary = buildHumanSummary(rule);
 
   return (
     <div className={`group relative bg-white rounded-xl border transition-all hover:shadow-md ${isActive ? 'border-slate-200' : 'border-slate-200/60 opacity-70'}`}>
@@ -367,27 +413,16 @@ const RuleCard = ({ rule, onToggle, onEdit, onDelete, onViewHistory, updating })
       <div className="px-5 pl-6 py-4">
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-3 mb-2">
+            <div className="flex items-center gap-3 mb-1.5">
               <h4 className="text-[14px] font-bold text-slate-800 truncate">{rule.name}</h4>
               <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${isActive ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
                 {isActive ? 'Active' : 'Paused'}
               </span>
             </div>
-            {/* Condition summary */}
-            <div className="flex flex-wrap items-center gap-1.5 mb-2">
-              <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">{actionLabel}</span>
-              <span className="text-[10px] text-slate-300">on</span>
-              <span className="text-[10px] font-medium text-slate-500">{rule.evaluation_spec?.entity_type || 'campaigns'}</span>
-              <span className="text-[10px] text-slate-300">when</span>
-              {filters.map((f, i) => (
-                <span key={i} className="text-[10px] font-medium text-orange-600 bg-orange-50 px-2 py-0.5 rounded-md">
-                  {METRIC_FIELDS.find(m => m.value === f.field)?.label || f.field} {OPERATORS.find(o => o.value === f.operator)?.label || f.operator} {f.value}
-                </span>
-              ))}
-            </div>
+            {/* Human-readable summary */}
+            <p className="text-[12px] text-slate-500 leading-relaxed mb-1.5">{summary}</p>
             {/* Meta */}
             <div className="flex items-center gap-3 text-[10px] text-slate-400">
-              <span className="flex items-center gap-1"><Clock size={10} /> {scheduleLabel}</span>
               {rule.created_time && <span>Created {fmtDate(rule.created_time)}</span>}
             </div>
           </div>
