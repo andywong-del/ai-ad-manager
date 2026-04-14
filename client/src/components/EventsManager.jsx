@@ -487,23 +487,6 @@ export const EventsManager = ({ adAccountId, token, onLogin, onLogout, selectedA
                 </table>
               </div>
 
-              {/* Diagnostics */}
-              {pixels[0]?.id && pixelDiagnostics[pixels[0].id]?.length > 0 && (
-                <div className="mt-4">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Pixel Health</p>
-                  <div className="space-y-1.5">
-                    {pixelDiagnostics[pixels[0].id].map((d, i) => (
-                      <div key={i} className={`flex items-start gap-2.5 px-3 py-2 rounded-lg border ${DIAG_COLORS[d.result] || DIAG_COLORS.warning}`}>
-                        <span className="text-[13px] mt-0.5">{DIAG_ICONS[d.result] || '?'}</span>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[11px] font-semibold">{d.title}</p>
-                          <p className="text-[10px] opacity-70 mt-0.5 line-clamp-2">{d.description}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </>
           )
         ) : activeTab === 'pixels' ? (
