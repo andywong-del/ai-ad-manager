@@ -352,53 +352,57 @@ const RuleModal = ({ rule, onSave, onClose }) => {
 };
 
 // ── Rule Card (existing rules) ──
-// ── Human-readable rule summary ──
+// ── Human-readable rule summary (Meta-style: action line + condition line) ──
 const CURRENCY_FIELDS = new Set(['spent', 'cost_per_action_type', 'cpm', 'cpc', 'action_values:offsite_conversion.fb_pixel_purchase']);
 const buildHumanSummary = (rule) => {
   const action = rule.execution_spec?.execution_type || '';
   const filters = rule.evaluation_spec?.filters || [];
-  const schedule = rule.schedule_spec?.schedule_type;
+  const budgetOpts = rule.execution_spec?.execution_options;
 
-  // Find entity type and time preset from filters
-  let entityType = 'campaigns';
-  let timeWindow = '';
   const conditionFilters = [];
+  let timeWindow = '';
 
   filters.forEach(f => {
-    if (f.field === 'entity_type') {
-      entityType = { CAMPAIGN: 'campaigns', ADSET: 'ad sets', AD: 'ads' }[f.value] || f.value?.toLowerCase() || 'campaigns';
-    } else if (f.field === 'time_preset') {
-      timeWindow = { TODAY: 'today', YESTERDAY: 'yesterday', LAST_3_DAYS: 'last 3 days', LAST_7_DAYS: 'last 7 days', LAST_14_DAYS: 'last 14 days', LAST_30_DAYS: 'last 30 days', LIFETIME: 'lifetime' }[f.value] || f.value;
+    if (f.field === 'entity_type' || f.field === 'time_preset') {
+      if (f.field === 'time_preset') {
+        timeWindow = { TODAY: 'Today', YESTERDAY: 'Yesterday', LAST_3_DAYS: 'Last 3 days', LAST_7_DAYS: 'Last 7 days', LAST_14_DAYS: 'Last 14 days', LAST_30_DAYS: 'Last 30 days', LIFETIME: 'Lifetime' }[f.value] || f.value;
+      }
     } else {
       conditionFilters.push(f);
     }
   });
 
-  // Action verb — marketer-friendly, no technical jargon
-  const actionVerb = {
-    PAUSE: 'Pause', UNPAUSE: 'Activate', CHANGE_BUDGET: 'Adjust budget for',
-    CHANGE_BID: 'Adjust bid for', SEND_NOTIFICATION: 'Notify me about',
-    PING_ENDPOINT: 'Run automation on', ADGROUP_BID: 'Adjust bid for',
-  }[action] || 'Manage';
+  // Action line
+  let actionLine = {
+    PAUSE: 'Pause campaigns', UNPAUSE: 'Activate campaigns',
+    CHANGE_BUDGET: 'Adjust budget', CHANGE_BID: 'Adjust bid',
+    SEND_NOTIFICATION: 'Send notification only',
+    PING_ENDPOINT: 'Run automation',
+  }[action] || action;
 
-  // Build condition phrases
+  if (action === 'CHANGE_BUDGET' && budgetOpts) {
+    const opt = Array.isArray(budgetOpts) ? budgetOpts[0] : budgetOpts;
+    if (opt) {
+      const dir = opt.operator === 'INCREASE' ? 'Increase' : 'Decrease';
+      const unit = opt.unit === 'PERCENTAGE' ? '%' : '$';
+      actionLine = `${dir} budget by ${opt.value}${unit}`;
+    }
+  }
+
+  // Condition line
   const condParts = conditionFilters.map(f => {
     const fieldLabel = METRIC_FIELDS.find(m => m.value === f.field)?.label || f.field?.replace(/_/g, ' ');
-    const op = { GREATER_THAN: 'above', LESS_THAN: 'below', EQUAL: 'at', IN_RANGE: 'between', NOT_IN_RANGE: 'outside' }[f.operator] || f.operator?.toLowerCase();
+    const op = { GREATER_THAN: 'is greater than', LESS_THAN: 'is less than', EQUAL: 'equals', IN_RANGE: 'is between', NOT_IN_RANGE: 'is not between' }[f.operator] || f.operator;
     let val = f.value;
-    if (CURRENCY_FIELDS.has(f.field) && val) val = '$' + (Number(val) / 100).toFixed(0);
+    if (CURRENCY_FIELDS.has(f.field) && val) val = '$' + (Number(val) / 100).toFixed(2);
     return `${fieldLabel} ${op} ${val}`;
   });
 
-  let sentence = `${actionVerb} ${entityType}`;
-  if (condParts.length) sentence += ` when ${condParts.join(' and ')}`;
-  if (timeWindow) sentence += ` (${timeWindow})`;
+  let conditionLine = condParts.length ? `If ${condParts.join(' and ')}` : '';
+  if (timeWindow && conditionLine) conditionLine += ` · ${timeWindow}`;
+  else if (timeWindow) conditionLine = timeWindow;
 
-  // Schedule
-  const scheduleLabel = { SEMI_HOURLY: 'every 30 min', HOURLY: 'hourly', DAILY: 'daily', CUSTOM: 'custom' }[schedule];
-  if (scheduleLabel) sentence += ` · Checks ${scheduleLabel}`;
-
-  return sentence;
+  return { actionLine, conditionLine };
 };
 
 // ── Toggle switch ──
@@ -413,7 +417,7 @@ const Toggle = ({ active, onChange, loading }) => (
 const RuleCard = ({ rule, onToggle, onEdit, onDelete, onViewHistory, updating }) => {
   const isActive = rule.status === 'ENABLED';
   const isInvalid = rule.status === 'INVALID' || rule.status === 'HAS_ISSUES';
-  const summary = buildHumanSummary(rule);
+  const { actionLine, conditionLine } = buildHumanSummary(rule);
 
   // Extract entity type from filters
   const entityFilter = (rule.evaluation_spec?.filters || []).find(f => f.field === 'entity_type');
@@ -441,25 +445,28 @@ const RuleCard = ({ rule, onToggle, onEdit, onDelete, onViewHistory, updating })
               {isActive ? 'Active' : 'Paused'}
             </span>
           )}
-          {/* Actions — always visible, clean icons */}
-          <div className="flex items-center gap-0.5 shrink-0">
-            <button onClick={() => onEdit(rule)} title="Edit rule"
-              className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-300 hover:text-slate-600 transition-colors">
-              <Edit3 size={14} />
+          {/* Actions */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button onClick={() => onEdit(rule)}
+              className="px-2.5 py-1 rounded-lg text-[11px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors">
+              Edit
             </button>
-            <button onClick={() => onViewHistory(rule.id)} title="View history"
-              className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-300 hover:text-slate-600 transition-colors">
-              <Eye size={14} />
+            <button onClick={() => onViewHistory(rule.id)} title="Execution history"
+              className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-300 hover:text-slate-600 transition-colors">
+              <Clock size={13} />
             </button>
             <button onClick={() => onDelete(rule.id)} title="Delete rule"
-              className="w-8 h-8 rounded-lg hover:bg-red-50 flex items-center justify-center text-slate-300 hover:text-red-500 transition-colors">
-              <Trash2 size={14} />
+              className="w-7 h-7 rounded-lg hover:bg-red-50 flex items-center justify-center text-slate-300 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100">
+              <Trash2 size={13} />
             </button>
           </div>
         </div>
 
-        {/* Action & condition summary */}
-        <p className="text-[12px] text-slate-500 leading-relaxed mb-2.5 ml-12">{summary}</p>
+        {/* Action & condition — Meta-style two lines */}
+        <div className="ml-12 mb-2.5">
+          <p className="text-[12px] font-semibold text-slate-700">{actionLine}</p>
+          {conditionLine && <p className="text-[11px] text-slate-400 mt-0.5">{conditionLine}</p>}
+        </div>
 
         {/* Info row */}
         <div className="flex items-center gap-4 text-[10px] ml-12">
