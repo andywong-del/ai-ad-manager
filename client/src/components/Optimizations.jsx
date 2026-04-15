@@ -115,7 +115,7 @@ export const Optimizations = ({ adAccountId, token, onLogin, onLogout, selectedA
       setRecommendations([]);
       setLastScanned(new Date());
     } catch (err) {
-      setError(err.response?.data?.error || err.message);
+      setError(typeof err.response?.data?.error === 'string' ? err.response.data.error : err.response?.data?.error?.message || err.message);
     } finally {
       setLoading(false);
     }

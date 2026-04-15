@@ -122,7 +122,7 @@ const CreateFormModal = ({ pageId, onClose, onCreated }) => {
       onCreated();
       onClose();
     } catch (err) {
-      setError(err.response?.data?.error || err.message);
+      setError(typeof err.response?.data?.error === 'string' ? err.response.data.error : err.response?.data?.error?.message || err.message);
     } finally {
       setSaving(false);
     }
@@ -737,7 +737,7 @@ export const InstantForms = ({ adAccountId, token, onLogin, onLogout, selectedAc
       else setForms(items);
       setFormsPaging(data?.paging || null);
     } catch (err) {
-      setError(err.response?.data?.error || err.message);
+      setError(typeof err.response?.data?.error === 'string' ? err.response.data.error : err.response?.data?.error?.message || err.message);
     } finally {
       setLoading(false);
       setLoadingMore(false);

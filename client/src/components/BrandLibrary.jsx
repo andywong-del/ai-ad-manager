@@ -140,7 +140,7 @@ const CrawlUrlModal = ({ onClose, onSave, crawlUrl }) => {
       const data = await crawlUrl(url.trim());
       setResult(data);
     } catch (err) {
-      setError(err.response?.data?.error || err.message);
+      setError(typeof err.response?.data?.error === 'string' ? err.response.data.error : err.response?.data?.error?.message || err.message);
     } finally {
       setCrawling(false);
     }
@@ -255,7 +255,7 @@ const CrawlSocialModal = ({ onClose, onSave, crawlSocial, token }) => {
       const data = await crawlSocial(selectedPage.id);
       setResult(data);
     } catch (err) {
-      setError(err.response?.data?.error || err.message);
+      setError(typeof err.response?.data?.error === 'string' ? err.response.data.error : err.response?.data?.error?.message || err.message);
     } finally {
       setCrawling(false);
     }

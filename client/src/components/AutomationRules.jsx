@@ -640,7 +640,7 @@ export const AutomationRules = ({ adAccountId, token, onLogin, onLogout, selecte
     try {
       const { data } = await api.get('/rules', { params: { adAccountId } });
       setRules(data || []);
-    } catch (err) { setError(err.response?.data?.error || err.message); }
+    } catch (err) { setError(typeof err.response?.data?.error === 'string' ? err.response.data.error : err.response?.data?.error?.message || err.message); }
     finally { setLoading(false); }
   }, [adAccountId]);
 

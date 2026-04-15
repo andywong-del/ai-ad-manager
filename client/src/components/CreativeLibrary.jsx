@@ -309,7 +309,7 @@ export const CreativeLibrary = ({ adAccountId, token, onLogin, onLogout, selecte
       setImages((imgRes.data || []).map(img => ({ ...img, _type: 'image' })));
       setVideos((vidRes.data || []).map(vid => ({ ...vid, _type: 'video' })));
     } catch (err) {
-      setError(err.response?.data?.error || err.message);
+      setError(typeof err.response?.data?.error === 'string' ? err.response.data.error : err.response?.data?.error?.message || err.message);
     } finally {
       setLoading(false);
     }

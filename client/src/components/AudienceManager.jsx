@@ -1785,9 +1785,9 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack, token, onLo
           }))
         : [];
       setAudiences([...custom, ...saved]);
-      if (customRes.status === 'rejected') setError(customRes.reason?.response?.data?.error || customRes.reason?.message);
+      if (customRes.status === 'rejected') { const e = customRes.reason?.response?.data?.error; setError(typeof e === 'string' ? e : e?.message || customRes.reason?.message); }
     } catch (err) {
-      setError(err.response?.data?.error || err.message);
+      setError(typeof err.response?.data?.error === 'string' ? err.response.data.error : err.response?.data?.error?.message || err.message);
     } finally {
       setLoading(false);
     }

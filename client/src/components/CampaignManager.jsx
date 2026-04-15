@@ -566,7 +566,7 @@ export const CampaignManager = ({ adAccountId, onBack, onSendToChat, token, onLo
       } while (after);
       setCampaigns(allItems);
     } catch (err) {
-      setError(err.response?.data?.error || err.message);
+      setError(typeof err.response?.data?.error === 'string' ? err.response.data.error : err.response?.data?.error?.message || err.message);
     } finally {
       setLoading(false);
     }
@@ -591,7 +591,7 @@ export const CampaignManager = ({ adAccountId, onBack, onSendToChat, token, onLo
       } while (after);
       setAdSets(allItems);
     } catch (err) {
-      setError(err.response?.data?.error || err.message);
+      setError(typeof err.response?.data?.error === 'string' ? err.response.data.error : err.response?.data?.error?.message || err.message);
     } finally {
       setLoading(false);
     }
@@ -616,7 +616,7 @@ export const CampaignManager = ({ adAccountId, onBack, onSendToChat, token, onLo
       } while (after);
       setAds(allItems);
     } catch (err) {
-      setError(err.response?.data?.error || err.message);
+      setError(typeof err.response?.data?.error === 'string' ? err.response.data.error : err.response?.data?.error?.message || err.message);
     } finally {
       setLoading(false);
     }
@@ -640,7 +640,7 @@ export const CampaignManager = ({ adAccountId, onBack, onSendToChat, token, onLo
       setAdSets(allItems);
       // all loaded
     } catch (err) {
-      setError(err.response?.data?.error || err.message);
+      setError(typeof err.response?.data?.error === 'string' ? err.response.data.error : err.response?.data?.error?.message || err.message);
     } finally { setLoading(false); }
   }, [datePreset]);
 
@@ -659,7 +659,7 @@ export const CampaignManager = ({ adAccountId, onBack, onSendToChat, token, onLo
       setAds(allItems);
       // all loaded
     } catch (err) {
-      setError(err.response?.data?.error || err.message);
+      setError(typeof err.response?.data?.error === 'string' ? err.response.data.error : err.response?.data?.error?.message || err.message);
     } finally { setLoading(false); }
   }, [datePreset]);
 
@@ -702,7 +702,7 @@ export const CampaignManager = ({ adAccountId, onBack, onSendToChat, token, onLo
         setLoading(true); setError(null);
         api.get(`/meta/adaccounts/${adAccountId}/adsets`, { params: { limit: 200, date_preset: datePreset } })
           .then(({ data }) => { setAdSets((data.data || data || []).map(as => normAdSet(as))); })
-          .catch(err => setError(err.response?.data?.error || err.message))
+          .catch(err => setError(typeof err.response?.data?.error === 'string' ? err.response.data.error : err.response?.data?.error?.message || err.message))
           .finally(() => setLoading(false));
       }
     } else if (tab === 'ads') {
@@ -715,7 +715,7 @@ export const CampaignManager = ({ adAccountId, onBack, onSendToChat, token, onLo
         setLoading(true); setError(null);
         api.get(`/meta/adaccounts/${adAccountId}/ads`, { params: { limit: 200, date_preset: datePreset } })
           .then(({ data }) => { setAds((data.data || data || []).map(normAd)); })
-          .catch(err => setError(err.response?.data?.error || err.message))
+          .catch(err => setError(typeof err.response?.data?.error === 'string' ? err.response.data.error : err.response?.data?.error?.message || err.message))
           .finally(() => setLoading(false));
       }
     }

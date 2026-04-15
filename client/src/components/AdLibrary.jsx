@@ -295,7 +295,7 @@ export const AdLibrary = ({ adAccountId, token, onLogin, onLogout, selectedAccou
       else setAds(items);
       setPaging(res.data?.paging || null);
     } catch (err) {
-      setError(err.response?.data?.error || err.message);
+      setError(typeof err.response?.data?.error === 'string' ? err.response.data.error : err.response?.data?.error?.message || err.message);
     } finally {
       setLoading(false);
       setLoadingMore(false);

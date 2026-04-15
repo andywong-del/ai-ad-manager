@@ -272,7 +272,7 @@ export const EventsManager = ({ adAccountId, token, onLogin, onLogout, selectedA
       // Auto-expand first pixel
       if (data?.length && !expandedPixel) setExpandedPixel(data[0].id);
     } catch (err) {
-      setError(err.response?.data?.error || err.message);
+      setError(typeof err.response?.data?.error === 'string' ? err.response.data.error : err.response?.data?.error?.message || err.message);
     } finally {
       setLoading(false);
     }
@@ -286,7 +286,7 @@ export const EventsManager = ({ adAccountId, token, onLogin, onLogout, selectedA
       const { data } = await api.get('/conversions', { params: { adAccountId } });
       setConversions(data || []);
     } catch (err) {
-      setError(err.response?.data?.error || err.message);
+      setError(typeof err.response?.data?.error === 'string' ? err.response.data.error : err.response?.data?.error?.message || err.message);
     } finally {
       setLoading(false);
     }
