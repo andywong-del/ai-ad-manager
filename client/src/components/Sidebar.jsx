@@ -250,6 +250,7 @@ export const Sidebar = ({
   const [collapsedProjectsOpen, setCollapsedProjectsOpen] = useState(false);
   const [collapsedModulesOpen, setCollapsedModulesOpen] = useState(false);
   const [manageAdsOpen, setManageAdsOpen] = useState(true);
+  const [allTasksOpen, setAllTasksOpen] = useState(true);
   const [editingFolderId, setEditingFolderId] = useState(null);
   const [editFolderName, setEditFolderName] = useState('');
   const newFolderRef = useRef(null);
@@ -328,7 +329,7 @@ export const Sidebar = ({
 
   return (
     <aside ref={sidebarRef} style={{ width: open ? 260 : 52 }}
-      className={`shrink-0 bg-white/70 backdrop-blur-xl border-r border-slate-200 flex flex-col h-screen transition-all duration-200 ease-in-out z-20 relative ${open ? 'overflow-hidden' : 'overflow-visible'}`}>
+      className={`shrink-0 bg-white/70 backdrop-blur-xl border-r border-slate-200 flex flex-col h-full transition-all duration-200 ease-in-out z-20 relative ${open ? 'overflow-hidden' : 'overflow-visible'}`}>
 
       {/* Collapsed overlay — icon rail */}
       <div className={`absolute inset-0 flex flex-col items-center transition-opacity duration-150 ${open ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
@@ -466,10 +467,10 @@ export const Sidebar = ({
       </div>
 
       {/* Expanded content — fades in/out */}
-      <div className={`flex flex-col h-full transition-opacity duration-150 ${open ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+      <div className={`flex flex-col h-full overflow-hidden transition-opacity duration-150 ${open ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
 
       {/* Header */}
-      <div className="px-4 py-4 flex items-center justify-between">
+      <div className="px-4 py-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-md shadow-orange-200/50">
             <Zap size={18} className="text-white" />
@@ -482,7 +483,7 @@ export const Sidebar = ({
       </div>
 
       {/* New Task */}
-      <div className="px-3 mb-2">
+      <div className="px-3 mb-2 shrink-0">
         <button
           onClick={onNewChat}
           className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 text-[13px] font-semibold text-white transition-all shadow-sm shadow-orange-500/15 hover:shadow-md hover:shadow-orange-500/25"
@@ -492,8 +493,8 @@ export const Sidebar = ({
         </button>
       </div>
 
-      {/* Navigation */}
-      <div className="px-3 mb-2">
+      {/* Navigation — fixed */}
+      <div className="px-3 mb-2 shrink-0">
         {/* Skills */}
         <button
           onClick={onOpenSkillsLibrary}
@@ -537,11 +538,9 @@ export const Sidebar = ({
         )}
       </div>
 
-      {/* Scrollable area: Projects first, then All Tasks */}
-      <div className="flex-1 overflow-y-auto px-2 pb-2">
-
-        {/* Projects Section (Manus-style) */}
-        <div className="mb-3">
+      {/* Projects — fixed */}
+      <div className="px-2 shrink-0">
+        <div className="mb-2">
           <div className="flex items-center justify-between px-3 py-1.5">
             <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Projects</p>
             <button onClick={() => setAddingProject(true)} className="text-slate-300 hover:text-blue-500 transition-colors" title="New project">
@@ -587,11 +586,20 @@ export const Sidebar = ({
           )}
         </div>
 
-        {/* All Tasks */}
-        <div className="border-t border-slate-100 pt-2">
-          <div className="flex items-center justify-between px-3 py-1.5 mb-0.5">
-            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">All Tasks</p>
-          </div>
+      </div>
+
+      {/* All Tasks header — fixed */}
+      <div className="px-2 shrink-0 border-t border-slate-100 pt-2">
+        <button onClick={() => setAllTasksOpen(v => !v)} className="w-full flex items-center justify-between px-3 py-1.5">
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">All Tasks</p>
+          <ChevronDown size={12} className={`text-slate-300 transition-transform ${allTasksOpen ? '' : '-rotate-90'}`} />
+        </button>
+      </div>
+
+      {/* All Tasks list — scrolls internally */}
+      {allTasksOpen && (
+      <div className="flex-1 overflow-y-auto min-h-0 px-2 pb-2">
+        <div>
           {sessions.length === 0 ? (
             <div className="px-3 py-6 text-center">
               <ListTodo size={20} className="text-slate-200 mx-auto mb-2" />
@@ -651,9 +659,10 @@ export const Sidebar = ({
           )}
         </div>
       </div>
+      )}
 
-      {/* User Profile */}
-      <div className="px-3 pb-4 pt-2">
+      {/* User Profile — always at bottom */}
+      <div className="px-3 pb-4 pt-2 shrink-0 border-t border-slate-100 mt-auto">
         <div className="flex items-center gap-3 px-2">
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shrink-0 shadow-sm">
             <span className="text-white text-xs font-bold">A</span>

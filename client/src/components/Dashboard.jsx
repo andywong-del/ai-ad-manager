@@ -249,7 +249,7 @@ export const Dashboard = ({
   const quickChips = QUICK_CHIPS;
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
+    <div className="flex h-full overflow-hidden bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
 
       {/* Sidebar */}
       <Sidebar

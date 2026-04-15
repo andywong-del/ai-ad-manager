@@ -90,6 +90,43 @@ const renderMarkdown = (md) => {
       continue;
     }
 
+    // Table (lines starting with |)
+    if (line.startsWith('|') && line.endsWith('|')) {
+      const tableRows = [];
+      while (i < lines.length && lines[i].startsWith('|') && lines[i].endsWith('|')) {
+        tableRows.push(lines[i]);
+        i++;
+      }
+      // Filter out separator rows (|---|---|)
+      const isSeparator = (row) => /^\|[\s\-:|]+\|$/.test(row);
+      const parseRow = (row) => row.split('|').slice(1, -1).map(cell => cell.trim());
+      const headerRow = tableRows[0] ? parseRow(tableRows[0]) : [];
+      const dataRows = tableRows.filter((r, idx) => idx > 0 && !isSeparator(r)).map(parseRow);
+      elements.push(
+        <div key={key++} className="my-4 overflow-x-auto rounded-xl border border-slate-200/80">
+          <table className="w-full text-[12px]">
+            <thead>
+              <tr className="bg-slate-50/80">
+                {headerRow.map((cell, ci) => (
+                  <th key={ci} className="px-4 py-2.5 text-left font-bold text-slate-700 border-b border-slate-200/80">{parseInline(cell)}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {dataRows.map((row, ri) => (
+                <tr key={ri} className="border-b border-slate-100 last:border-0 hover:bg-orange-50/20">
+                  {row.map((cell, ci) => (
+                    <td key={ci} className="px-4 py-2.5 text-slate-600">{parseInline(cell)}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+      continue;
+    }
+
     // Empty line
     if (!line.trim()) { i++; continue; }
 
@@ -145,7 +182,7 @@ const parseInline = (text) => {
 const SkillDetailView = ({ skill, onClose, onTrySkill, onDownload }) => {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
-  const fileName = `${skill.id || skill.name.toLowerCase().replace(/\s+/g, '-')}.skill`;
+  const fileName = `${skill.id || skill.name.toLowerCase().replace(/\s+/g, '_')}.md`;
 
   const yamlFrontmatter = `name: ${skill.name}\ndescription: "${skill.description || ''}"`;
 
@@ -159,7 +196,7 @@ const SkillDetailView = ({ skill, onClose, onTrySkill, onDownload }) => {
 
   const panelClass = expanded
     ? 'fixed inset-0 z-50 bg-white/95 backdrop-blur-xl flex flex-col animate-[fadeSlideUp_0.3s_ease-out]'
-    : 'fixed inset-y-0 right-0 z-50 w-[720px] bg-white/95 backdrop-blur-xl shadow-2xl border-l border-slate-200 flex flex-col animate-[fadeSlideUp_0.3s_ease-out]';
+    : 'fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[780px] max-h-[85vh] bg-white/95 backdrop-blur-xl shadow-2xl shadow-orange-500/5 border border-slate-200/60 rounded-2xl flex flex-col animate-[fadeSlideUp_0.3s_ease-out]';
 
   return (
     <>
@@ -202,18 +239,7 @@ const SkillDetailView = ({ skill, onClose, onTrySkill, onDownload }) => {
         </div>
 
         <div className="flex-1 flex min-h-0">
-          {/* Left sidebar: file tree */}
-          <div className="w-[200px] shrink-0 border-r border-slate-200 bg-slate-50/50 py-3">
-            <button className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium text-white bg-slate-600 rounded-md mx-1.5" style={{ width: 'calc(100% - 12px)' }}>
-              <FileText size={12} /> SKILL.md
-            </button>
-            <div className="flex items-center gap-2 px-3 py-1.5 mt-0.5 text-[11px] text-slate-400 mx-1.5 cursor-default">
-              <ChevronRight size={10} />
-              <FolderOpen size={12} /> references
-            </div>
-          </div>
-
-          {/* Right: content */}
+          {/* Content */}
           <div className="flex-1 overflow-auto p-6">
             {/* YAML frontmatter block */}
             <div className="bg-slate-900 rounded-lg overflow-hidden mb-6">
@@ -246,80 +272,88 @@ const SkillDetailView = ({ skill, onClose, onTrySkill, onDownload }) => {
 // ── Skill Card ─────────────────────────────────────────────────────────────
 const SkillCard = ({ skill, isActive, onToggle, onMenuAction, onView }) => {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
+  const menuRef = useRef(null);
   const menuBtnRef = useRef(null);
   const isOfficial = skill.isOfficial;
 
   const openMenu = (e) => {
     e.stopPropagation();
-    const rect = menuBtnRef.current?.getBoundingClientRect();
-    if (rect) {
-      setMenuPos({ top: rect.bottom + 4, left: rect.right });
-    }
     setMenuOpen(!menuOpen);
   };
 
+  // Close menu on any click outside
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target) && !menuBtnRef.current?.contains(e.target)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [menuOpen]);
+
   return (
-    <div onClick={() => onView?.(skill)} className="relative bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-200 p-5 flex flex-col gap-3 group hover:border-orange-200 hover:shadow-md transition-all cursor-pointer">
+    <div onClick={() => { if (!menuOpen) onView?.(skill); }} className="relative bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-200/80 p-5 flex flex-col gap-3 group hover:border-orange-200/60 hover:shadow-lg hover:shadow-orange-500/5 hover:-translate-y-0.5 transition-all duration-300 cursor-pointer">
+      {/* Hover gradient overlay */}
+      <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-orange-500/[0.02] via-transparent to-amber-500/[0.02] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
       {/* Top row: name + toggle */}
-      <div className="flex items-start justify-between gap-3">
+      <div className="relative flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            <h3 className="text-[13px] font-bold text-slate-800 truncate">{skill.name}</h3>
-            {(skill.featured || isOfficial) && <Sparkles size={12} className="text-indigo-400 shrink-0" />}
+            <h3 className="text-[13px] font-bold text-slate-800 truncate group-hover:text-orange-700 transition-colors">{skill.name}</h3>
+            {(skill.featured || isOfficial) && <Sparkles size={12} className="text-orange-400 shrink-0" />}
           </div>
         </div>
         <button
           onClick={(e) => { e.stopPropagation(); onToggle(skill.id); }}
-          className={`relative w-11 h-6 rounded-full shrink-0 transition-colors duration-200 ${isActive ? 'bg-blue-500' : 'bg-slate-200'}`}
+          className={`relative w-9 h-[20px] rounded-full shrink-0 transition-all duration-300 ${isActive ? 'bg-gradient-to-r from-orange-500 to-amber-500 shadow-sm shadow-orange-500/30' : 'bg-slate-200'}`}
         >
-          <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${isActive ? 'left-[24px]' : 'left-1'}`} />
+          <span className={`absolute top-[2px] w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${isActive ? 'left-[18px]' : 'left-[2px]'}`} />
         </button>
       </div>
 
       {/* Description */}
-      <p className="text-[11px] text-slate-500 leading-relaxed line-clamp-2 min-h-[32px]">{skill.description}</p>
+      <p className="relative text-[11px] text-slate-500 leading-relaxed line-clamp-2 min-h-[32px]">{skill.description}</p>
 
       {/* Bottom: badge + date + menu */}
-      <div className="flex items-center justify-between mt-auto pt-1">
-        <div className="flex flex-col gap-0.5 min-w-0">
+      <div className="relative flex items-center justify-between mt-auto pt-1">
+        <div className="flex items-center gap-2 min-w-0">
           {isOfficial && (
-            <span className="flex items-center gap-1 text-[10px] text-slate-400 font-medium">
-              <Check size={10} className="text-slate-400" />
+            <span className="flex items-center gap-1 text-[10px] text-emerald-600 font-medium bg-emerald-50 px-2 py-0.5 rounded-full">
+              <Check size={9} />
               Official
             </span>
           )}
           {!isOfficial && skill.isPersonal && (
-            <span className="text-[10px] text-violet-500 font-medium flex items-center gap-1">
+            <span className="text-[10px] text-orange-600 font-medium flex items-center gap-1 bg-orange-50 px-2 py-0.5 rounded-full">
               {skill.icon === 'sparkles' ? <><MessageSquare size={9} /> From Chat</> : 'Custom'}
             </span>
           )}
           {skill.updatedAt && (
             <span className="flex items-center gap-1 text-[10px] text-slate-400">
-              <Clock size={9} className="shrink-0" />
-              Updated on {new Date(skill.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+              <Clock size={9} className="shrink-0 text-orange-400/60" />
+              {new Date(skill.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
             </span>
           )}
         </div>
 
         {/* Context menu trigger */}
-        <button
-          ref={menuBtnRef}
-          onClick={openMenu}
-          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-slate-600 hover:bg-slate-100 opacity-0 group-hover:opacity-100 transition-all shrink-0"
-        >
-          <MoreHorizontal size={14} />
-        </button>
-      </div>
-
-      {/* Fixed-position context menu (portaled outside card) */}
-      {menuOpen && (
-        <>
-          <div className="fixed inset-0 z-[70]" onClick={() => setMenuOpen(false)} />
-          <div
-            className="fixed w-52 bg-white rounded-xl shadow-2xl border border-slate-200 z-[80] py-1.5"
-            style={{ top: menuPos.top, left: menuPos.left - 208 }}
+        <div className="relative">
+          <button
+            ref={menuBtnRef}
+            onClick={openMenu}
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-slate-600 hover:bg-slate-100 opacity-0 group-hover:opacity-100 transition-all shrink-0"
           >
+            <MoreHorizontal size={14} />
+          </button>
+
+          {/* Context menu — positioned relative to button */}
+          {menuOpen && (
+            <>
+              <div ref={menuRef} className="absolute right-0 top-full mt-1 w-52 bg-white backdrop-blur-xl rounded-xl shadow-2xl shadow-orange-500/5 border border-slate-200/60 z-[100] py-1.5 animate-[fadeSlideUp_0.15s_ease-out]">
+
             <button onClick={() => { setMenuOpen(false); onMenuAction('tryit', skill); }}
               className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-slate-700 hover:bg-slate-50">
               <Play size={14} className="text-slate-400" /> Try it out
@@ -346,9 +380,11 @@ const SkillCard = ({ skill, isActive, onToggle, onMenuAction, onView }) => {
               className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-red-500 hover:bg-red-50">
               <Trash2 size={14} /> {isOfficial ? 'Remove' : 'Delete'}
             </button>
-          </div>
-        </>
-      )}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 };
@@ -587,79 +623,73 @@ export const SkillsLibrary = ({ skills, onCreate, onDelete, onBack, onBuildWithA
         </div>
       )}
 
-      {/* Header */}
-      <div className="relative px-8 pt-8 pb-6 shrink-0 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900">
+      {/* Header — compact dark bar */}
+      <div className="relative bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 shrink-0">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(249,115,22,0.15),transparent_60%)]" />
           <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-orange-500/10 to-transparent rounded-full blur-3xl -translate-y-1/2 translate-x-1/4" />
         </div>
-        <div className="relative">
-          <div className="flex items-center gap-3 mb-1">
-            <div>
-              <h1 className="text-2xl font-bold text-white">Skills</h1>
-              <p className="text-sm text-slate-400 mt-0.5">Prepackaged and repeatable best practices & tools for your agents</p>
-            </div>
+        <div className="relative flex items-center justify-between px-6 py-4">
+          <div>
+            <h1 className="text-lg font-extrabold text-white tracking-tight">Skills</h1>
+            <p className="text-xs text-slate-400 mt-0.5">Prepackaged and repeatable best practices & tools for your agents</p>
           </div>
-
-          {/* Search + Add button */}
-          <div className="flex items-center gap-3 mt-5">
-            {/* Search bar */}
-            <div className="flex-1 relative">
-              <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Search Skill"
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl border-slate-200/80 bg-white/80 backdrop-blur-sm border text-sm text-slate-700 placeholder-slate-400 outline-none focus:border-orange-300 focus:ring-2 focus:ring-orange-100 transition-colors shadow-sm"
-              />
-            </div>
-
-            {/* + Add button */}
-            <div className="relative">
-              <button
-                onClick={() => setAddDropdownOpen(!addDropdownOpen)}
-                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 text-sm font-medium text-white shadow-lg shadow-orange-500/30 hover:shadow-orange-500/40 transition-all"
-              >
-                <Plus size={14} />
-                Add
-              </button>
-              <AddDropdown
-                open={addDropdownOpen}
-                onClose={() => setAddDropdownOpen(false)}
-                onSelect={handleAddSelect}
-              />
-            </div>
+          <div className="relative">
+            <button
+              onClick={() => setAddDropdownOpen(!addDropdownOpen)}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 transition-all shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50"
+            >
+              <Plus size={13} />
+              Add
+            </button>
+            <AddDropdown
+              open={addDropdownOpen}
+              onClose={() => setAddDropdownOpen(false)}
+              onSelect={handleAddSelect}
+            />
           </div>
+        </div>
+      </div>
 
-          {/* Filter tabs */}
-          <div className="flex items-center gap-1 mt-4 bg-white/10 rounded-lg p-0.5">
+      {/* Search + Filter tabs — light background */}
+      <div className="px-6 py-3 bg-white/80 backdrop-blur-sm border-b border-slate-100 shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="flex-1 relative">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-400/60" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search skills..."
+              className="w-full pl-9 pr-3 py-2 text-[12px] rounded-xl border border-slate-200/80 bg-white/80 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-300 placeholder:text-slate-300"
+            />
+          </div>
+          <div className="flex rounded-xl border border-slate-200/80 bg-white/80 backdrop-blur-sm overflow-hidden">
             {[
               { value: 'all', label: 'All Skills' },
-              { value: 'official', label: 'Official Skills' },
-              { value: 'private', label: 'Custom Skills' },
+              { value: 'official', label: 'Official' },
+              { value: 'private', label: 'Custom' },
             ].map(tab => (
               <button key={tab.value} onClick={() => setFilterType(tab.value)}
-                className={`flex-1 px-3 py-2 rounded-md text-[12px] font-medium transition-colors
-                  ${filterType === tab.value ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-sm' : 'text-slate-300 hover:text-white'}`}>
+                className={`px-3 py-1.5 text-[11px] font-semibold transition-all ${filterType === tab.value ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-sm' : 'text-slate-500 hover:text-orange-600'}`}>
                 {tab.label}
               </button>
             ))}
           </div>
+        </div>
 
           {/* GitHub import bar */}
-          {showGitHubImport && (
-            <div className="mt-4">
-              <GitHubImportBar
-                onClose={() => setShowGitHubImport(false)}
-                onImport={handleGitHubImport}
-              />
-            </div>
-          )}
-        </div>
+        {showGitHubImport && (
+          <div className="mt-3">
+            <GitHubImportBar
+              onClose={() => setShowGitHubImport(false)}
+              onImport={handleGitHubImport}
+            />
+          </div>
+        )}
       </div>
 
       {/* Skill Cards Grid */}
-      <div className="flex-1 overflow-y-auto px-8 pb-8">
+      <div className="flex-1 overflow-y-auto px-6 py-6">
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
