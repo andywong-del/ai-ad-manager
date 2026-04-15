@@ -1175,6 +1175,7 @@ export const CampaignManager = ({ adAccountId, onBack, onSendToChat, token, onLo
           )}
         </div>
       </div>
+      </div>
 
       {/* Error */}
       {error && (
