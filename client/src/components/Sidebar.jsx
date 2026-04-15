@@ -672,7 +672,7 @@ export const Sidebar = ({
       {/* Context Menu for chat sessions */}
       {contextMenu && (
         <div ref={contextRef}
-          style={{ position: 'fixed', top: contextMenu.y / 1.1 - 10, left: contextMenu.x / 1.1 + 8, zIndex: 9999 }}
+          style={{ position: 'fixed', top: contextMenu.y, left: contextMenu.x + 8, zIndex: 9999 }}
           className="bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden min-w-[140px] animate-[fadeSlideUp_0.15s_ease-out]">
           <button onClick={() => {
             onPinSession?.(contextMenu.sessionId);

@@ -360,7 +360,7 @@ const AdLibraryCards = ({ ads }) => (
           {ad.body && <p className="text-xs text-slate-500 leading-relaxed line-clamp-3">{ad.body}</p>}
         </div>
         <div className="px-3.5 py-2 border-t border-slate-100 flex items-center justify-between bg-slate-50/50">
-          <span className="text-[10px] text-slate-400">Ad Library</span>
+          <span className="text-[10px] text-slate-400">Ads Gallery</span>
           <span className="text-[10px] text-blue-600 group-hover:text-blue-500 transition-colors">View Ad →</span>
         </div>
       </a>

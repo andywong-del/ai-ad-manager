@@ -125,6 +125,92 @@ router.delete('/videos/:id', async (req, res) => {
   }
 });
 
+// ── Asset Usage — which assets are used in which ads ──────────────
+// GET /usage - Returns { imageHashes: { hash: [{adId, adName, status}] }, videoIds: { id: [{adId, adName, status}] } }
+const usageCache = new Map();
+const USAGE_CACHE_TTL = 5 * 60 * 1000; // 5 min
+
+router.get('/usage', async (req, res) => {
+  try {
+    const { adAccountId } = req.query;
+    if (!adAccountId) return res.status(400).json({ error: 'adAccountId is required' });
+
+    // Check cache
+    const cacheKey = `${adAccountId}:${req.token?.slice(-8)}`;
+    const cached = usageCache.get(cacheKey);
+    if (cached && Date.now() - cached.ts < USAGE_CACHE_TTL) return res.json(cached.data);
+
+    // Fetch all ads with full creative data to find all asset references
+    const fields = 'id,name,effective_status,creative{id,image_hash,video_id,object_story_spec,asset_feed_spec}';
+    let allAds = [];
+    let after = null;
+    // Paginate up to 200 ads
+    for (let i = 0; i < 2; i++) {
+      const params = { access_token: req.token, fields, limit: 100 };
+      if (after) params.after = after;
+      const { data } = await metaClient.metaApi.get(`/${adAccountId}/ads`, { params });
+      const ads = data?.data || [];
+      allAds.push(...ads);
+      after = data?.paging?.cursors?.after;
+      if (!after || ads.length < 100) break;
+    }
+
+    // Build usage maps — extract all image hashes and video IDs from all nesting levels
+    const imageUsage = {};  // hash → [{adId, adName, status}]
+    const videoUsage = {};  // videoId → [{adId, adName, status}]
+
+    const addImage = (hash, entry) => {
+      if (!hash) return;
+      if (!imageUsage[hash]) imageUsage[hash] = [];
+      imageUsage[hash].push(entry);
+    };
+    const addVideo = (vid, entry) => {
+      if (!vid) return;
+      if (!videoUsage[vid]) videoUsage[vid] = [];
+      videoUsage[vid].push(entry);
+    };
+
+    for (const ad of allAds) {
+      const c = ad.creative || {};
+      const oss = c.object_story_spec || {};
+      const ld = oss.link_data || {};
+      const vd = oss.video_data || {};
+      const afs = c.asset_feed_spec || {};
+      const entry = { adId: ad.id, adName: ad.name, status: ad.effective_status };
+
+      // Top-level creative fields
+      addImage(c.image_hash, entry);
+      addVideo(c.video_id, entry);
+
+      // object_story_spec.link_data
+      addImage(ld.image_hash, entry);
+      addVideo(ld.video_id, entry);
+      // Carousel child attachments
+      if (ld.child_attachments) {
+        for (const child of ld.child_attachments) {
+          addImage(child.image_hash, entry);
+          addVideo(child.video_id, entry);
+        }
+      }
+
+      // object_story_spec.video_data
+      addVideo(vd.video_id, entry);
+
+      // asset_feed_spec (dynamic creative)
+      if (afs.images) for (const img of afs.images) addImage(img.hash, entry);
+      if (afs.videos) for (const vid of afs.videos) addVideo(vid.video_id, entry);
+    }
+
+    const result = { imageUsage, videoUsage };
+    usageCache.set(cacheKey, { data: result, ts: Date.now() });
+    res.json(result);
+  } catch (err) {
+    const metaErr = err.response?.data?.error;
+    console.error('[assets] GET /usage error:', metaErr || err.message);
+    res.status(err.response?.status || 500).json({ error: metaErr?.message || err.message, code: metaErr?.code });
+  }
+});
+
 // ── Bulk Upload (for chat attachments) ────────────────────────────
 // POST /bulk-upload - Upload multiple images/videos at once
 // Body: { adAccountId, files: [{ name, type, base64 }] }

@@ -425,6 +425,51 @@ const ItemDetailPanel = ({ item, onClose, onUpdate, onDelete, onToggle }) => {
   );
 };
 
+// ── Brand Memory Card (skills-style) ──
+const BrandMemoryCard = ({ item, onView, onToggle, onDelete }) => {
+  const cfg = ITEM_TYPES[item.type] || ITEM_TYPES.guidelines;
+  const preview = (item.content || '').slice(0, 120);
+  const source = item.metadata?.source === 'chat' ? 'From Chat' : item.metadata?.source_url ? 'Crawled' : item.metadata?.source_file ? 'Uploaded' : 'Manual';
+
+  return (
+    <div onClick={onView}
+      className={`relative bg-white/80 backdrop-blur-sm rounded-2xl border p-5 flex flex-col gap-3 group hover:border-orange-200/60 hover:shadow-lg hover:shadow-orange-500/5 hover:-translate-y-0.5 transition-all duration-300 cursor-pointer ${item.enabled ? 'border-slate-200/80' : 'border-slate-200/50 opacity-60'}`}>
+      <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-orange-500/[0.02] via-transparent to-amber-500/[0.02] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+      {/* Top: name + toggle */}
+      <div className="relative flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <h3 className="text-[13px] font-bold text-slate-800 truncate group-hover:text-orange-700 transition-colors">{item.name}</h3>
+        </div>
+        <button onClick={(e) => { e.stopPropagation(); onToggle(); }}
+          className={`relative w-9 h-[20px] rounded-full shrink-0 transition-all duration-300 ${item.enabled ? 'bg-gradient-to-r from-orange-500 to-amber-500 shadow-sm shadow-orange-500/30' : 'bg-slate-200'}`}>
+          <span className={`absolute top-[2px] w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${item.enabled ? 'left-[18px]' : 'left-[2px]'}`} />
+        </button>
+      </div>
+
+      {/* Content preview */}
+      <p className="relative text-[11px] text-slate-500 leading-relaxed line-clamp-3 min-h-[44px]">
+        {preview || <span className="italic text-slate-300">No content</span>}
+      </p>
+
+      {/* Bottom: type badge + source + date + delete */}
+      <div className="relative flex items-center gap-2 mt-auto pt-1">
+        <TypeBadge type={item.type} />
+        <span className="text-[10px] text-slate-400 flex items-center gap-1">
+          {source}
+        </span>
+        <span className="text-[10px] text-slate-300 ml-auto">
+          {fmtDate(item.updated_at || item.created_at)}
+        </span>
+        <button onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          className="w-6 h-6 rounded-lg flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all shrink-0">
+          <Trash2 size={12} />
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // ── Main Component ──
 export const BrandLibrary = ({ adAccountId, token, onLogin, onLogout, selectedAccount, selectedBusiness, onSelectAccount, onSendToChat, onPrefillChat }) => {
   const { items, loading, error, enabledCount, fetchItems, createItem, updateItem, deleteItem, toggleItem, crawlUrl, crawlSocial } = useBrandLibrary(adAccountId);
@@ -436,12 +481,21 @@ export const BrandLibrary = ({ adAccountId, token, onLogin, onLogout, selectedAc
   const [showCrawlUrl, setShowCrawlUrl] = useState(false);
   const [showCrawlSocial, setShowCrawlSocial] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+  const [typeFilter, setTypeFilter] = useState('all');
   const fileRef = useRef(null);
 
   const filtered = items.filter(item => {
     if (search && !item.name?.toLowerCase().includes(search.toLowerCase())) return false;
+    if (typeFilter !== 'all' && item.type !== typeFilter) return false;
     return true;
   });
+
+  // Group: enabled first, then disabled
+  const enabledItems = filtered.filter(i => i.enabled);
+  const disabledItems = filtered.filter(i => !i.enabled);
+
+  // Type counts for filter pills
+  const typeCounts = items.reduce((acc, i) => { acc[i.type] = (acc[i.type] || 0) + 1; return acc; }, {});
 
   const handleAddSelect = (type) => {
     switch (type) {
@@ -487,7 +541,7 @@ export const BrandLibrary = ({ adAccountId, token, onLogin, onLogout, selectedAc
           <div className="flex items-center gap-4">
             <div>
               <h1 className="text-lg font-bold text-white flex items-center gap-2">
-                Brand Library
+                Brand Memory
                 {enabledCount > 0 && (
                   <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -507,13 +561,6 @@ export const BrandLibrary = ({ adAccountId, token, onLogin, onLogout, selectedAc
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 transition-all shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50">
               <Sparkles size={13} /> Create with AI
             </button>
-            <div className="relative">
-              <button onClick={() => setAddOpen(!addOpen)}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:brightness-110 transition-all shadow-lg shadow-orange-500/30">
-                <Plus size={13} /> Add
-              </button>
-              <AddDropdown open={addOpen} onClose={() => setAddOpen(false)} onSelect={handleAddSelect} />
-            </div>
             <button onClick={fetchItems} disabled={loading}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-white/10 border border-slate-700 transition-colors disabled:opacity-50">
               <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
@@ -522,79 +569,117 @@ export const BrandLibrary = ({ adAccountId, token, onLogin, onLogout, selectedAc
         </div>
       </div>
 
-      {/* Search */}
-      <div className="px-6 py-3 shrink-0 bg-white border-b border-slate-100">
-        <div className="relative max-w-sm">
+      {/* Search + Type filter */}
+      <div className="px-6 py-3 shrink-0 bg-white border-b border-slate-100 flex items-center gap-3">
+        <div className="relative max-w-[200px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search brand items..."
-            className="w-full pl-9 pr-3 py-2 text-[12px] rounded-xl border border-slate-200/80 bg-white/80 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-300 placeholder:text-slate-300" />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..."
+            className="w-full pl-9 pr-3 py-1.5 text-[11px] rounded-lg border border-slate-200/80 bg-white/80 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-300 placeholder:text-slate-300" />
+        </div>
+        <div className="flex rounded-md border border-slate-200 bg-white overflow-hidden">
+          <button onClick={() => setTypeFilter('all')}
+            className={`px-2.5 py-1.5 text-[10px] font-medium transition-colors ${typeFilter === 'all' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
+            All ({items.length})
+          </button>
+          {Object.entries(ITEM_TYPES).map(([key, cfg]) => {
+            const count = typeCounts[key] || 0;
+            if (count === 0) return null;
+            return (
+              <button key={key} onClick={() => setTypeFilter(typeFilter === key ? 'all' : key)}
+                className={`px-2.5 py-1.5 text-[10px] font-medium transition-colors ${typeFilter === key ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
+                {cfg.label} ({count})
+              </button>
+            );
+          })}
         </div>
       </div>
 
       {error && <div className="mx-6 mt-3 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg">{error}</div>}
 
-      {/* Content — master-detail */}
-      <div className="flex-1 flex min-h-0">
-        {/* Left: Item list */}
-        <div className="w-[280px] shrink-0 border-r border-slate-200 overflow-auto bg-white/80 backdrop-blur-sm">
-          {loading && items.length === 0 ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 size={24} className="animate-spin text-slate-400" />
+      {/* Content — card grid like skills */}
+      <div className="flex-1 overflow-auto px-6 py-5">
+        {loading && items.length === 0 ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 size={24} className="animate-spin text-slate-400" />
+          </div>
+        ) : filtered.length === 0 && !search ? (
+          /* Demo cards when no items exist */
+          <div>
+            <div className="text-center mb-6">
+              <p className="text-sm font-semibold text-slate-700 mb-1">No brand memory yet for this account</p>
+              <p className="text-[11px] text-slate-400">Save insights from chat conversations or click "Create with AI" to get started. Here's what it looks like:</p>
             </div>
-          ) : filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 px-4">
-              <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mb-3">
-                <BookMarked size={22} className="text-slate-300" />
-              </div>
-              <p className="text-[12px] font-semibold text-slate-700 mb-1">{search ? 'No matches' : 'No brand memory yet'}</p>
-              <p className="text-[10px] text-slate-400 mb-3 text-center">Add brand knowledge so AI always stays on-brand in every conversation.</p>
-            </div>
-          ) : (
-            filtered.map(item => (
-              <div key={item.id}
-                className={`flex items-center gap-3 px-4 py-3 border-b border-slate-100 transition-colors cursor-pointer
-                  ${selectedItem?.id === item.id ? 'bg-orange-50/60 border-l-2 border-l-orange-500' : 'hover:bg-slate-50 border-l-2 border-l-transparent'}`}>
-                <div className="flex-1 min-w-0" onClick={() => setSelectedItem(item)}>
-                  <p className={`text-[12px] font-semibold truncate ${item.enabled ? 'text-slate-800' : 'text-slate-400'}`}>{item.name}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <TypeBadge type={item.type} />
-                    {item.enabled
-                      ? <span className="text-[9px] text-emerald-500 font-medium">In AI memory</span>
-                      : <span className="text-[9px] text-slate-300">Disabled</span>
-                    }
-                  </div>
-                </div>
-                {/* Inline toggle */}
-                <button onClick={(e) => { e.stopPropagation(); toggleItem(item.id, !item.enabled); }}
-                  className={`relative w-8 h-[18px] rounded-full transition-colors duration-200 shrink-0 ${item.enabled ? 'bg-emerald-500' : 'bg-slate-200'}`}>
-                  <span className={`absolute top-[2px] left-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-transform duration-200 ${item.enabled ? 'translate-x-[14px]' : ''}`} />
-                </button>
-              </div>
-            ))
-          )}
-        </div>
-
-        {/* Right: Detail panel or empty */}
-        {selectedItem ? (
-          <ItemDetailPanel
-            item={selectedItem}
-            onClose={() => setSelectedItem(null)}
-            onUpdate={async (id, updates) => { await updateItem(id, updates); setSelectedItem(prev => ({ ...prev, ...updates })); }}
-            onDelete={handleDelete}
-            onToggle={async (id, enabled) => { await toggleItem(id, enabled); setSelectedItem(prev => ({ ...prev, enabled })); }}
-          />
-        ) : (
-          <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-orange-50/60 via-white to-amber-50/40">
-            <div className="text-center max-w-xs">
-              <BookMarked size={40} className="text-slate-200 mx-auto mb-3" />
-              <p className="text-sm font-medium text-slate-500 mb-1">Brand Long-Term Memory</p>
-              <p className="text-[11px] text-slate-400 leading-relaxed">
-                Everything you add here becomes permanent AI memory. Enabled items are automatically referenced in every chat conversation to keep content on-brand.
-              </p>
+            <h3 className="text-[10px] font-bold text-slate-300 uppercase tracking-wider mb-3">Demo Preview</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 opacity-50 pointer-events-none select-none">
+              {[
+                { id: 'd1', name: 'Brand Voice & Tone', type: 'tone', enabled: true, content: 'We speak with confidence and warmth. Our tone is professional yet approachable — like a trusted friend who happens to be an expert. Avoid jargon. Use short, punchy sentences.', metadata: { source: 'chat' }, created_at: '2026-04-10' },
+                { id: 'd2', name: 'Target Audience Profile', type: 'guidelines', enabled: true, content: 'Primary: Women 25-45, health-conscious, mid-to-high income. Interested in skincare, wellness, and beauty treatments. Values quality over price. Active on Instagram and Facebook.', metadata: { source: 'chat' }, created_at: '2026-04-08' },
+                { id: 'd3', name: 'Dr.Once Product Messaging', type: 'content', enabled: true, content: 'Key messages: Medical-grade ingredients, salon results at home, clinically tested. Hero product: Anti-hair loss shampoo with DDS nano technology. Price point: $138/bottle.', metadata: { source_url: 'https://dr-once.com' }, created_at: '2026-04-05' },
+                { id: 'd4', name: 'Visual Identity', type: 'visual', enabled: true, content: 'Primary colors: Deep blue (#1a365d), Gold (#d69e2e). Typography: Clean sans-serif. Photography: Bright, clinical, aspirational. Product shots on white/light blue backgrounds.', metadata: { source: 'chat' }, created_at: '2026-04-03' },
+                { id: 'd5', name: 'Competitor Positioning', type: 'guidelines', enabled: false, content: 'vs. Generic shampoos: We are medical-grade, not mass-market. vs. Salon treatments: Same results, fraction of the cost, use at home. Never mention competitors by name.', metadata: { source: 'chat' }, created_at: '2026-03-28' },
+                { id: 'd6', name: 'TopBeauty Page Insights', type: 'crawled', enabled: true, content: 'Brand personality: Fun, trendy, youth-oriented. Content style: Before/after transformations, KOL reviews, limited-time offers. High engagement on video content with personal stories.', metadata: { source_url: 'https://facebook.com/topbeauty' }, created_at: '2026-03-25' },
+              ].map(demo => (
+                <BrandMemoryCard key={demo.id} item={demo} onView={() => {}} onToggle={() => {}} onDelete={() => {}} />
+              ))}
             </div>
           </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <p className="text-sm font-semibold text-slate-700 mb-1">No matches</p>
+            <p className="text-[11px] text-slate-400">Try a different search or filter.</p>
+          </div>
+        ) : (
+          <>
+            {/* Active in AI memory */}
+            {enabledItems.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Active in AI Memory ({enabledItems.length})
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {enabledItems.map(item => (
+                    <BrandMemoryCard key={item.id} item={item} onView={() => setSelectedItem(item)}
+                      onToggle={() => toggleItem(item.id, false)} onDelete={() => handleDelete(item.id)} />
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* Disabled */}
+            {disabledItems.length > 0 && (
+              <div>
+                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">
+                  Disabled ({disabledItems.length})
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {disabledItems.map(item => (
+                    <BrandMemoryCard key={item.id} item={item} onView={() => setSelectedItem(item)}
+                      onToggle={() => toggleItem(item.id, true)} onDelete={() => handleDelete(item.id)} />
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
+
+      {/* Detail modal */}
+      {selectedItem && (
+        <>
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40" onClick={() => setSelectedItem(null)} />
+          <div className="fixed inset-8 z-50 flex items-center justify-center">
+            <div className="bg-white rounded-2xl shadow-2xl overflow-hidden max-w-2xl w-full max-h-full flex flex-col">
+              <ItemDetailPanel
+                item={selectedItem}
+                onClose={() => setSelectedItem(null)}
+                onUpdate={async (id, updates) => { await updateItem(id, updates); setSelectedItem(prev => ({ ...prev, ...updates })); }}
+                onDelete={handleDelete}
+                onToggle={async (id, enabled) => { await toggleItem(id, enabled); setSelectedItem(prev => ({ ...prev, enabled })); }}
+              />
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Modals */}
       {showWrite && <WriteModal onClose={() => setShowWrite(false)} onSave={createItem} />}

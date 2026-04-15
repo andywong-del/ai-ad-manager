@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Users, Plus, RefreshCw, Trash2, Copy, Target, Globe, Hash, X, AlertTriangle, Search, Film, ClipboardCopy, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, SlidersHorizontal, FolderOpen, Smartphone, ShoppingBag, BookOpen, CalendarDays, Database, FileText, Building2, ChevronRight, Link2, Lock, LogOut } from 'lucide-react';
+import { Users, Plus, RefreshCw, Trash2, Copy, Target, Globe, Hash, X, AlertTriangle, Search, Film, ClipboardCopy, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, FolderOpen, Smartphone, ShoppingBag, BookOpen, CalendarDays, Database, FileText, Building2, ChevronRight, Link2, Lock, LogOut } from 'lucide-react';
 import api from '../services/api.js';
 import { useBusinesses } from '../hooks/useBusinesses.js';
 import { useAdAccounts } from '../hooks/useAdAccounts.js';
@@ -184,24 +184,6 @@ const CopyableId = ({ id }) => {
     </button>
   );
 };
-
-// ── Filter Options (matching Meta's Audience Manager) ──────────────────────
-const STATUS_FILTERS = [
-  { id: 'in_active_ads', label: 'In Active Ads' },
-  { id: 'recently_used', label: 'Recently Used' },
-  { id: 'shared', label: 'Shared' },
-  { id: 'action_needed', label: 'Action Needed' },
-];
-const TYPE_FILTERS = [
-  { id: 'CUSTOM', label: 'Custom Audience' },
-  { id: 'LOOKALIKE', label: 'Lookalike Audience' },
-  { id: 'SAVED', label: 'Saved Audience' },
-];
-const AVAILABILITY_FILTERS = [
-  { id: 'ready', label: 'Ready' },
-  { id: 'not_ready', label: 'Not Ready' },
-  { id: 'error', label: 'Error' },
-];
 
 // ── Create Audience Modal ───────────────────────────────────────────────────
 const YOUR_SOURCES = [
@@ -1750,11 +1732,11 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack, token, onLo
   const [searchQuery, setSearchQuery] = useState('');
   const [sortKey, setSortKey] = useState('time_created');
   const [sortDir, setSortDir] = useState('desc');
-  // Filters matching Meta's UI
-  const [showFilterPanel, setShowFilterPanel] = useState(false);
-  const [filterStatus, setFilterStatus] = useState([]);
-  const [filterType, setFilterType] = useState([]);
-  const [filterAvailability, setFilterAvailability] = useState([]);
+  // Three independent filter dimensions (multi-select each, like Meta)
+  const [filterType, setFilterType] = useState([]);         // 'custom'|'lookalike'|'saved'
+  const [filterAvail, setFilterAvail] = useState([]);       // 'ready'|'not_ready'|'error'|'too_small'
+  const [filterStatus, setFilterStatus] = useState([]);     // 'in_active_ads'|'recently_used'|'shared'|'action_needed'
+  const [openDropdown, setOpenDropdown] = useState(null);   // 'type'|'avail'|'status'|null
   const [expandedAudienceId, setExpandedAudienceId] = useState(null);
   const [platform, setPlatform] = useState('meta'); // 'meta' | 'google' | 'tiktok'
 
@@ -1798,8 +1780,8 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack, token, onLo
     setAudiences([]);
     setSearchQuery('');
     setFilterType([]);
+    setFilterAvail([]);
     setFilterStatus([]);
-    setFilterAvailability([]);
     fetchAudiences();
   }, [adAccountId, fetchAudiences]);
 
@@ -1820,34 +1802,46 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack, token, onLo
 
   const SortIcon = ({ col }) => {
     if (sortKey !== col) return <ArrowUpDown size={10} className="text-slate-300" />;
-    return sortDir === 'asc' ? <ArrowUp size={10} className="text-blue-500" /> : <ArrowDown size={10} className="text-blue-500" />;
+    return sortDir === 'asc' ? <ArrowUp size={10} className="text-orange-500" /> : <ArrowDown size={10} className="text-orange-500" />;
   };
 
-  const toggleFilter = (arr, setArr, val) => {
+  // Close filter dropdowns on outside click
+  const filterBarRef = useRef(null);
+  useEffect(() => {
+    const handler = (e) => {
+      if (filterBarRef.current && !filterBarRef.current.contains(e.target)) setOpenDropdown(null);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const toggleInArray = (arr, setArr, val) => {
     setArr(prev => prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val]);
   };
 
-  const activeFilterCount = filterStatus.length + filterType.length + filterAvailability.length;
+  const activeFilterCount = filterType.length + filterAvail.length + filterStatus.length;
 
   const filtered = audiences.filter(aud => {
     const matchesSearch = !searchQuery || aud.name?.toLowerCase().includes(searchQuery.toLowerCase()) || aud.id?.includes(searchQuery);
 
-    // Type filter
+    // Type dimension
     const sub = aud.subtype || 'CUSTOM';
-    const isCustom = sub !== 'LOOKALIKE' && sub !== 'SAVED';
+    const isCustom = sub !== 'LOOKALIKE' && sub !== 'SAVED' && !aud._isSaved;
     const matchesType = filterType.length === 0
-      || (filterType.includes('CUSTOM') && isCustom)
-      || (filterType.includes('LOOKALIKE') && sub === 'LOOKALIKE')
-      || (filterType.includes('SAVED') && (sub === 'SAVED' || aud._isSaved));
+      || (filterType.includes('custom') && isCustom)
+      || (filterType.includes('lookalike') && sub === 'LOOKALIKE')
+      || (filterType.includes('saved') && (sub === 'SAVED' || aud._isSaved));
 
-    // Availability filter — use getAvailability() to match what the user sees
+    // Availability dimension
     const availLabel = getAvailability(aud).label;
-    const matchesAvail = filterAvailability.length === 0
-      || (filterAvailability.includes('ready') && availLabel === 'Ready')
-      || (filterAvailability.includes('not_ready') && (availLabel === 'Populating' || availLabel === 'Expiring' || availLabel === 'Expired' || availLabel === 'Warning'))
-      || (filterAvailability.includes('error') && availLabel === 'Error');
+    const isTooSmall = aud.operation_status?.code === 411 || (aud.approximate_count_lower_bound === 0 && aud.approximate_count_upper_bound === 0 && availLabel !== 'Populating');
+    const matchesAvail = filterAvail.length === 0
+      || (filterAvail.includes('ready') && availLabel === 'Ready')
+      || (filterAvail.includes('not_ready') && (availLabel === 'Populating' || availLabel === 'Expiring' || availLabel === 'Expired' || availLabel === 'Warning'))
+      || (filterAvail.includes('error') && availLabel === 'Error')
+      || (filterAvail.includes('too_small') && isTooSmall);
 
-    // Status filter — uses delivery_status and timing data
+    // Status dimension
     const deliveryCode = aud.delivery_status?.code;
     const matchesStatus = filterStatus.length === 0
       || (filterStatus.includes('in_active_ads') && deliveryCode === 200)
@@ -1990,94 +1984,117 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack, token, onLo
             <span className="text-[9px] bg-slate-700 text-slate-400 px-1.5 py-0.5 rounded-full font-semibold">Soon</span>
           </button>
         </div>
-
-        {/* TOS banner removed — acceptance now happens inline in customer list creation flow */}
-
-        {/* Search + Filter row */}
-        {audiences.length > 0 && (
-          <div className="relative px-6 pb-3 pt-3 flex items-center gap-3">
-            <div className="relative flex-1 max-w-xs">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-400/60" />
-              <input
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Search by name or audience ID"
-                className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200/80 bg-white/80 backdrop-blur-sm text-xs focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-300"
-              />
-            </div>
-            <button onClick={() => setShowFilterPanel(v => !v)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-colors
-                ${showFilterPanel || activeFilterCount > 0
-                  ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-sm border-transparent'
-                  : 'border-slate-200/80 text-slate-500 hover:bg-white/80 bg-white/80 backdrop-blur-sm'}`}>
-              <SlidersHorizontal size={13} />
-              Filter
-              {activeFilterCount > 0 && (
-                <span className="ml-1 bg-white/30 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">{activeFilterCount}</span>
-              )}
-            </button>
-            {activeFilterCount > 0 && (
-              <button onClick={() => { setFilterStatus([]); setFilterType([]); setFilterAvailability([]); }}
-                className="text-[11px] text-blue-600 hover:text-blue-800 font-medium">
-                Clear all
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* Filter panel (collapsible, like Meta) */}
-        {showFilterPanel && audiences.length > 0 && (
-          <div className="px-6 pb-4 border-t border-slate-100 pt-3">
-            <div className="flex gap-6">
-              {/* Status */}
-              <div className="min-w-[150px]">
-                <button onClick={() => {}} className="flex items-center justify-between w-full text-xs font-bold text-slate-700 mb-2">
-                  Status <ChevronUp size={12} className="text-slate-400" />
-                </button>
-                <div className="space-y-1.5">
-                  {STATUS_FILTERS.map(f => (
-                    <label key={f.id} className="flex items-center gap-2 cursor-pointer group">
-                      <input type="checkbox" checked={filterStatus.includes(f.id)} onChange={() => toggleFilter(filterStatus, setFilterStatus, f.id)}
-                        className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-200" />
-                      <span className="text-xs text-slate-600 group-hover:text-slate-900">{f.label}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-              {/* Type */}
-              <div className="min-w-[150px]">
-                <button onClick={() => {}} className="flex items-center justify-between w-full text-xs font-bold text-slate-700 mb-2">
-                  Type <ChevronUp size={12} className="text-slate-400" />
-                </button>
-                <div className="space-y-1.5">
-                  {TYPE_FILTERS.map(f => (
-                    <label key={f.id} className="flex items-center gap-2 cursor-pointer group">
-                      <input type="checkbox" checked={filterType.includes(f.id)} onChange={() => toggleFilter(filterType, setFilterType, f.id)}
-                        className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-200" />
-                      <span className="text-xs text-slate-600 group-hover:text-slate-900">{f.label}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-              {/* Availability */}
-              <div className="min-w-[150px]">
-                <button onClick={() => {}} className="flex items-center justify-between w-full text-xs font-bold text-slate-700 mb-2">
-                  Availability <ChevronUp size={12} className="text-slate-400" />
-                </button>
-                <div className="space-y-1.5">
-                  {AVAILABILITY_FILTERS.map(f => (
-                    <label key={f.id} className="flex items-center gap-2 cursor-pointer group">
-                      <input type="checkbox" checked={filterAvailability.includes(f.id)} onChange={() => toggleFilter(filterAvailability, setFilterAvailability, f.id)}
-                        className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-200" />
-                      <span className="text-xs text-slate-600 group-hover:text-slate-900">{f.label}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* Filter bar — 3 dimensions: Type, Availability, Status + search */}
+      {audiences.length > 0 && (
+        <div ref={filterBarRef} className="relative z-20 bg-white/90 backdrop-blur-md border-b border-slate-200/60 px-6 py-2.5 flex items-center gap-2 shrink-0">
+          {/* Audience count */}
+          <span className="text-[11px] font-semibold text-slate-400 tabular-nums mr-1">{filtered.length} of {audiences.length}</span>
+
+          {/* Filter dropdowns */}
+          {[
+            { key: 'type', label: 'Type', state: filterType, setState: setFilterType, options: [
+              { id: 'custom', label: 'Custom Audience' },
+              { id: 'lookalike', label: 'Lookalike Audience' },
+              { id: 'saved', label: 'Saved Audience' },
+            ]},
+            { key: 'avail', label: 'Availability', state: filterAvail, setState: setFilterAvail, options: [
+              { id: 'ready', label: 'Ready' },
+              { id: 'not_ready', label: 'Not Ready' },
+              { id: 'error', label: 'Error' },
+              { id: 'too_small', label: 'Too Small' },
+            ]},
+            { key: 'status', label: 'Status', state: filterStatus, setState: setFilterStatus, options: [
+              { id: 'in_active_ads', label: 'In Active Ads' },
+              { id: 'recently_used', label: 'Recently Used' },
+              { id: 'shared', label: 'Shared' },
+              { id: 'action_needed', label: 'Action Needed' },
+            ]},
+          ].map(dim => (
+            <div key={dim.key} className="relative">
+              <button onClick={() => setOpenDropdown(openDropdown === dim.key ? null : dim.key)}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-all duration-150 ${
+                  dim.state.length > 0
+                    ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                    : openDropdown === dim.key
+                      ? 'bg-slate-100 text-slate-700 border-slate-300'
+                      : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:text-slate-700'
+                }`}>
+                {dim.label}
+                {dim.state.length > 0 && (
+                  <span className="bg-white/20 text-[9px] font-bold w-4 h-4 rounded flex items-center justify-center">{dim.state.length}</span>
+                )}
+                <ChevronDown size={11} className={`transition-transform duration-150 ${openDropdown === dim.key ? 'rotate-180' : ''}`} />
+              </button>
+              {openDropdown === dim.key && (
+                <div className="absolute left-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-30 animate-[fadeSlideUp_0.15s_ease-out]">
+                  {dim.options.map(opt => {
+                    const isChecked = dim.state.includes(opt.id);
+                    return (
+                      <button key={opt.id} onClick={() => toggleInArray(dim.state, dim.setState, opt.id)}
+                        className={`w-full flex items-center gap-2.5 px-3 py-2 text-[11px] text-left transition-colors ${
+                          isChecked ? 'bg-slate-50 text-slate-900 font-medium' : 'text-slate-600 hover:bg-slate-50'
+                        }`}>
+                        <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 transition-colors ${
+                          isChecked ? 'bg-slate-900 border-slate-900' : 'border-slate-300'
+                        }`}>
+                          {isChecked && <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4L3.2 5.7L6.5 2.3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                        </span>
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                  {dim.state.length > 0 && (
+                    <div className="border-t border-slate-100 mt-1 pt-1">
+                      <button onClick={() => dim.setState([])}
+                        className="w-full px-3 py-1.5 text-[10px] font-medium text-slate-400 hover:text-slate-600 text-left transition-colors">
+                        Clear {dim.label.toLowerCase()}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+
+          {/* Clear all filters */}
+          {activeFilterCount > 0 && (
+            <button onClick={() => { setFilterType([]); setFilterAvail([]); setFilterStatus([]); }}
+              className="text-[10px] font-medium text-slate-400 hover:text-slate-600 transition-colors ml-1">
+              Clear all
+            </button>
+          )}
+
+          {/* Active filter chips */}
+          {activeFilterCount > 0 && (
+            <div className="flex items-center gap-1 ml-1">
+              {[...filterType.map(v => ({ dim: 'type', id: v, label: v === 'custom' ? 'Custom' : v === 'lookalike' ? 'Lookalike' : 'Saved', setState: setFilterType, state: filterType })),
+                ...filterAvail.map(v => ({ dim: 'avail', id: v, label: v === 'ready' ? 'Ready' : v === 'not_ready' ? 'Not Ready' : v === 'error' ? 'Error' : 'Too Small', setState: setFilterAvail, state: filterAvail })),
+                ...filterStatus.map(v => ({ dim: 'status', id: v, label: v === 'in_active_ads' ? 'Active' : v === 'recently_used' ? 'Recent' : v === 'shared' ? 'Shared' : 'Action', setState: setFilterStatus, state: filterStatus })),
+              ].map(chip => (
+                <span key={`${chip.dim}-${chip.id}`} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-[10px] font-medium text-slate-600">
+                  {chip.label}
+                  <button onClick={() => toggleInArray(chip.state, chip.setState, chip.id)} className="text-slate-400 hover:text-slate-700">
+                    <X size={9} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Search */}
+          <div className="ml-auto relative">
+            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-300" />
+            <input
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search audiences..."
+              className="pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50/80 text-[11px] text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 focus:bg-white w-52 transition-all"
+            />
+          </div>
+        </div>
+      )}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-6 py-4">
@@ -2112,28 +2129,28 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack, token, onLo
         )}
 
         {sorted.length > 0 && (
+          <div className="bg-white rounded-xl border border-slate-200/80 overflow-hidden shadow-sm shadow-slate-100">
           <table className="w-full border-collapse">
             <thead>
-              <tr className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                <th className="text-left py-1.5 px-4 font-semibold cursor-pointer hover:text-slate-600 select-none" onClick={() => toggleSort('name')}>
-                  <span className="inline-flex items-center gap-1">Name <SortIcon col="name" /></span>
-                </th>
-                <th className="text-left py-1.5 px-3 font-semibold w-[150px] cursor-pointer hover:text-slate-600 select-none" onClick={() => toggleSort('subtype')}>
-                  <span className="inline-flex items-center gap-1">Type <SortIcon col="subtype" /></span>
-                </th>
-                <th className="text-right py-1.5 px-2 font-semibold w-[160px] cursor-pointer hover:text-slate-600 select-none" onClick={() => toggleSort('size')}>
-                  <span className="inline-flex items-center gap-1 justify-end">Est. audience size <SortIcon col="size" /></span>
-                </th>
-                <th className="text-left py-1.5 px-2 font-semibold w-[130px]">Availability</th>
-                <th className="text-left py-1.5 px-2 font-semibold w-[110px]">Audience ID</th>
-                <th className="text-right py-1.5 px-2 font-semibold w-[90px] cursor-pointer hover:text-slate-600 select-none" onClick={() => toggleSort('time_created')}>
-                  <span className="inline-flex items-center gap-1 justify-end">Created <SortIcon col="time_created" /></span>
-                </th>
-                <th className="w-[110px]"></th>
+              <tr className="bg-slate-50 border-b border-slate-200/80">
+                {[
+                  { label: 'Name', col: 'name', align: 'left', w: null },
+                  { label: 'Type', col: 'subtype', align: 'left', w: 'w-[130px]' },
+                  { label: 'Size', col: 'size', align: 'right', w: 'w-[140px]' },
+                  { label: 'Status', col: null, align: 'left', w: 'w-[120px]' },
+                  { label: 'ID', col: null, align: 'left', w: 'w-[110px]' },
+                  { label: 'Created', col: 'time_created', align: 'right', w: 'w-[80px]' },
+                  { label: '', col: null, align: 'right', w: 'w-[100px]' },
+                ].map((h, hi) => (
+                  <th key={hi} className={`text-${h.align} py-2 px-3 text-[10px] font-semibold text-slate-400 uppercase tracking-[0.08em] ${h.w || ''} ${h.col ? 'cursor-pointer select-none hover:text-slate-600 transition-colors' : ''}`}
+                    onClick={h.col ? () => toggleSort(h.col) : undefined}>
+                    {h.label && <span className="inline-flex items-center gap-1">{h.label} {h.col && <SortIcon col={h.col} />}</span>}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {sorted.map(aud => {
+              {sorted.map((aud, i) => {
                 const subtype = aud.subtype || 'CUSTOM';
                 const typeInfo = getTypeDisplay(aud);
                 const sizeInfo = fmtSize(aud.approximate_count_lower_bound, aud.approximate_count_upper_bound, aud);
@@ -2143,92 +2160,104 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack, token, onLo
                 return (
                   <React.Fragment key={aud.id}>
                   <tr onClick={() => setExpandedAudienceId(isExpanded ? null : aud.id)}
-                    className="group border-t border-slate-100 hover:bg-orange-50/40 transition-colors cursor-pointer">
+                    style={{ animationDelay: `${i * 40}ms` }}
+                    className="group border-t border-slate-100 hover:bg-orange-50/30 transition-colors duration-150 cursor-pointer animate-[fadeSlideUp_0.3s_ease-out_both]">
                     {/* Name */}
-                    <td className="py-2 px-4">
-                      <p className="text-[12px] font-semibold text-blue-700 truncate max-w-[320px]">{aud.name}</p>
+                    <td className="py-2.5 px-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 ${
+                          subtype === 'LOOKALIKE' ? 'bg-violet-500/10 text-violet-500' :
+                          subtype === 'SAVED' || aud._isSaved ? 'bg-sky-500/10 text-sky-500' :
+                          'bg-orange-500/10 text-orange-500'
+                        }`}>
+                          {subtype === 'LOOKALIKE' ? <Copy size={13} /> : subtype === 'SAVED' || aud._isSaved ? <FolderOpen size={13} /> : <Users size={13} />}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[12px] font-medium text-slate-800 truncate max-w-[300px] leading-tight">{aud.name}</p>
+                          {typeInfo.detail && <p className="text-[10px] text-slate-400 mt-0.5">{typeInfo.detail}</p>}
+                        </div>
+                      </div>
                     </td>
-                    {/* Type — two lines like Meta: "Custom Audience" + "Engagement – Page" */}
-                    <td className="py-2 px-3">
-                      <p className="text-[11px] text-slate-700">{typeInfo.main}</p>
-                      {typeInfo.detail && <p className="text-[10px] text-slate-400">{typeInfo.detail}</p>}
+                    {/* Type badge */}
+                    <td className="py-2.5 px-3">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold tracking-wide ${
+                        subtype === 'LOOKALIKE' ? 'bg-violet-50 text-violet-600 border border-violet-100' :
+                        subtype === 'SAVED' || aud._isSaved ? 'bg-sky-50 text-sky-600 border border-sky-100' :
+                        'bg-orange-50 text-orange-600 border border-orange-100'
+                      }`}>
+                        {subtype === 'LOOKALIKE' ? 'Lookalike' : subtype === 'SAVED' || aud._isSaved ? 'Saved' : 'Custom'}
+                      </span>
                     </td>
-                    {/* Size + Match Quality */}
-                    <td className="py-2 px-2 text-right">
+                    {/* Size */}
+                    <td className="py-2.5 px-3 text-right">
                       {sizeInfo ? (
                         <div>
-                          <span className="text-[12px] font-bold text-slate-900 tabular-nums whitespace-nowrap">{sizeInfo.text}</span>
-                          {sizeInfo.sub && <p className="text-[10px] text-slate-400">{sizeInfo.sub}</p>}
-                          {subtype === 'CUSTOM' && aud.approximate_count_lower_bound > 0 && (() => {
-                            // Approximate match quality based on audience population vs "Below 1,000" threshold
-                            const size = aud.approximate_count_lower_bound;
-                            if (size >= 1000) return <span className="text-[9px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded mt-0.5 inline-block" title="Good data quality — audience matched well with Meta users">Great Match</span>;
-                            if (size >= 100) return <span className="text-[9px] font-semibold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded mt-0.5 inline-block" title="Consider adding more identifiers (email + phone) to improve match rate">Good Match</span>;
-                            return <span className="text-[9px] font-semibold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded mt-0.5 inline-block" title="Low match rate — try adding multiple identifiers per customer and ensure data is recent">Needs Improvement</span>;
-                          })()}
+                          <span className={`text-[13px] font-semibold tabular-nums whitespace-nowrap ${
+                            (aud.approximate_count_lower_bound || 0) >= 10000
+                              ? 'text-orange-600'
+                              : 'text-slate-800'
+                          }`}>{sizeInfo.text}</span>
+                          {sizeInfo.sub && <p className="text-[9px] text-slate-400 mt-0.5">{sizeInfo.sub}</p>}
                         </div>
                       ) : (
-                        <span className="text-[12px] text-slate-300">—</span>
+                        <span className="text-[11px] text-slate-300">—</span>
                       )}
                     </td>
-                    {/* Availability — dot + label, error reason on hover */}
-                    <td className="py-2 px-2">
-                      <div className="flex items-start gap-1.5 relative group/avail">
-                        <span className={`w-2 h-2 rounded-full ${avail.dot} mt-1 shrink-0`} />
-                        <div>
-                          <p className={`text-[11px] font-medium ${avail.color}`}>{avail.label}</p>
-                          {avail.sub && <p className="text-[10px] text-slate-400 whitespace-pre-line leading-tight">{avail.sub}</p>}
-                        </div>
+                    {/* Status */}
+                    <td className="py-2.5 px-3">
+                      <div className="flex items-center gap-1.5 relative group/avail">
+                        <span className={`w-1.5 h-1.5 rounded-full ${avail.dot} shrink-0`} />
+                        <span className={`text-[11px] font-medium ${avail.color}`}>{avail.label}</span>
                         {avail.tooltip && (
-                          <div className="absolute bottom-full left-0 mb-1 hidden group-hover/avail:block z-20 w-56 bg-slate-800 text-white text-[11px] rounded-lg px-3 py-2 shadow-lg pointer-events-none">
+                          <div className="absolute bottom-full left-0 mb-1 hidden group-hover/avail:block z-20 w-52 bg-slate-900 text-white text-[10px] rounded-md px-2.5 py-1.5 shadow-lg pointer-events-none leading-relaxed">
                             {avail.tooltip}
                           </div>
                         )}
                       </div>
                     </td>
-                    {/* Audience ID */}
-                    <td className="py-2 px-2">
+                    {/* ID */}
+                    <td className="py-2.5 px-3">
                       <CopyableId id={aud.id} />
                     </td>
-                    {/* Date Created */}
-                    <td className="py-2 px-2 text-right">
-                      <span className="text-[10px] text-slate-400 whitespace-pre-line">{fmtDate(aud.time_created)}</span>
+                    {/* Created */}
+                    <td className="py-2.5 px-3 text-right">
+                      <span className="text-[10px] text-slate-400 whitespace-pre-line leading-tight">{fmtDate(aud.time_created)}</span>
                     </td>
                     {/* Actions */}
-                    <td className="py-2 px-2 text-right">
-                      <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                    <td className="py-2.5 px-3 text-right">
+                      <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-150">
                         <button onClick={(e) => { e.stopPropagation(); handleUse(aud); }} title="Use in campaign"
-                          className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-600 hover:to-amber-600 transition-colors shadow-sm shadow-orange-500/20">
-                          <Target size={10} /> Use
+                          className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-semibold bg-slate-900 text-white hover:bg-slate-800 transition-colors">
+                          <Target size={9} /> Use
                         </button>
                         {subtype !== 'LOOKALIKE' && !aud._isSaved && (
                           <button onClick={(e) => { e.stopPropagation(); handleCreateLookalike(aud); }} title="Create lookalike"
-                            className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors border border-emerald-200">
-                            <Copy size={10} /> LAL
+                            className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-semibold text-slate-600 hover:bg-slate-100 transition-colors border border-slate-200">
+                            <Copy size={9} /> LAL
                           </button>
                         )}
                         <button onClick={(e) => { e.stopPropagation(); handleDelete(aud); }} title="Delete"
                           className="p-1 rounded-md text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors">
-                          <Trash2 size={11} />
+                          <Trash2 size={10} />
                         </button>
                       </div>
                     </td>
                   </tr>
                   {isExpanded && (
-                    <tr className="bg-slate-50/80 border-t border-slate-100">
-                      <td colSpan={7} className="px-6 py-3">
-                        {bullets && bullets.length > 0 ? (
-                          <div className="space-y-1">
-                            <p className="text-[11px] font-semibold text-slate-600 mb-1.5">Audience Configuration</p>
-                            <ul className="list-disc list-inside space-y-0.5">
-                              {bullets.map((b, i) => (
-                                <li key={i} className="text-[11px] text-slate-600 leading-relaxed">{b}</li>
+                    <tr className="bg-slate-50/60">
+                      <td colSpan={7} className="px-3 py-0">
+                        <div className="ml-9 pl-3 py-2.5 border-l-2 border-orange-300/60">
+                          {bullets && bullets.length > 0 ? (
+                            <div className="space-y-1">
+                              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Configuration</p>
+                              {bullets.map((b, bi) => (
+                                <p key={bi} className="text-[11px] text-slate-600 leading-relaxed">· {b}</p>
                               ))}
-                            </ul>
-                          </div>
-                        ) : (
-                          <p className="text-[11px] text-slate-400 italic">No configuration details saved for this audience.</p>
-                        )}
+                            </div>
+                          ) : (
+                            <p className="text-[11px] text-slate-400">No configuration details saved.</p>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   )}
@@ -2237,6 +2266,7 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack, token, onLo
               })}
             </tbody>
           </table>
+          </div>
         )}
 
         {audiences.length > 0 && sorted.length === 0 && (
