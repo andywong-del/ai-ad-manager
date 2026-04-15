@@ -2607,12 +2607,12 @@ const useSuggestedSkill = (input, skills, activeSkill, slashSkills) => {
 const ACTION_PILLS = [
   { icon: '📊', label: 'Campaign', prompt: 'I want to create a new ad campaign. Help me set it up.' },
   { icon: '👥', label: 'Audience', prompt: 'I want to build a custom audience for my campaigns.' },
-  { icon: '⚡', label: 'Automation Rules', prompt: 'I want to create an automation rule for my campaigns. Help me set it up.' },
+  { icon: '⚡', label: 'Automations', prompt: 'I want to create an automation rule for my campaigns. Help me set it up.' },
   { icon: '📈', label: 'Performance', prompt: 'Analyze the performance of my ad campaigns and give me insights.' },
-  { icon: '📋', label: 'Lead Form', prompt: 'I want to create a new lead generation form for my campaigns.' },
-  { icon: '🔍', label: 'Ad Library', prompt: 'Show me the ads running in my ad account from the Ad Library.' },
+  { icon: '📋', label: 'Lead Forms', prompt: 'I want to create a new lead generation form for my campaigns.' },
+  { icon: '🔍', label: 'Ad Gallery', prompt: 'Show me the ads running in my ad account.' },
   { icon: '🎯', label: 'Pixel Setup', prompt: 'Help me set up tracking for my website with Meta Pixel.' },
-  { icon: '🎨', label: 'Creative', prompt: 'I want to upload new creative assets for my ad campaigns.' },
+  { icon: '🎨', label: 'Creative Hub', prompt: 'I want to upload and manage creative assets for my ad campaigns.' },
 ];
 
 const ActionPills = ({ onSelect }) => (

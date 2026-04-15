@@ -1,5 +1,5 @@
 ---
-name: campaign-operations
+name: campaigns
 description: All campaign, ad set, and ad operations — create, edit, delete, copy, bulk create. The execution layer for campaign management.
 layer: system
 ---

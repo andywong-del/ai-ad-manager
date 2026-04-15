@@ -1,5 +1,5 @@
 ---
-name: automation-rules
+name: automations
 description: Create, manage, and configure Meta automated rules — pause/scale/notify based on performance triggers. The execution layer for automation rule management.
 layer: system
 ---

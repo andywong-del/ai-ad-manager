@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Zap, Plus, MessageSquare, Trash2, ChevronDown, ChevronLeft, ChevronRight, LogOut, FileText, Lightbulb, FolderOpen, Building2, Check, Globe, GripVertical, FolderPlus, X, Users, Sparkles, MoreVertical, Pin, Pencil, PenLine, Menu, BarChart3, Image, Calendar, TrendingUp, ClipboardList, Settings, Palette, LayoutGrid, ListTodo, BookMarked, Layers } from 'lucide-react';
+import { Zap, Plus, MessageSquare, Trash2, ChevronDown, ChevronLeft, ChevronRight, LogOut, FileText, Lightbulb, FolderOpen, Building2, Check, Globe, GripVertical, FolderPlus, X, Users, Sparkles, MoreVertical, Pin, Pencil, PenLine, Menu, BarChart3, Image, Calendar, TrendingUp, ClipboardList, Settings, Palette, LayoutGrid, ListTodo, BookMarked, Layers, Diamond } from 'lucide-react';
 import { groupSessionsByDate } from '../hooks/useChatSessions.js';
 import { useAdAccounts } from '../hooks/useAdAccounts.js';
 import { useBusinesses } from '../hooks/useBusinesses.js';
@@ -317,9 +317,9 @@ export const Sidebar = ({
   const modules = [
     { icon: BarChart3, type: 'campaigns', action: onOpenCampaigns, label: 'Campaigns' },
     { icon: Users, type: 'audiences', action: onOpenAudiences, label: 'Audiences' },
-    { icon: Image, type: 'creativeLibrary', action: onOpenCreativeLibrary, label: 'Creative Studio' },
     { icon: Palette, type: 'adLibrary', action: onOpenAdLibrary, label: 'Ad Gallery' },
-    { icon: BookMarked, type: 'brandLibrary', action: onOpenBrandLibrary, label: 'Brand Memory' },
+    { icon: Image, type: 'creativeLibrary', action: onOpenCreativeLibrary, label: 'Creative Hub', premium: true },
+    { icon: BookMarked, type: 'brandLibrary', action: onOpenBrandLibrary, label: 'Brand Memory', premium: true },
     { icon: Settings, type: 'automationRules', action: onOpenAutomationRules, label: 'Automations' },
     { icon: ClipboardList, type: 'instantForms', action: onOpenInstantForms, label: 'Lead Forms' },
     { icon: TrendingUp, type: 'eventsManager', action: onOpenEventsManager, label: 'Events Manager' },
@@ -523,7 +523,7 @@ export const Sidebar = ({
 
         {manageAdsOpen && (
           <div className="ml-3 pl-3 border-l border-slate-100 mt-0.5">
-            {modules.map(({ icon: Icon, type, action, label }) => {
+            {modules.map(({ icon: Icon, type, action, label, premium }) => {
               const isActive = type && activeView?.type === type;
               return (
                 <button key={label} onClick={action}
@@ -531,7 +531,7 @@ export const Sidebar = ({
                     ${isActive ? 'bg-orange-50 text-orange-700' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}>
                   <Icon size={13} className={isActive ? 'text-orange-500' : 'text-slate-400'} />
                   <span className="flex-1 text-left">{label}</span>
-                </button>
+                                  </button>
               );
             })}
           </div>

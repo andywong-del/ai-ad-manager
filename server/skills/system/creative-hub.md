@@ -1,5 +1,5 @@
 ---
-name: asset-library
+name: creative-hub
 description: Upload, manage, and organize ad images and videos — the creative asset management layer for Meta Ads.
 layer: system
 ---

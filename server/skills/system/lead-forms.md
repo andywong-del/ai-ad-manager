@@ -1,5 +1,5 @@
 ---
-name: instant-forms
+name: lead-forms
 description: Create and manage Meta lead generation forms (Instant Forms) — design questions, privacy policy, thank-you pages, and retrieve submitted leads.
 layer: system
 ---

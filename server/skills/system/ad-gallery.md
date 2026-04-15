@@ -1,5 +1,5 @@
 ---
-name: ad-library
+name: ad-gallery
 description: Search and analyze competitor ads from Meta Ad Library — competitive research, creative inspiration, and market intelligence.
 layer: system
 ---

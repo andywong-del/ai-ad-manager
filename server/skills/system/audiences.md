@@ -1,5 +1,5 @@
 ---
-name: audience-operations
+name: audiences
 description: All audience creation and targeting operations — custom audiences, lookalikes, saved audiences, interest targeting.
 layer: system
 ---
