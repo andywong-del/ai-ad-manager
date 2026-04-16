@@ -2606,9 +2606,9 @@ const useSuggestedSkill = (input, skills, activeSkill, slashSkills) => {
 // ── Action Pills with Use Case Tabs ──
 const ACTION_PILLS = [
   { icon: '📊', label: 'Campaign', primary: true, cards: [
-    { title: 'Launch new ads', desc: 'Drop in your materials or start fresh — AI builds everything', prompt: 'I want to launch new ads. Help me set up a complete campaign — ask me about my goal, materials, budget, and audience, then build everything for me.' },
+    { title: 'Launch new ads', desc: 'Drop in your images/videos — AI builds the full campaign', prompt: 'I want to launch new ads. I\'ll drop in my images or videos — build me a complete campaign with the right objective, targeting, budget, and ad copy. Use my brand memory if available.' },
+    { title: 'Boost a post', desc: 'Pick an existing FB/IG post and promote it', prompt: 'I want to boost an existing post. Show me my recent Facebook and Instagram posts with their engagement — recommend which ones would perform best as ads.' },
     { title: 'Improve what\'s running', desc: 'Find waste, scale winners, optimize performance', prompt: 'Review my active campaigns — what\'s wasting money, what should I scale, and what changes will improve performance? Give me specific actions.' },
-    { title: 'Manage & organize', desc: 'Duplicate, bulk edit, restructure campaigns', prompt: 'Help me manage my campaigns — I want to duplicate, bulk update budgets, or reorganize my campaign structure. Show me what I have.' },
   ]},
   { icon: '👥', label: 'Audience', primary: true, cards: [
     { title: 'Build new audiences', desc: 'From customer data, website visitors, or lookalikes', prompt: 'Help me build audiences — create custom audiences from my data, retargeting segments, or lookalikes from my best converters. Guide me.' },
@@ -3236,7 +3236,7 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, activityLog = 
 
       const defaultPrompt = docAttachments.length
         ? `\n\nI've uploaded a strategy/brand document. Please analyze it and suggest a campaign plan based on its content.`
-        : `\n\nI've uploaded these creatives to the ad account. What would you like to do with them?`;
+        : `\n\nI've uploaded these creatives to the ad account. Build me a campaign using these assets — suggest the best objective, targeting, ad format, and generate the ad copy. Use my brand memory if available.`;
 
       msgText = lines.join('\n') + (t ? '\n\n' + t : defaultPrompt);
     }
