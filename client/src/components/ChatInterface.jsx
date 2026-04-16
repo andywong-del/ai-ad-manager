@@ -2672,7 +2672,6 @@ const ACTION_PILLS = [
   { icon: '📊', label: 'Campaign', primary: true, cards: [
     { title: 'Launch new ads', desc: 'Drop in your images/videos — AI builds the full campaign', prompt: 'I want to launch new ads. I\'ll drop in my images or videos — build me a complete campaign with the right objective, targeting, budget, and ad copy. Use my brand memory if available.' },
     { title: 'Boost a post', desc: 'Pick an existing FB/IG post and promote it', prompt: 'I want to boost an existing post. Show me my recent Facebook and Instagram posts with their engagement — recommend which ones would perform best as ads.' },
-    { title: 'Improve what\'s running', desc: 'Find waste, scale winners, optimize performance', prompt: 'Review my active campaigns — what\'s wasting money, what should I scale, and what changes will improve performance? Give me specific actions.' },
   ]},
   { icon: '👥', label: 'Audience', primary: true, cards: [
     { title: 'Build new audiences', desc: 'From customer data, website visitors, or lookalikes', prompt: 'Help me build audiences — create custom audiences from my data, retargeting segments, or lookalikes from my best converters. Guide me.' },
@@ -2686,7 +2685,7 @@ const ACTION_PILLS = [
   ]},
   { icon: '📈', label: 'Performance', primary: true, cards: [
     { title: 'Quick snapshot', desc: 'How are things right now?', prompt: 'Give me a quick performance snapshot — how are my active campaigns doing? Any red flags or wins I should know about?' },
-    { title: 'Deep analysis', desc: 'Full breakdown by campaign, creative, audience', prompt: 'Deep performance analysis — break down by campaign, ad set, creative, and audience. What\'s working, what\'s not, what should I do?' },
+    { title: 'Improve what\'s running', desc: 'Find waste, scale winners, optimize', prompt: 'Review my active campaigns — what\'s wasting money, what should I scale, and what changes will improve performance? Give me specific actions.' },
     { title: 'Weekly report', desc: 'This week vs last with actions', prompt: 'Generate my weekly report — compare this week vs last, highlight top and bottom performers, give me 3 actionable recommendations.' },
   ]},
   { icon: '🎨', label: 'Creatives', primary: true, cards: [
