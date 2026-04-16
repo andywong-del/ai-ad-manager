@@ -15,7 +15,7 @@ import {
   LineChart, Line,
 } from 'recharts';
 
-const CHART_COLORS = ['#3B82F6','#8B5CF6','#EC4899','#F59E0B','#10B981','#6366F1','#EF4444','#14B8A6'];
+const CHART_COLORS = ['#f97316','#3b82f6','#10b981','#8b5cf6','#ec4899','#f59e0b','#ef4444','#14b8a6'];
 const parseNum = (s) => {
   if (typeof s === 'number') return s;
   if (!s || typeof s !== 'string') return 0;
@@ -184,7 +184,7 @@ const ActivityLog = ({ entries }) => {
 
 const TypingIndicator = ({ thinkingText, activityLog }) => (
   <div className="flex items-end gap-3 mb-6">
-    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shrink-0">
+    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center shrink-0">
       <Zap size={15} className="text-white" />
     </div>
     <div className="bg-white/80 backdrop-blur-sm border border-slate-200 rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm min-w-[160px]">
@@ -406,24 +406,24 @@ const MetricCards = ({ data }) => {
   return (
     <MetaCard title="Performance Overview" subtitle="Key metrics at a glance" badge="Meta Ads"
       csvData={data.map(m => ({ Metric: m.label, Value: m.value, Change: m.change || '', Trend: m.trend || '' }))}>
-      <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-slate-100">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3">
         {data.map((m, i) => {
           const isUp = m.trend === 'up';
           const isDown = m.trend === 'down';
           const trendColor = isUp ? 'text-emerald-600' : isDown ? 'text-red-500' : 'text-slate-400';
           return (
-            <div key={i} className="px-4 py-3.5">
-              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">{m.label}</p>
-              <p className="text-2xl font-bold text-slate-900 leading-tight tracking-tight">{m.value}</p>
+            <div key={i} className="bg-gradient-to-br from-slate-50/80 to-white rounded-xl px-4 py-3.5 border border-slate-100">
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.1em] mb-1.5">{m.label}</p>
+              <p className="text-xl font-extrabold text-slate-900 leading-tight tracking-tight">{m.value}</p>
               {m.change && (
                 <div className={`flex items-center gap-1 mt-1.5 ${trendColor}`}>
                   {isUp && <TrendingUp size={11} />}
                   {isDown && <TrendingDown size={11} />}
-                  <span className="text-[11px] font-semibold">{m.change}</span>
-                  {m.vs && <span className="text-[10px] text-slate-400 ml-0.5">{m.vs}</span>}
+                  <span className="text-[10px] font-bold">{m.change}</span>
+                  {m.vs && <span className="text-[9px] text-slate-400 ml-0.5">{m.vs}</span>}
                 </div>
               )}
-              {m.desc && <p className="text-[10px] text-slate-400 mt-1 leading-snug">{m.desc}</p>}
+              {m.desc && <p className="text-[9px] text-slate-400 mt-1 leading-snug">{m.desc}</p>}
             </div>
           );
         })}
@@ -1586,13 +1586,14 @@ const QuickReplies = ({ actions, onSend, disabled }) => (
   <div className="flex justify-end flex-wrap gap-2 mt-3 mb-1 pr-1">
     {actions.map(({ label, value, variant = 'default' }) => (
       <button key={value} onClick={() => onSend(value)} disabled={disabled}
-        className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold border transition-all disabled:opacity-40 disabled:cursor-not-allowed
-          ${variant === 'confirm' ? 'bg-emerald-500 hover:bg-emerald-400 text-white border-emerald-400 shadow-md shadow-emerald-100' :
-            variant === 'danger'  ? 'bg-red-500 hover:bg-red-400 text-white border-red-400 shadow-md shadow-red-100' :
-            'bg-white hover:bg-blue-50 text-blue-600 border-blue-200 shadow-sm'}`}>
-        {variant === 'confirm' && <CheckCircle2 size={14} />}
-        {variant === 'danger' && <XCircle size={14} />}
+        className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-[11px] font-bold tracking-wide border transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed hover:-translate-y-0.5
+          ${variant === 'confirm' ? 'bg-gradient-to-r from-emerald-500 to-emerald-400 text-white border-emerald-400/50 shadow-md shadow-emerald-500/20 hover:shadow-lg hover:shadow-emerald-500/30' :
+            variant === 'danger'  ? 'bg-gradient-to-r from-red-500 to-red-400 text-white border-red-400/50 shadow-md shadow-red-500/20 hover:shadow-lg hover:shadow-red-500/30' :
+            'bg-white text-slate-700 border-slate-200/80 shadow-sm hover:border-orange-200 hover:text-orange-700 hover:shadow-md hover:shadow-orange-500/8'}`}>
+        {variant === 'confirm' && <CheckCircle2 size={13} />}
+        {variant === 'danger' && <XCircle size={13} />}
         {label}
+        {variant === 'default' && <ArrowRight size={12} className="text-slate-300 group-hover:text-orange-400" />}
       </button>
     ))}
   </div>
@@ -1621,7 +1622,7 @@ const ReportMessage = ({ message, timestamp }) => {
 
   return (
     <div className="flex items-end gap-3 mb-6">
-      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shrink-0 mb-0.5">
+      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center shrink-0 mb-0.5">
         <Zap size={15} className="text-white" />
       </div>
       <div className="flex-1 min-w-0">
@@ -1680,7 +1681,7 @@ const ReportMessage = ({ message, timestamp }) => {
 // ── Table renderer (structured) ──────────────────────────────────────────────
 const TableMessage = ({ message }) => (
   <div className="flex items-end gap-3 mb-2">
-    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shrink-0 mb-0.5">
+    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center shrink-0 mb-0.5">
       <Zap size={15} className="text-white" />
     </div>
     <div className="max-w-[95%] w-full">
@@ -2008,7 +2009,7 @@ const SaveAsSkillModal = ({ messageText, onClose, onCreateSkill, generateSkill }
 const SaveAsSkillButton = ({ onClick }) => (
   <button
     onClick={onClick}
-    className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all opacity-0 group-hover:opacity-100 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 border border-transparent hover:border-indigo-200"
+    className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all opacity-0 group-hover:opacity-100 text-slate-400 hover:text-amber-600 hover:bg-amber-50 border border-transparent hover:border-amber-200"
   >
     <Sparkles size={11} /> Save as Skill
   </button>
@@ -2115,9 +2116,9 @@ const SaveToBrandModal = ({ messageText, onClose, onSaveToBrand }) => {
 const SaveToBrandButton = ({ onClick }) => (
   <button
     onClick={onClick}
-    className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all opacity-0 group-hover:opacity-100 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 border border-transparent hover:border-emerald-200"
+    className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all opacity-0 group-hover:opacity-100 text-slate-400 hover:text-orange-600 hover:bg-orange-50 border border-transparent hover:border-orange-200"
   >
-    <Brain size={11} /> Save to Brand
+    <Brain size={11} /> Save to Brand Memory
   </button>
 );
 
@@ -2203,7 +2204,7 @@ const MessageBubble = ({ message, isLatest, onSend, isTyping, onSaveItem, folder
               {isSelected && <Check size={11} />}
             </button>
           )}
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shrink-0 mb-0.5">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center shrink-0 mb-0.5">
             <Zap size={15} className="text-white" />
           </div>
           <div className={hasWide ? 'max-w-[95%] flex-1 min-w-0' : 'max-w-[80%]'}>
@@ -2240,7 +2241,7 @@ const MessageBubble = ({ message, isLatest, onSend, isTyping, onSaveItem, folder
               {canvasData?.dashboard && isLatest && <AutoCanvasOpener data={canvasData} onOpen={onOpenCanvas} />}
               {canvasData?.dashboard && (
                 <button onClick={() => onOpenCanvas?.(canvasData)}
-                  className="mt-2 flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-violet-600 text-white text-[13px] font-semibold hover:from-blue-600 hover:to-violet-700 transition-all shadow-sm">
+                  className="mt-2 flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-white text-[13px] font-semibold hover:from-blue-600 hover:to-violet-700 transition-all shadow-sm">
                   <BarChart3 size={14} /> View Dashboard
                 </button>
               )}
@@ -2266,7 +2267,7 @@ const MessageBubble = ({ message, isLatest, onSend, isTyping, onSaveItem, folder
   return (
     <div className="flex items-end justify-end gap-3 mb-6 group">
       <div className="max-w-[75%]">
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-2xl rounded-br-sm px-4 py-3 text-sm leading-relaxed shadow-md shadow-blue-200/30">
+        <div className="bg-gradient-to-br from-slate-800 to-slate-900 text-white rounded-2xl rounded-br-sm px-4 py-3 text-sm leading-relaxed shadow-md shadow-slate-300/20">
           {message.attachments && <MessageAttachments attachments={message.attachments} />}
           {message.text}
         </div>
@@ -2670,40 +2671,39 @@ const useSuggestedSkill = (input, skills, activeSkill, slashSkills) => {
 // ── Action Pills with Use Case Tabs ──
 const ACTION_PILLS = [
   { icon: '📊', label: 'Campaign', primary: true, cards: [
-    { title: 'Launch new ads', desc: 'Drop in your images/videos — AI builds the full campaign', prompt: 'I want to launch new ads. I\'ll drop in my images or videos — build me a complete campaign with the right objective, targeting, budget, and ad copy. Use my brand memory if available.' },
-    { title: 'Boost a post', desc: 'Pick an existing FB/IG post and promote it', prompt: 'I want to boost an existing post. Show me my recent Facebook and Instagram posts with their engagement — recommend which ones would perform best as ads.' },
+    { title: 'Launch new ads', desc: 'Drop images/videos, upload CSV, or start from scratch — single or bulk', prompt: 'I want to create new ads for my campaigns.' },
+    { title: 'Boost post', desc: 'Pick a FB/IG post to promote — single or multiple posts', prompt: 'I want to boost a post from my page.' },
+    { title: 'Edit campaigns', desc: 'Pause, change budgets, swap creatives, bulk update', prompt: 'I want to make changes to my existing campaigns.' },
   ]},
   { icon: '👥', label: 'Audience', primary: true, cards: [
-    { title: 'Build new audiences', desc: 'From customer data, website visitors, or lookalikes', prompt: 'Help me build audiences — create custom audiences from my data, retargeting segments, or lookalikes from my best converters. Guide me.' },
-    { title: 'Find untapped segments', desc: 'New interests, behaviors, competitor fans', prompt: 'Suggest new audience segments I haven\'t tested — interests, behaviors, competitor fans, or angles that could work for my business.' },
-    { title: 'Audit & clean up', desc: 'Fix overlap, refresh stale, consolidate', prompt: 'Audit my existing audiences — check for overlap, find stale segments, and suggest which to merge, refresh, or retire.' },
+    { title: 'Create audience', desc: 'Lookalike, retargeting, custom list, interest-based — single or bulk', prompt: 'I want to create a new audience for my campaigns.' },
+    { title: 'Manage audiences', desc: 'View existing, check overlap, edit, refresh stale', prompt: 'Show me my existing audiences and check for any issues.' },
   ]},
   { icon: '⚡', label: 'Automations', primary: true, cards: [
-    { title: 'Protect my budget', desc: 'Auto-pause bad ads, set spend alerts', prompt: 'Set up automation rules to protect my budget — auto-pause ads when performance drops, and alert me when spend exceeds my limits.' },
-    { title: 'Auto-scale winners', desc: 'Increase budget when ads perform well', prompt: 'Create rules to automatically scale my best-performing ad sets — increase budget when ROAS is strong, with guardrails to prevent overspend.' },
-    { title: 'Smart monitoring', desc: 'Frequency caps, day-of-week rules, alerts', prompt: 'Set up smart monitoring — watch for ad fatigue, adjust budgets by day of week, and notify me when something needs attention.' },
+    { title: 'Create rule', desc: 'Auto-pause, auto-scale, spend alerts, frequency caps', prompt: 'I want to create an automation rule for my campaigns.' },
+    { title: 'Manage rules', desc: 'View, edit, or delete existing rules', prompt: 'Show me my existing automation rules.' },
   ]},
   { icon: '📈', label: 'Performance', primary: true, cards: [
-    { title: 'Quick snapshot', desc: 'How are things right now?', prompt: 'Give me a quick performance snapshot — how are my active campaigns doing? Any red flags or wins I should know about?' },
-    { title: 'Improve what\'s running', desc: 'Find waste, scale winners, optimize', prompt: 'Review my active campaigns — what\'s wasting money, what should I scale, and what changes will improve performance? Give me specific actions.' },
-    { title: 'Weekly report', desc: 'This week vs last with actions', prompt: 'Generate my weekly report — compare this week vs last, highlight top and bottom performers, give me 3 actionable recommendations.' },
+    { title: 'Quick snapshot', desc: 'Key metrics, red flags, wins — with dashboard', prompt: 'How are my campaigns doing? Show me the dashboard.' },
+    { title: 'Diagnose & fix', desc: 'Find why CPA is high, ROAS dropped, or spend is off', prompt: 'Something seems off with my campaigns. Help me figure out what\'s wrong and how to fix it.' },
+    { title: 'Weekly report', desc: 'This week vs last — formatted for boss or client', prompt: 'Generate my weekly performance report.' },
   ]},
   { icon: '🎨', label: 'Creatives', primary: true, cards: [
-    { title: 'Manage assets', desc: 'Upload, organize, audit usage', prompt: 'Help me manage my creative assets — upload new ones, see what\'s being used vs available, and organize my library.' },
-    { title: 'Creative strategy', desc: 'What\'s winning and what to make next', prompt: 'Analyze my creative performance — which visuals and messages work best? What new concepts should I produce?' },
+    { title: 'Upload & manage', desc: 'Add new assets, see what\'s used vs available', prompt: 'I want to manage my creative assets.' },
+    { title: 'What\'s working', desc: 'Which creatives perform best and what to make next', prompt: 'Analyze my creative performance and suggest what to make next.' },
   ]},
   // Secondary — shown in "More" expandable
   { icon: '📋', label: 'Lead Forms', cards: [
-    { title: 'Create a lead form', desc: 'Questions, privacy, thank-you page', prompt: 'I want to create a lead generation form. Help me design the questions, set up privacy, and configure a thank-you page that converts.' },
-    { title: 'Analyze & improve', desc: 'Completion rates, CPL, drop-off', prompt: 'Show me how my lead forms are performing — completion rates, cost per lead, and where people drop off. Suggest improvements.' },
+    { title: 'Create form', desc: 'Design questions, privacy, thank-you page', prompt: 'I want to create a lead generation form.' },
+    { title: 'Check performance', desc: 'Completion rates, cost per lead, drop-off', prompt: 'How are my lead forms performing?' },
   ]},
   { icon: '🔍', label: 'Ad Review', cards: [
-    { title: 'Review all ads', desc: 'What\'s running across campaigns', prompt: 'Show me all ads running in my account — status, preview, which campaign. Full picture of what\'s live.' },
-    { title: 'Find ad fatigue', desc: 'Declining CTR, high frequency', prompt: 'Which ads are showing fatigue? High frequency, declining CTR, rising CPA — suggest what to replace them with.' },
+    { title: 'Review my ads', desc: 'See what\'s running across all campaigns', prompt: 'Show me all the ads running in my account.' },
+    { title: 'Ad fatigue check', desc: 'Find tired ads and suggest replacements', prompt: 'Which of my ads are fatigued and need replacing?' },
   ]},
   { icon: '🎯', label: 'Tracking', cards: [
-    { title: 'Set up tracking', desc: 'Pixel, CAPI, events', prompt: 'Help me set up tracking — Meta Pixel, server-side CAPI, and the right conversion events for my business.' },
-    { title: 'Check my setup', desc: 'Verify events are firing', prompt: 'Check if my tracking is working — are events firing correctly? Any missing data or setup issues?' },
+    { title: 'Setup tracking', desc: 'Meta Pixel, CAPI, conversion events', prompt: 'I need to set up tracking for my website.' },
+    { title: 'Check setup', desc: 'Verify events are firing correctly', prompt: 'Is my tracking working properly?' },
   ]},
 ];
 
@@ -2967,7 +2967,7 @@ const ChatInput = ({ input, setInput, onKeyDown, onSend, onStop, onFilesAdded, a
               </button>
             ) : (
               <button onClick={onSend} disabled={!input.trim() && !attachments.length}
-                className="w-8 h-8 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:bg-slate-200 disabled:text-slate-400 text-white flex items-center justify-center transition-colors shadow-sm">
+                className="w-8 h-8 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 disabled:bg-slate-200 disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-400 text-white flex items-center justify-center transition-colors shadow-sm">
                 <Send size={14} />
               </button>
             )}
@@ -3466,7 +3466,7 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, activityLog = 
       {/* Selection mode toggle */}
       {onCreateSkill && !selectionMode && messages.some(m => m.role === 'agent') && (
         <button onClick={() => setSelectionMode(true)}
-          className="fixed bottom-20 right-6 z-40 flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-medium text-slate-400 bg-white border border-slate-200 hover:border-indigo-300 hover:text-indigo-500 shadow-sm transition-colors"
+          className="fixed bottom-20 right-6 z-40 flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[11px] font-semibold text-slate-500 bg-white/90 backdrop-blur-sm border border-slate-200/80 hover:border-orange-300 hover:text-orange-600 shadow-lg shadow-slate-200/50 transition-all hover:-translate-y-0.5"
           title="Select messages to package as skill">
           <CheckSquare size={12} /> Select Messages
         </button>

@@ -7,7 +7,7 @@ import {
   LineChart, Line,
 } from 'recharts';
 
-const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#6366f1', '#ef4444', '#14b8a6'];
+const COLORS = ['#f97316', '#3b82f6', '#10b981', '#8b5cf6', '#ec4899', '#f59e0b', '#ef4444', '#14b8a6'];
 
 const fmtNum = (n) => {
   if (n == null) return '—';
@@ -31,13 +31,14 @@ const KpiCard = ({ label, value, change, trend }) => {
   const isGood = isCost ? isDown : isUp;
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 px-4 py-3 flex-1 min-w-[140px]">
-      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">{label}</p>
-      <p className="text-lg font-bold text-slate-800 mt-0.5">{value}</p>
+    <div className="bg-gradient-to-br from-white to-slate-50/50 rounded-xl border border-slate-200/80 px-4 py-3.5 flex-1 min-w-[140px]">
+      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.1em]">{label}</p>
+      <p className="text-xl font-extrabold text-slate-800 mt-1 tracking-tight">{value}</p>
       {change && (
-        <div className={`flex items-center gap-1 mt-1 text-[11px] font-medium ${isGood ? 'text-emerald-600' : isDown || isUp ? 'text-red-500' : 'text-slate-400'}`}>
-          {isUp ? <ArrowUpRight size={12} /> : isDown ? <ArrowDownRight size={12} /> : null}
-          <span>{change} vs prev period</span>
+        <div className={`flex items-center gap-1 mt-1.5 text-[10px] font-bold ${isGood ? 'text-emerald-600' : isDown || isUp ? 'text-red-500' : 'text-slate-400'}`}>
+          {isUp ? <ArrowUpRight size={11} /> : isDown ? <ArrowDownRight size={11} /> : null}
+          <span>{change}</span>
+          <span className="text-slate-300 font-normal">vs prev</span>
         </div>
       )}
     </div>
@@ -138,9 +139,9 @@ export const CanvasPanel = ({ data, onClose, onSend }) => {
   if (!dashboard) {
     return (
       <div className={`flex flex-col bg-white/95 backdrop-blur-xl border-l border-slate-200 shadow-2xl transition-all duration-300 ${isFullScreen ? 'fixed inset-0 z-50' : 'relative h-full'}`}>
-        <div className="shrink-0 flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
+        <div className="shrink-0 flex items-center justify-between px-5 py-3.5 border-b border-orange-100/50 bg-gradient-to-r from-orange-50/40 to-white">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center">
               <BarChart3 size={14} className="text-white" />
             </div>
             <span className="text-sm font-semibold text-slate-700">{data.title || 'Performance Dashboard'}</span>
@@ -204,11 +205,11 @@ export const CanvasPanel = ({ data, onClose, onSend }) => {
   const trendChart = dashboard.charts?.find(c => c.type === 'trend');
 
   return (
-    <div className={`flex flex-col bg-gradient-to-b from-slate-50 to-white border-l border-slate-200 shadow-2xl transition-all duration-300 ${isFullScreen ? 'fixed inset-0 z-50' : 'relative h-full'}`}>
+    <div className={`flex flex-col bg-gradient-to-br from-orange-50/30 via-white to-amber-50/20 border-l border-slate-200/80 shadow-2xl transition-all duration-300 ${isFullScreen ? 'fixed inset-0 z-50' : 'relative h-full'}`}>
       {/* Header */}
       <div className="shrink-0 flex items-center justify-between px-5 py-3 border-b border-slate-200 bg-white">
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center">
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center">
             <BarChart3 size={14} className="text-white" />
           </div>
           <div>
