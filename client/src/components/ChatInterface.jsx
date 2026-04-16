@@ -466,7 +466,7 @@ const OptionCards = ({ data, onSend, isAnswered, selectedTitle }) => {
         <div className="px-4 py-3">
           {/* Dropdown trigger */}
           <button onClick={() => setDropdownOpen(v => !v)}
-            className="w-full flex items-center justify-between px-3.5 py-2.5 bg-white border border-slate-200 rounded-lg hover:border-blue-300 transition-colors text-left">
+            className="w-full flex items-center justify-between px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl hover:border-orange-300 transition-colors text-left">
             <span className="text-[13px] text-slate-500">Select...</span>
             <ChevronDown size={14} className={`text-slate-400 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
           </button>
@@ -490,12 +490,12 @@ const OptionCards = ({ data, onSend, isAnswered, selectedTitle }) => {
                   const desc = opt.description || opt.desc;
                   return (
                     <button key={i} onClick={() => { setDropdownOpen(false); setDropdownSearch(''); onSend?.(`I choose: ${opt.title}`); }}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-blue-50 transition-colors border-b border-slate-50 last:border-0">
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-orange-50/50 transition-colors border-b border-slate-50 last:border-0">
                       <div className="flex-1 min-w-0">
                         <p className="text-[13px] font-medium text-slate-800">{opt.title}</p>
                         {desc && <p className="text-[11px] text-slate-400 mt-0.5 truncate">{desc}</p>}
                       </div>
-                      {opt.tag && <span className="text-[9px] font-bold bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full shrink-0">{opt.tag}</span>}
+                      {opt.tag && <span className="text-[9px] font-bold bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full shrink-0">{opt.tag}</span>}
                     </button>
                   );
                 })}
@@ -519,18 +519,18 @@ const OptionCards = ({ data, onSend, isAnswered, selectedTitle }) => {
             const desc = opt.description || opt.desc;
             return (
               <button key={i} onClick={() => onSend?.(`I choose: ${opt.title}`)}
-                className="flex flex-col px-4 py-4 text-left hover:bg-blue-50/50 transition-all group relative">
+                className="flex flex-col px-4 py-4 text-left hover:bg-orange-50/50 transition-all duration-200 group relative">
                 {opt.tag && (
-                  <span className="absolute top-2 right-3 text-[9px] font-bold bg-slate-900 text-white px-2 py-0.5 rounded-full">{opt.tag}</span>
+                  <span className="absolute top-2 right-3 text-[9px] font-bold bg-gradient-to-r from-orange-500 to-amber-500 text-white px-2 py-0.5 rounded-full">{opt.tag}</span>
                 )}
                 <div className="flex items-center gap-2.5 mb-2">
-                  <span className="w-7 h-7 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 text-xs font-bold group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-600 transition-colors">
+                  <span className="w-7 h-7 rounded-lg bg-orange-50 border border-orange-200/50 flex items-center justify-center text-orange-600 text-xs font-bold group-hover:bg-gradient-to-br group-hover:from-orange-500 group-hover:to-amber-500 group-hover:text-white group-hover:border-orange-500 transition-all duration-200">
                     {badgeLabel(opt)}
                   </span>
-                  <p className="text-[13px] font-semibold text-slate-800">{opt.title}</p>
+                  <p className="text-[13px] font-semibold text-slate-800 group-hover:text-orange-800 transition-colors">{opt.title}</p>
                 </div>
-                {desc && <p className="text-xs text-slate-500 leading-relaxed flex-1 line-clamp-2">{desc}</p>}
-                <div className="flex items-center gap-1 mt-3 text-blue-600 text-[11px] font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
+                {desc && <p className="text-[11px] text-slate-500 leading-relaxed flex-1 line-clamp-2">{desc}</p>}
+                <div className="flex items-center gap-1 mt-3 text-orange-500 text-[11px] font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
                   <span>Select</span><ArrowUpRight size={11} />
                 </div>
               </button>
@@ -543,16 +543,16 @@ const OptionCards = ({ data, onSend, isAnswered, selectedTitle }) => {
             const desc = opt.description || opt.desc;
             return (
               <button key={i} onClick={() => onSend?.(`I choose: ${opt.title}`)}
-                className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-blue-50/50 transition-all group">
-                <span className="w-7 h-7 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 text-xs font-bold group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-600 transition-colors shrink-0">
+                className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-orange-50/50 transition-all duration-200 group">
+                <span className="w-7 h-7 rounded-lg bg-orange-50 border border-orange-200/50 flex items-center justify-center text-orange-600 text-xs font-bold group-hover:bg-gradient-to-br group-hover:from-orange-500 group-hover:to-amber-500 group-hover:text-white group-hover:border-orange-500 transition-all duration-200 shrink-0">
                   {badgeLabel(opt)}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-semibold text-slate-800">{opt.title}</p>
-                  {desc && <p className="text-xs text-slate-500 mt-0.5 line-clamp-2 leading-relaxed">{desc}</p>}
+                  <p className="text-[13px] font-semibold text-slate-800 group-hover:text-orange-800 transition-colors">{opt.title}</p>
+                  {desc && <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2 leading-relaxed">{desc}</p>}
                 </div>
-                {opt.tag && <span className="text-[9px] font-bold bg-slate-900 text-white px-2 py-0.5 rounded-full shrink-0">{opt.tag}</span>}
-                <ArrowUpRight size={12} className="text-slate-300 group-hover:text-blue-600 transition-colors shrink-0" />
+                {opt.tag && <span className="text-[9px] font-bold bg-gradient-to-r from-orange-500 to-amber-500 text-white px-2 py-0.5 rounded-full shrink-0">{opt.tag}</span>}
+                <ArrowUpRight size={11} className="text-slate-300 group-hover:text-orange-500 transition-colors shrink-0" />
               </button>
             );
           })}
@@ -1130,11 +1130,11 @@ const QuickRepliesCard = ({ data, onSend }) => {
         const displayText = text.replace(/^\[\w+\]\s*/, '');
         return (
           <button key={i} onClick={() => onSend?.(text)}
-            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border text-[13px] font-medium transition-all hover:-translate-y-0.5 active:translate-y-0
-              ${isNav ? 'border-indigo-200 bg-indigo-50/60 text-indigo-700 hover:bg-indigo-100 hover:border-indigo-300'
-                      : 'border-blue-200 bg-blue-50/60 text-blue-700 hover:bg-blue-100 hover:border-blue-300'}`}>
+            className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border text-[11px] font-semibold transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0
+              ${isNav ? 'border-orange-200 bg-gradient-to-r from-orange-50 to-amber-50 text-orange-700 hover:shadow-md hover:shadow-orange-500/10 hover:border-orange-300'
+                      : 'border-slate-200/80 bg-white text-slate-700 hover:border-orange-200 hover:text-orange-700 hover:shadow-md hover:shadow-orange-500/8'}`}>
             {displayText}
-            <ArrowUpRight size={12} className="opacity-50" />
+            <ArrowUpRight size={11} className="opacity-40" />
           </button>
         );
       })}
@@ -1147,7 +1147,7 @@ const QuickRepliesCard = ({ data, onSend }) => {
 const FunnelCard = ({ data }) => {
   if (!data?.stages?.length) return null;
   const max = Math.max(...data.stages.map(s => parseFloat(s.value) || 0));
-  const colors = ['bg-blue-500', 'bg-indigo-500', 'bg-violet-500', 'bg-purple-500', 'bg-fuchsia-500', 'bg-pink-500'];
+  const colors = ['bg-orange-500', 'bg-amber-500', 'bg-yellow-500', 'bg-orange-400', 'bg-amber-400', 'bg-yellow-400'];
 
   // Area chart data
   const chartData = data.stages.map(s => ({
@@ -2241,7 +2241,7 @@ const MessageBubble = ({ message, isLatest, onSend, isTyping, onSaveItem, folder
               {canvasData?.dashboard && isLatest && <AutoCanvasOpener data={canvasData} onOpen={onOpenCanvas} />}
               {canvasData?.dashboard && (
                 <button onClick={() => onOpenCanvas?.(canvasData)}
-                  className="mt-2 flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-white text-[13px] font-semibold hover:from-blue-600 hover:to-violet-700 transition-all shadow-sm">
+                  className="mt-2 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 text-white text-[12px] font-bold hover:from-orange-400 hover:to-amber-400 transition-all shadow-md shadow-orange-500/20 hover:shadow-lg hover:shadow-orange-500/30 hover:-translate-y-0.5">
                   <BarChart3 size={14} /> View Dashboard
                 </button>
               )}

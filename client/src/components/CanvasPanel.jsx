@@ -81,7 +81,7 @@ const CampaignRow = ({ campaign, isExpanded, onToggle }) => {
   return (
     <>
       <tr onClick={onToggle}
-        className={`cursor-pointer transition-colors ${isExpanded ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`}>
+        className={`cursor-pointer transition-colors ${isExpanded ? 'bg-orange-50/50' : 'hover:bg-orange-50/30'}`}>
         <td className="px-3 py-2.5 text-center">
           <span className={statusEmoji[campaign.status] || 'text-slate-400'}>{campaign.status || '—'}</span>
         </td>
@@ -102,7 +102,7 @@ const CampaignRow = ({ campaign, isExpanded, onToggle }) => {
       </tr>
       {isExpanded && (
         <tr>
-          <td colSpan={7} className="px-4 py-3 bg-blue-50/30 border-b border-blue-100">
+          <td colSpan={7} className="px-4 py-3 bg-orange-50/30 border-b border-orange-100">
             <div className="grid grid-cols-2 gap-3 text-[12px]">
               <div>
                 <span className="font-semibold text-slate-500">Diagnosis:</span>
@@ -205,34 +205,37 @@ export const CanvasPanel = ({ data, onClose, onSend }) => {
   const trendChart = dashboard.charts?.find(c => c.type === 'trend');
 
   return (
-    <div className={`flex flex-col bg-gradient-to-br from-orange-50/30 via-white to-amber-50/20 border-l border-slate-200/80 shadow-2xl transition-all duration-300 ${isFullScreen ? 'fixed inset-0 z-50' : 'relative h-full'}`}>
-      {/* Header */}
-      <div className="shrink-0 flex items-center justify-between px-5 py-3 border-b border-slate-200 bg-white">
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center">
-            <BarChart3 size={14} className="text-white" />
+    <div className={`flex flex-col border-l border-slate-200/60 shadow-2xl transition-all duration-300 ${isFullScreen ? 'fixed inset-0 z-50' : 'relative h-full'}`}>
+      {/* Dark premium header */}
+      <div className="shrink-0 relative bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none"><div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(249,115,22,0.12),transparent_60%)]" /></div>
+        <div className="relative flex items-center justify-between px-5 py-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center shadow-md shadow-orange-500/30">
+              <BarChart3 size={14} className="text-white" />
+            </div>
+            <div>
+              <p className="text-[13px] font-bold text-white">{dashboard.title || 'Performance Dashboard'}</p>
+              {dashboard.dateRange && <p className="text-[10px] text-slate-400">{dashboard.dateRange}</p>}
+            </div>
           </div>
-          <div>
-            <p className="text-sm font-semibold text-slate-700">{dashboard.title || 'Performance Dashboard'}</p>
-            {dashboard.dateRange && <p className="text-[10px] text-slate-400">{dashboard.dateRange}</p>}
+          <div className="flex items-center gap-1.5">
+            <button onClick={handleExport}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 border border-slate-700 transition-colors">
+              <Download size={11} /> Export CSV
+            </button>
+            <button onClick={() => setIsFullScreen(f => !f)} className="w-7 h-7 rounded-lg hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-colors">
+              {isFullScreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+            </button>
+            <button onClick={onClose} className="w-7 h-7 rounded-lg hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-colors">
+              <X size={14} />
+            </button>
           </div>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <button onClick={handleExport}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-slate-600 hover:bg-slate-100 border border-slate-200 transition-colors">
-            <Download size={12} /> Export CSV
-          </button>
-          <button onClick={() => setIsFullScreen(f => !f)} className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
-            {isFullScreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-          </button>
-          <button onClick={onClose} className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
-            <X size={14} />
-          </button>
         </div>
       </div>
 
-      {/* Scrollable dashboard content */}
-      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+      {/* Scrollable dashboard content — warm background */}
+      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5 bg-gradient-to-br from-orange-50/40 via-white to-amber-50/30">
         {/* KPI Cards */}
         {dashboard.kpis?.length > 0 && (
           <div className="flex gap-3 flex-wrap">
@@ -244,8 +247,8 @@ export const CanvasPanel = ({ data, onClose, onSend }) => {
         {(budgetChart || comparisonChart || trendChart) && (
           <div className="grid grid-cols-2 gap-4">
             {budgetChart?.data?.items && (
-              <div className="bg-white rounded-xl border border-slate-200 p-4">
-                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-3">{budgetChart.data.title || 'Budget Allocation'}</p>
+              <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-200/60 p-5 shadow-sm">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em] mb-3">{budgetChart.data.title || 'Budget Allocation'}</p>
                 <ResponsiveContainer width="100%" height={180}>
                   <PieChart>
                     <Pie data={budgetChart.data.items} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={65} innerRadius={35}>
@@ -258,7 +261,7 @@ export const CanvasPanel = ({ data, onClose, onSend }) => {
               </div>
             )}
             {comparisonChart?.data?.items && (
-              <div className="bg-white rounded-xl border border-slate-200 p-4">
+              <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-200/60 p-5 shadow-sm">
                 <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-3">{comparisonChart.data.title || 'CPA Comparison'}</p>
                 <ResponsiveContainer width="100%" height={180}>
                   <BarChart data={comparisonChart.data.items} barGap={2}>
@@ -273,7 +276,7 @@ export const CanvasPanel = ({ data, onClose, onSend }) => {
               </div>
             )}
             {trendChart?.data?.series && (
-              <div className="bg-white rounded-xl border border-slate-200 p-4 col-span-2">
+              <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-200/60 p-5 shadow-sm col-span-2">
                 <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-3">{trendChart.data.title || '7-Day Trend'}</p>
                 <ResponsiveContainer width="100%" height={180}>
                   <AreaChart data={trendChart.data.series}>
@@ -294,7 +297,7 @@ export const CanvasPanel = ({ data, onClose, onSend }) => {
 
         {/* Campaign Table */}
         {campaigns.length > 0 && (
-          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-200/60 overflow-hidden shadow-sm">
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100">
               <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Campaigns ({campaigns.length})</p>
               <div className="flex items-center gap-2">
