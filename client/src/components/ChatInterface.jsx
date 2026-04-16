@@ -2044,8 +2044,10 @@ const SaveToBrandModal = ({ messageText, onClose, onSaveToBrand }) => {
 
   const types = [
     { value: 'guidelines', label: 'Guidelines' },
-    { value: 'tone', label: 'Tone of Voice' },
-    { value: 'content', label: 'Content Sample' },
+    { value: 'tone', label: 'Tone' },
+    { value: 'visual', label: 'Visual' },
+    { value: 'content', label: 'Content' },
+    { value: 'crawled', label: 'Crawled' },
   ];
 
   return (

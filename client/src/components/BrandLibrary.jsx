@@ -510,13 +510,19 @@ export const BrandLibrary = ({ adAccountId, token, onLogin, onLogout, selectedAc
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      const text = await file.text();
-      if (!text.trim()) return;
+      // Upload to server for parsing (handles PDF, TXT, MD)
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await api.post('/brand-library/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      const { name, content, metadata } = res.data;
+      if (!content?.trim()) { console.error('No text extracted from file'); return; }
       await createItem({
-        name: file.name.replace(/\.(pdf|txt|md|doc|docx)$/i, ''),
+        name,
         type: 'guidelines',
-        content: text.slice(0, 50000),
-        metadata: { source_file: file.name },
+        content,
+        metadata,
       });
     } catch (err) {
       console.error('Upload failed:', err);
@@ -532,7 +538,7 @@ export const BrandLibrary = ({ adAccountId, token, onLogin, onLogout, selectedAc
 
   return (
     <div className="flex-1 flex flex-col h-full bg-gradient-to-br from-orange-50/60 via-white to-amber-50/40">
-      <input ref={fileRef} type="file" accept=".txt,.md,.pdf,.doc,.docx" onChange={handleFileUpload} className="hidden" />
+      <input ref={fileRef} type="file" accept=".txt,.md,.pdf,.doc,.docx,.ppt,.pptx" onChange={handleFileUpload} className="hidden" />
 
       {/* Header */}
       <div className="relative bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 shrink-0">
@@ -557,10 +563,17 @@ export const BrandLibrary = ({ adAccountId, token, onLogin, onLogout, selectedAc
               selectedAccount={selectedAccount} selectedBusiness={selectedBusiness} onSelectAccount={onSelectAccount} />
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => onPrefillChat?.('Help me set up my brand library — add brand voice, target audience, and key messaging guidelines.')}
+            <button onClick={() => onPrefillChat?.('Help me set up my brand memory — add brand voice, target audience, and key messaging guidelines.')}
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 transition-all shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50">
               <Sparkles size={13} /> Create with AI
             </button>
+            <div className="relative">
+              <button onClick={() => setAddOpen(!addOpen)}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/10 border border-slate-700 transition-colors">
+                <Plus size={13} /> Add
+              </button>
+              <AddDropdown open={addOpen} onClose={() => setAddOpen(false)} onSelect={handleAddSelect} />
+            </div>
             <button onClick={fetchItems} disabled={loading}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-white/10 border border-slate-700 transition-colors disabled:opacity-50">
               <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />

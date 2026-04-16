@@ -1,9 +1,12 @@
 import { Router } from 'express';
 import axios from 'axios';
+import multer from 'multer';
+import pdf from 'pdf-parse/lib/pdf-parse.js';
 import { GoogleGenAI } from '@google/genai';
 import { supabase } from '../lib/supabase.js';
 
 const router = Router();
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } }); // 20MB max
 
 // ── FB User ID extraction (cached) ──
 const userIdCache = new Map();
@@ -275,6 +278,45 @@ router.post('/crawl-social', async (req, res) => {
   } catch (err) {
     console.error('[brand-library/crawl-social] error:', err.message);
     res.status(500).json({ error: 'Failed to crawl: ' + err.message });
+  }
+});
+
+// ── File Upload — extract text from PDF, TXT, MD ──
+router.post('/upload', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+    const { originalname, mimetype, buffer } = req.file;
+    let text = '';
+
+    if (mimetype === 'application/pdf') {
+      // Parse PDF
+      const data = await pdf(buffer);
+      text = data.text || '';
+    } else {
+      // TXT, MD, DOC (plain text fallback)
+      text = buffer.toString('utf-8');
+    }
+
+    // Clean up — collapse whitespace, trim
+    text = text.replace(/\s+/g, ' ').trim();
+
+    // Truncate to 50,000 chars
+    const truncated = text.length > 50000;
+    if (truncated) text = text.slice(0, 50000);
+
+    const name = originalname.replace(/\.(pdf|txt|md|doc|docx|ppt|pptx)$/i, '');
+
+    res.json({
+      name,
+      content: text,
+      charCount: text.length,
+      truncated,
+      metadata: { source_file: originalname, file_type: mimetype },
+    });
+  } catch (err) {
+    console.error('[brand-library/upload] error:', err.message);
+    res.status(500).json({ error: 'Failed to parse file: ' + err.message });
   }
 });
 

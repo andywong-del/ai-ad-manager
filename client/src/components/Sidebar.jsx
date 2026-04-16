@@ -393,42 +393,6 @@ export const Sidebar = ({
           )}
         </div>
 
-        {/* Projects flyout */}
-        <div className="relative w-full px-1.5 shrink-0">
-          <button onClick={() => { setCollapsedProjectsOpen(v => !v); setCollapsedHistoryOpen(false); }}
-            className={`group w-full h-[36px] rounded-xl flex items-center justify-center transition-colors
-              ${collapsedProjectsOpen ? 'bg-slate-100 text-slate-600' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'}`}>
-            <FolderOpen size={16} />
-            {!collapsedProjectsOpen && (
-              <span className="absolute left-full ml-2 px-2.5 py-1 text-[11px] font-medium text-white bg-slate-800 rounded-lg whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-[60] shadow-lg">Projects</span>
-            )}
-          </button>
-          {collapsedProjectsOpen && (
-            <div className="absolute left-full top-0 ml-2 w-[220px] bg-white border border-slate-200 rounded-xl shadow-xl z-[60] overflow-hidden max-h-[350px] flex flex-col">
-              <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Projects</p>
-                <button onClick={() => { setCollapsedProjectsOpen(false); onToggle(); setTimeout(() => setAddingProject(true), 200); }}
-                  className="text-slate-300 hover:text-orange-500 transition-colors"><Plus size={12} /></button>
-              </div>
-              <div className="flex-1 overflow-auto">
-                {projects.length === 0 ? (
-                  <p className="text-[10px] text-slate-400 px-3 py-4 text-center">No projects yet</p>
-                ) : projects.map(proj => (
-                  <button key={proj.id} onClick={() => { setCollapsedProjectsOpen(false); onOpenProject(proj.id); }}
-                    className={`w-full flex items-center gap-2 px-3 py-2 text-left transition-colors
-                      ${activeView?.type === 'projectDetail' && activeView?.projectId === proj.id ? 'bg-orange-50 text-orange-700' : 'hover:bg-slate-50 text-slate-600'}`}>
-                    <FolderOpen size={13} className="text-slate-400 shrink-0" />
-                    <span className="text-[11px] truncate flex-1">{proj.name}</span>
-                    {(proj.tasks || []).length > 0 && (
-                      <span className="text-[9px] text-slate-300">{(proj.tasks || []).filter(t => t.completed).length}/{(proj.tasks || []).length}</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
         {/* All Tasks flyout */}
         <div className="relative w-full px-1.5 shrink-0">
           <button onClick={() => { setCollapsedHistoryOpen(v => !v); setCollapsedProjectsOpen(false); }}
@@ -541,55 +505,6 @@ export const Sidebar = ({
         )}
       </div>
 
-      {/* Projects — fixed */}
-      <div className="px-2 shrink-0">
-        <div className="mb-2">
-          <div className="flex items-center justify-between px-3 py-1.5">
-            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Projects</p>
-            <button onClick={() => setAddingProject(true)} className="text-slate-300 hover:text-orange-500 transition-colors" title="New project">
-              <Plus size={13} />
-            </button>
-          </div>
-
-          {/* Inline new project input */}
-          {addingProject && (
-            <div className="flex items-center gap-1.5 px-3 py-1.5">
-              <FolderOpen size={13} className="text-blue-400 shrink-0" />
-              <input
-                value={newProjectName}
-                onChange={(e) => setNewProjectName(e.target.value)}
-                onBlur={() => { if (newProjectName.trim()) { const p = onCreateProject(newProjectName.trim()); onOpenProject(p.id); } setAddingProject(false); setNewProjectName(''); }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && newProjectName.trim()) { const p = onCreateProject(newProjectName.trim()); onOpenProject(p.id); setAddingProject(false); setNewProjectName(''); }
-                  if (e.key === 'Escape') { setAddingProject(false); setNewProjectName(''); }
-                }}
-                placeholder="Project name..."
-                className="text-[12px] font-medium bg-blue-50 border border-orange-200 rounded-lg px-2 py-1 w-full focus:outline-none focus:ring-1 focus:ring-blue-300"
-                autoFocus
-              />
-            </div>
-          )}
-
-          {projects.length === 0 && !addingProject ? (
-            <p className="px-3 py-2 text-[11px] text-slate-300 italic">No projects yet</p>
-          ) : (
-            projects.map(project => (
-              <button key={project.id} onClick={() => onOpenProject(project.id)}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors
-                  ${activeView?.type === 'projectDetail' && activeView?.projectId === project.id
-                    ? 'bg-orange-50 text-orange-700'
-                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-700'}`}>
-                <FolderOpen size={14} className={`shrink-0 ${activeView?.type === 'projectDetail' && activeView?.projectId === project.id ? 'text-orange-500' : 'text-slate-400'}`} />
-                <span className="flex-1 text-[12px] font-medium truncate">{project.name}</span>
-                {(project.tasks || []).length > 0 && (
-                  <span className="text-[9px] text-slate-300 shrink-0">{(project.tasks || []).filter(t => t.completed).length}/{(project.tasks || []).length}</span>
-                )}
-              </button>
-            ))
-          )}
-        </div>
-
-      </div>
 
       {/* All Tasks header — fixed */}
       <div className="px-2 shrink-0 border-t border-slate-100 pt-2">
