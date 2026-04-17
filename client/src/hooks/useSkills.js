@@ -5,17 +5,7 @@ const ACTIVE_KEY = 'aam_active_skills';
 
 // Fallback defaults when API hasn't loaded — must match all 18 built-in skills from server/skills/default/
 const DEFAULT_SKILLS = [
-  // ── System Skills (always active, read-only) ──
-  { id: 'campaigns', name: 'Campaigns', description: 'Create, edit, boost, and manage ad campaigns — launch new ads, boost posts, bulk updates', icon: 'target', isDefault: true, visibility: 'system' },
-  { id: 'audiences', name: 'Audiences', description: 'Build and manage audiences — lookalikes, retargeting, custom lists, interest targeting', icon: 'users', isDefault: true, visibility: 'system' },
-  { id: 'analytics-engine', name: 'Analytics & Reporting', description: 'Performance analysis, diagnostics, and strategic recommendations with dashboard', icon: 'chart', isDefault: true, visibility: 'system' },
-  { id: 'automations', name: 'Automations', description: 'Create and manage automation rules — auto-pause, auto-scale, alerts, frequency caps', icon: 'zap', isDefault: true, visibility: 'system' },
-  { id: 'creative-hub', name: 'Creative Hub', description: 'Upload, manage, and organize ad images and videos — asset management layer', icon: 'palette', isDefault: true, visibility: 'system' },
-  { id: 'lead-forms', name: 'Lead Forms', description: 'Create and manage lead generation forms — design questions, privacy, thank-you pages', icon: 'sparkles', isDefault: true, visibility: 'system' },
-  { id: 'account-infrastructure', name: 'Account & Tracking', description: 'Pixels, CAPI, custom conversions, product catalogs, automation rules setup', icon: 'target', isDefault: true, visibility: 'system' },
-  { id: 'ad-gallery', name: 'Ad Gallery', description: 'Search and analyze competitor ads from Meta Ad Library — creative inspiration', icon: 'sparkles', isDefault: true, visibility: 'system' },
-  { id: 'brand-memory', name: 'Brand Memory', description: 'Per-account brand knowledge base — voice, tone, guidelines, audience insights', icon: 'sparkles', isDefault: true, visibility: 'system' },
-  // ── Official Skills (toggleable) ──
+  // Only show official + custom skills in the Skills Library (system skills are background, not shown)
   { id: 'skill-creator', name: 'Skill Creator', description: 'Guide users through creating a new custom skill via structured conversation', icon: 'sparkles', isDefault: true, visibility: 'official', featured: true },
 ];
 
