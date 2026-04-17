@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Users, Plus, RefreshCw, Trash2, Copy, Target, Globe, Hash, X, AlertTriangle, Search, Film, ClipboardCopy, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, FolderOpen, Smartphone, ShoppingBag, BookOpen, CalendarDays, Database, FileText, Building2, ChevronRight, Link2, Lock, LogOut, MessageSquare } from 'lucide-react';
+import { Users, Plus, RefreshCw, Trash2, Copy, Target, Globe, Hash, X, AlertTriangle, Search, Film, ClipboardCopy, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, FolderOpen, Smartphone, ShoppingBag, BookOpen, CalendarDays, Database, FileText, Building2, ChevronRight, Link2, Lock, LogOut, MessageSquare, Sparkles } from 'lucide-react';
 import api from '../services/api.js';
 import { useBusinesses } from '../hooks/useBusinesses.js';
 import { useAdAccounts } from '../hooks/useAdAccounts.js';
@@ -1925,9 +1925,9 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onPrefillChat, onBa
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-white/10 border border-slate-700 transition-colors disabled:opacity-50">
               <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
             </button>
-            <button onClick={() => { setExpandedAudienceId(null); setExpandedCreateCard(null); }} disabled={!adAccountId}
+            <button onClick={() => handleCreateViaChat('I want to create a new audience for my campaigns. What type of audience should I build?')} disabled={!adAccountId}
               className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-600 hover:to-amber-600 transition-colors shadow-lg shadow-orange-500/30 disabled:opacity-50 disabled:cursor-not-allowed">
-              <Plus size={13} /> New Audience
+              <Sparkles size={13} /> Create with AI
             </button>
           </div>
         </div>
