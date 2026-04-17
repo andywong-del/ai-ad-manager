@@ -624,6 +624,7 @@ export const Dashboard = ({
               selectedAccount={selectedAccount}
               selectedBusiness={selectedBusiness}
               onSelectAccount={handleAccountSelect}
+              onNavigateToOptimizations={() => setActiveView({ type: 'optimizations' })}
             />
           ) : activeView.type === 'brandLibrary' ? (
             <BrandLibrary
@@ -668,12 +669,14 @@ export const Dashboard = ({
               selectedBusiness={selectedBusiness}
               onSelectAccount={handleAccountSelect}
               onSendToChat={handleAudienceToChat}
+              onPrefillChat={handlePrefillChat}
               activeSkills={activeSkills}
             />
           ) : activeView.type === 'audiences' ? (
             <AudienceManager
               adAccountId={adAccountId}
               onSendToChat={handleAudienceToChat}
+              onPrefillChat={handlePrefillChat}
               onBack={() => setActiveView({ type: 'chat' })}
               token={token}
               onLogin={onLogin}

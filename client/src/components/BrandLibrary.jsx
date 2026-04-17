@@ -484,16 +484,14 @@ export const BrandLibrary = ({ adAccountId, token, onLogin, onLogout, selectedAc
   const [typeFilter, setTypeFilter] = useState('all');
   const fileRef = useRef(null);
 
+  // Group items into 4 folders by source
+  const websiteItems = items.filter(i => i.metadata?.source_url && !i.metadata?.page_name);
+  const socialItems = items.filter(i => i.metadata?.page_name);
+  const uploadItems = items.filter(i => i.metadata?.source_file);
+  const chatItems = items.filter(i => i.metadata?.source === 'chat' || (!i.metadata?.source_url && !i.metadata?.source_file && !i.metadata?.page_name));
+
   const filtered = items.filter(item => {
     if (search && !item.name?.toLowerCase().includes(search.toLowerCase())) return false;
-    // Source filters
-    if (typeFilter === 'chat' && item.metadata?.source !== 'chat') return false;
-    if (typeFilter === 'file' && !item.metadata?.source_file) return false;
-    if (typeFilter === 'url' && (!item.metadata?.source_url || item.metadata?.page_name)) return false;
-    if (typeFilter === 'social' && !item.metadata?.page_name) return false;
-    if (typeFilter === 'manual' && (item.metadata?.source || item.metadata?.source_file || item.metadata?.source_url)) return false;
-    // Type filters
-    if (['guidelines', 'tone', 'visual', 'content', 'crawled'].includes(typeFilter) && item.type !== typeFilter) return false;
     return true;
   });
 
@@ -570,20 +568,13 @@ export const BrandLibrary = ({ adAccountId, token, onLogin, onLogout, selectedAc
               selectedAccount={selectedAccount} selectedBusiness={selectedBusiness} onSelectAccount={onSelectAccount} />
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => onPrefillChat?.('Help me set up my brand memory — add brand voice, target audience, and key messaging guidelines.')}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 transition-all shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50">
-              <Sparkles size={13} /> Create with AI
-            </button>
-            <div className="relative">
-              <button onClick={() => setAddOpen(!addOpen)}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/10 border border-slate-700 transition-colors">
-                <Plus size={13} /> Add
-              </button>
-              <AddDropdown open={addOpen} onClose={() => setAddOpen(false)} onSelect={handleAddSelect} />
-            </div>
             <button onClick={fetchItems} disabled={loading}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-white/10 border border-slate-700 transition-colors disabled:opacity-50">
-              <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+              <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
+            </button>
+            <button onClick={() => onPrefillChat?.('Help me set up my brand memory — analyze my brand voice, target audience, and key messaging guidelines.', 'Creatives')}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-600 hover:to-amber-600 transition-colors shadow-lg shadow-orange-500/30">
+              <Sparkles size={13} /> Ask AI Agent
             </button>
           </div>
         </div>
@@ -603,79 +594,252 @@ export const BrandLibrary = ({ adAccountId, token, onLogin, onLogout, selectedAc
       {error && <div className="mx-6 mt-3 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg">{error}</div>}
 
       {/* Content */}
-      <div className="flex-1 overflow-auto px-6 py-5">
+      <div className="flex-1 overflow-auto px-5 py-4">
         {loading && items.length === 0 ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 size={24} className="animate-spin text-slate-400" />
           </div>
-        ) : items.length === 0 ? (
-          /* Empty state — simple onboarding */
-          <div className="max-w-lg mx-auto py-12">
-            <div className="text-center mb-8">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-100 to-amber-50 flex items-center justify-center mx-auto mb-4">
-                <BookMarked size={28} className="text-orange-500" />
+        ) : (
+          <div className="space-y-4">
+            {/* AI Summary — synthesized from all brand memory */}
+            <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-2xl p-5 relative overflow-hidden">
+              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(249,115,22,0.12),transparent_60%)] pointer-events-none" />
+              <div className="relative">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center">
+                    <Sparkles size={14} className="text-white" />
+                  </div>
+                  <h3 className="text-[13px] font-bold text-white">Brand Summary</h3>
+                  <span className="text-[9px] text-slate-500 ml-auto">{items.length} items in memory · {enabledCount} active</span>
+                </div>
+                {items.length === 0 ? (
+                  <p className="text-[12px] text-slate-400 leading-relaxed">Add brand knowledge below — upload documents, crawl your website or pages. AI will use everything here to write better ads.</p>
+                ) : (
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-white/10 backdrop-blur-sm rounded-xl px-3.5 py-2.5 border border-white/10">
+                      <p className="text-[9px] font-bold text-orange-400 uppercase mb-1">Sources</p>
+                      <p className="text-[11px] text-slate-300 leading-relaxed">
+                        {[
+                          websiteItems.length > 0 && `${websiteItems.length} website${websiteItems.length > 1 ? 's' : ''}`,
+                          socialItems.length > 0 && `${socialItems.length} page${socialItems.length > 1 ? 's' : ''}`,
+                          uploadItems.length > 0 && `${uploadItems.length} doc${uploadItems.length > 1 ? 's' : ''}`,
+                          chatItems.length > 0 && `${chatItems.length} saved`,
+                        ].filter(Boolean).join(' · ') || 'No sources yet'}
+                      </p>
+                    </div>
+                    <div className="bg-white/10 backdrop-blur-sm rounded-xl px-3.5 py-2.5 border border-white/10">
+                      <p className="text-[9px] font-bold text-emerald-400 uppercase mb-1">Active in AI</p>
+                      <p className="text-[11px] text-slate-300 leading-relaxed">
+                        {enabledCount > 0 ? `${enabledCount} of ${items.length} items are feeding into every AI conversation` : 'No items active — toggle items on to use them'}
+                      </p>
+                    </div>
+                    <div className="bg-white/10 backdrop-blur-sm rounded-xl px-3.5 py-2.5 border border-white/10">
+                      <p className="text-[9px] font-bold text-blue-400 uppercase mb-1">Coverage</p>
+                      <p className="text-[11px] text-slate-300 leading-relaxed">
+                        {[
+                          items.some(i => i.type === 'tone') && 'Tone',
+                          items.some(i => i.type === 'guidelines') && 'Guidelines',
+                          items.some(i => i.type === 'visual') && 'Visual',
+                          items.some(i => i.type === 'content') && 'Content',
+                        ].filter(Boolean).join(', ') || 'Add content to improve AI quality'}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
-              <h2 className="text-lg font-bold text-slate-800 mb-2">Build Your Brand Knowledge Base</h2>
-              <p className="text-[12px] text-slate-500 max-w-sm mx-auto">The more you add, the smarter your AI becomes for this account. Every item is auto-applied to all conversations.</p>
             </div>
+
+            {/* 4 Folders — 2x2 grid */}
             <div className="grid grid-cols-2 gap-3">
-              <button onClick={() => onPrefillChat?.('Help me set up my brand memory.')}
-                className="group text-left p-5 rounded-2xl bg-white border border-slate-200/60 hover:border-orange-200 hover:shadow-lg hover:shadow-orange-500/5 hover:-translate-y-0.5 transition-all duration-300">
-                <span className="text-2xl mb-3 block">🤖</span>
-                <p className="text-[13px] font-bold text-slate-800 group-hover:text-orange-700">Create with AI</p>
-                <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">Chat with AI to build your brand profile step by step</p>
-              </button>
-              <button onClick={() => fileRef.current?.click()}
-                className="group text-left p-5 rounded-2xl bg-white border border-slate-200/60 hover:border-orange-200 hover:shadow-lg hover:shadow-orange-500/5 hover:-translate-y-0.5 transition-all duration-300">
-                <span className="text-2xl mb-3 block">📄</span>
-                <p className="text-[13px] font-bold text-slate-800 group-hover:text-orange-700">Upload Files</p>
-                <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">PDF, PPT, brand guidelines, any docs</p>
-              </button>
-              <button onClick={() => setShowCrawlUrl(true)}
-                className="group text-left p-5 rounded-2xl bg-white border border-slate-200/60 hover:border-orange-200 hover:shadow-lg hover:shadow-orange-500/5 hover:-translate-y-0.5 transition-all duration-300">
-                <span className="text-2xl mb-3 block">🌐</span>
-                <p className="text-[13px] font-bold text-slate-800 group-hover:text-orange-700">Crawl Website</p>
-                <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">AI reads your site and extracts brand info</p>
-              </button>
-              <button onClick={() => setShowCrawlSocial(true)}
-                className="group text-left p-5 rounded-2xl bg-white border border-slate-200/60 hover:border-orange-200 hover:shadow-lg hover:shadow-orange-500/5 hover:-translate-y-0.5 transition-all duration-300">
-                <span className="text-2xl mb-3 block">📱</span>
-                <p className="text-[13px] font-bold text-slate-800 group-hover:text-orange-700">Crawl Social</p>
-                <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">Analyze your Facebook or Instagram page</p>
-              </button>
+            {/* Website Crawl folder */}
+            {(() => {
+              const folderItems = search ? websiteItems.filter(i => i.name?.toLowerCase().includes(search.toLowerCase())) : websiteItems;
+              return (
+                <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-200/60 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
+                        <Globe size={15} className="text-amber-500" />
+                      </div>
+                      <div>
+                        <p className="text-[12px] font-bold text-slate-700">Website Crawl</p>
+                        <p className="text-[10px] text-slate-400">{folderItems.length} item{folderItems.length !== 1 ? 's' : ''}</p>
+                      </div>
+                    </div>
+                    <button onClick={() => setShowCrawlUrl(true)}
+                      className="text-[10px] font-semibold text-orange-500 hover:text-orange-600 transition-colors">
+                      + Add URL
+                    </button>
+                  </div>
+                  <div className="max-h-[240px] overflow-auto">
+                    {folderItems.length === 0 ? (
+                      <button onClick={() => setShowCrawlUrl(true)} className="w-full px-4 py-6 text-center hover:bg-slate-50 transition-colors">
+                        <p className="text-[11px] text-slate-400">No websites crawled yet</p>
+                        <p className="text-[10px] text-orange-500 font-medium mt-1">Crawl a URL to extract brand info</p>
+                      </button>
+                    ) : folderItems.map(item => (
+                      <div key={item.id} onClick={() => setSelectedItem(item)}
+                        className="px-4 py-2.5 border-b border-slate-50 hover:bg-slate-50 cursor-pointer transition-colors flex items-center justify-between group">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[11px] font-medium text-slate-700 truncate">{item.name}</p>
+                          <p className="text-[9px] text-slate-400 truncate">{item.metadata?.source_url || ''}</p>
+                        </div>
+                        <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={(e) => { e.stopPropagation(); toggleItem(item.id, !item.enabled); }}
+                            className={`w-7 h-4 rounded-full transition-colors ${item.enabled ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+                            <div className={`w-3 h-3 rounded-full bg-white shadow-sm transition-transform ${item.enabled ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
+                          </button>
+                          <button onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }}
+                            className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={11} /></button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Page Crawl folder */}
+            {(() => {
+              const folderItems = search ? socialItems.filter(i => i.name?.toLowerCase().includes(search.toLowerCase())) : socialItems;
+              return (
+                <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-200/60 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center">
+                        <Users size={15} className="text-violet-500" />
+                      </div>
+                      <div>
+                        <p className="text-[12px] font-bold text-slate-700">Page Crawl</p>
+                        <p className="text-[10px] text-slate-400">{folderItems.length} item{folderItems.length !== 1 ? 's' : ''}</p>
+                      </div>
+                    </div>
+                    <button onClick={() => setShowCrawlSocial(true)}
+                      className="text-[10px] font-semibold text-orange-500 hover:text-orange-600 transition-colors">
+                      + Add Page
+                    </button>
+                  </div>
+                  <div className="max-h-[240px] overflow-auto">
+                    {folderItems.length === 0 ? (
+                      <button onClick={() => setShowCrawlSocial(true)} className="w-full px-4 py-6 text-center hover:bg-slate-50 transition-colors">
+                        <p className="text-[11px] text-slate-400">No pages crawled yet</p>
+                        <p className="text-[10px] text-orange-500 font-medium mt-1">Analyze your FB or IG page</p>
+                      </button>
+                    ) : folderItems.map(item => (
+                      <div key={item.id} onClick={() => setSelectedItem(item)}
+                        className="px-4 py-2.5 border-b border-slate-50 hover:bg-slate-50 cursor-pointer transition-colors flex items-center justify-between group">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[11px] font-medium text-slate-700 truncate">{item.name}</p>
+                          <p className="text-[9px] text-slate-400 truncate">{item.metadata?.page_name || ''}</p>
+                        </div>
+                        <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={(e) => { e.stopPropagation(); toggleItem(item.id, !item.enabled); }}
+                            className={`w-7 h-4 rounded-full transition-colors ${item.enabled ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+                            <div className={`w-3 h-3 rounded-full bg-white shadow-sm transition-transform ${item.enabled ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
+                          </button>
+                          <button onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }}
+                            className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={11} /></button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Upload Documents folder */}
+            {(() => {
+              const folderItems = search ? uploadItems.filter(i => i.name?.toLowerCase().includes(search.toLowerCase())) : uploadItems;
+              return (
+                <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-200/60 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+                        <FileText size={15} className="text-blue-500" />
+                      </div>
+                      <div>
+                        <p className="text-[12px] font-bold text-slate-700">Documents</p>
+                        <p className="text-[10px] text-slate-400">{folderItems.length} item{folderItems.length !== 1 ? 's' : ''}</p>
+                      </div>
+                    </div>
+                    <button onClick={() => fileRef.current?.click()}
+                      className="text-[10px] font-semibold text-orange-500 hover:text-orange-600 transition-colors">
+                      + Upload
+                    </button>
+                  </div>
+                  <div className="max-h-[240px] overflow-auto">
+                    {folderItems.length === 0 ? (
+                      <button onClick={() => fileRef.current?.click()} className="w-full px-4 py-6 text-center hover:bg-slate-50 transition-colors">
+                        <p className="text-[11px] text-slate-400">No documents uploaded yet</p>
+                        <p className="text-[10px] text-orange-500 font-medium mt-1">Upload PDF, TXT, or brand docs</p>
+                      </button>
+                    ) : folderItems.map(item => (
+                      <div key={item.id} onClick={() => setSelectedItem(item)}
+                        className="px-4 py-2.5 border-b border-slate-50 hover:bg-slate-50 cursor-pointer transition-colors flex items-center justify-between group">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[11px] font-medium text-slate-700 truncate">{item.name}</p>
+                          <p className="text-[9px] text-slate-400 truncate">{item.metadata?.source_file || ''}</p>
+                        </div>
+                        <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={(e) => { e.stopPropagation(); toggleItem(item.id, !item.enabled); }}
+                            className={`w-7 h-4 rounded-full transition-colors ${item.enabled ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+                            <div className={`w-3 h-3 rounded-full bg-white shadow-sm transition-transform ${item.enabled ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
+                          </button>
+                          <button onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }}
+                            className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={11} /></button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Saved from Chat folder */}
+            {(() => {
+              const folderItems = search ? chatItems.filter(i => i.name?.toLowerCase().includes(search.toLowerCase())) : chatItems;
+              return (
+                <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-200/60 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
+                        <MessageSquare size={15} className="text-emerald-500" />
+                      </div>
+                      <div>
+                        <p className="text-[12px] font-bold text-slate-700">Saved from Chat</p>
+                        <p className="text-[10px] text-slate-400">{folderItems.length} item{folderItems.length !== 1 ? 's' : ''}</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="max-h-[240px] overflow-auto">
+                    {folderItems.length === 0 ? (
+                      <div className="px-4 py-6 text-center">
+                        <p className="text-[11px] text-slate-400">No items saved from chat yet</p>
+                        <p className="text-[10px] text-slate-400 mt-1">AI will suggest saving useful info during conversations</p>
+                      </div>
+                    ) : folderItems.map(item => (
+                      <div key={item.id} onClick={() => setSelectedItem(item)}
+                        className="px-4 py-2.5 border-b border-slate-50 hover:bg-slate-50 cursor-pointer transition-colors flex items-center justify-between group">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[11px] font-medium text-slate-700 truncate">{item.name}</p>
+                          <p className="text-[9px] text-slate-400 line-clamp-1">{item.content?.slice(0, 60)}</p>
+                        </div>
+                        <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={(e) => { e.stopPropagation(); toggleItem(item.id, !item.enabled); }}
+                            className={`w-7 h-4 rounded-full transition-colors ${item.enabled ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+                            <div className={`w-3 h-3 rounded-full bg-white shadow-sm transition-transform ${item.enabled ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
+                          </button>
+                          <button onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }}
+                            className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={11} /></button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
             </div>
           </div>
-        ) : (
-          <>
-            {/* All items — enabled first, then disabled */}
-            {enabledItems.length > 0 && (
-              <div className="mb-6">
-                <h3 className="text-[10px] font-bold text-emerald-600 uppercase tracking-[0.12em] mb-3 flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Active in AI Memory ({enabledItems.length})
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {enabledItems.map(item => (
-                    <BrandMemoryCard key={item.id} item={item} onView={() => setSelectedItem(item)}
-                      onToggle={() => toggleItem(item.id, false)} onDelete={() => handleDelete(item.id)} />
-                  ))}
-                </div>
-              </div>
-            )}
-            {disabledItems.length > 0 && (
-              <div>
-                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.12em] mb-3">
-                  Disabled ({disabledItems.length})
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {disabledItems.map(item => (
-                    <BrandMemoryCard key={item.id} item={item} onView={() => setSelectedItem(item)}
-                      onToggle={() => toggleItem(item.id, true)} onDelete={() => handleDelete(item.id)} />
-                  ))}
-                </div>
-              </div>
-            )}
-          </>
         )}
       </div>
 

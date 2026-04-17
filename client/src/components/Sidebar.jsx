@@ -251,7 +251,7 @@ export const Sidebar = ({
   const [newProjectName, setNewProjectName] = useState('');
   const [collapsedProjectsOpen, setCollapsedProjectsOpen] = useState(false);
   const [collapsedModulesOpen, setCollapsedModulesOpen] = useState(false);
-  const [manageAdsOpen, setManageAdsOpen] = useState(false);
+  const [manageAdsOpen, setManageAdsOpen] = useState(true);
   const [allTasksOpen, setAllTasksOpen] = useState(true);
   const [editingFolderId, setEditingFolderId] = useState(null);
   const [editFolderName, setEditFolderName] = useState('');
@@ -325,8 +325,8 @@ export const Sidebar = ({
     { icon: Settings, type: 'automationRules', action: onOpenAutomationRules, label: 'Automations' },
     { icon: ClipboardList, type: 'instantForms', action: onOpenInstantForms, label: 'Lead Forms' },
     { icon: TrendingUp, type: 'eventsManager', action: onOpenEventsManager, label: 'Events Manager' },
-    { icon: Zap, type: 'optimizations', action: onOpenOptimizations, label: 'Optimizations' },
     { icon: FileText, type: 'report', action: onOpenReports, label: 'Reports' },
+    { icon: Zap, type: 'optimizations', action: onOpenOptimizations, label: 'Optimizations' },
   ];
 
   return (

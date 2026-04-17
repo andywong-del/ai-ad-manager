@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { Search, RefreshCw, Loader2, X, Eye, ChevronDown, Palette } from 'lucide-react';
+import { Search, RefreshCw, Loader2, X, Eye, ChevronDown, Palette, Sparkles } from 'lucide-react';
 import { AccountSelector } from './AccountSelector.jsx';
 import api from '../services/api.js';
 
@@ -504,6 +504,10 @@ if (filterAdType !== 'all') {
             <button onClick={() => fetchAds()} disabled={loading}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-white/10 border border-slate-700 transition-colors disabled:opacity-50">
               <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
+            </button>
+            <button onClick={() => onPrefillChat?.('I want to analyze and optimize my ads.', 'Performance')}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:shadow-orange-500/50 transition-all shadow-lg shadow-orange-500/30">
+              <Sparkles size={13} /> Ask AI Agent
             </button>
           </div>
         </div>

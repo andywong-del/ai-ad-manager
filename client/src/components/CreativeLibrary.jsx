@@ -54,7 +54,7 @@ const getUsageStatus = (usage = []) => {
   const activeAds = usage.filter(u => u.status === 'ACTIVE');
   if (activeAds.length > 0) return { key: 'active', label: `${activeAds.length} active`, bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200', dot: 'bg-blue-500' };
   if (usage.length > 0) return { key: 'used', label: 'Used', bg: 'bg-slate-50', text: 'text-slate-400', border: 'border-slate-200', dot: 'bg-slate-400' };
-  return { key: 'unused', label: 'Available', bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200', dot: 'bg-emerald-500' };
+  return { key: 'unused', label: 'New Material', bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200', dot: 'bg-emerald-500' };
 };
 
 const AssetCard = ({ asset, isVideo, selected, onSelect, onPreview, onDelete, viewMode, usage = [] }) => {
@@ -689,8 +689,11 @@ export const CreativeLibrary = ({ adAccountId, token, onLogin, onLogout, selecte
             {setsLoading && sets.length === 0 ? (
               <div className="flex items-center justify-center py-12"><Loader2 size={16} className="animate-spin text-slate-300" /></div>
             ) : sets.length === 0 ? (
-              <div className="text-center py-10 px-4">
-                <p className="text-[10px] text-slate-400">No folders yet</p>
+              <div className="px-3 py-4">
+                <div className="rounded-lg bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200/50 p-3">
+                  <p className="text-[11px] font-semibold text-slate-700 mb-1">Organize your creatives</p>
+                  <p className="text-[10px] text-slate-500 leading-relaxed">Create folders to group assets by campaign, theme, or format. Drag and drop assets to sort them.</p>
+                </div>
               </div>
             ) : (
               sets.map(set => {
@@ -821,7 +824,7 @@ export const CreativeLibrary = ({ adAccountId, token, onLogin, onLogout, selecte
                   ))}
                 </div>
                 <div className="flex rounded-md border border-slate-200 bg-white overflow-hidden">
-                  {[['all', 'All'], ['active', 'In Use'], ['unused', 'Available'], ['used', 'Previously Used']].map(([val, label]) => (
+                  {[['all', 'All'], ['active', 'Active'], ['unused', 'New Materials'], ['used', 'Used Before']].map(([val, label]) => (
                     <button key={val} onClick={() => setUsageFilter(val)}
                       className={`px-2.5 py-1.5 text-[10px] font-medium transition-colors ${usageFilter === val ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
                       {label}

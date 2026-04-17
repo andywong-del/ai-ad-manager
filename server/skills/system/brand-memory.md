@@ -53,19 +53,36 @@ If brand memory says one thing but the user asks for something different:
 - **Mention the discrepancy**: "Your brand memory says [X], but I'll go with [Y] as you asked. Want me to update the brand memory?"
 - **Never silently ignore brand memory** — always acknowledge it
 
-## Brand Memory Types
+## Brand Memory Structure
 
-| Type | What it contains | How AI uses it |
+Brand memory is organized into 4 folders by source:
+
+| Folder | Source | How items get added |
 |---|---|---|
-| Guidelines | Brand rules, do's and don'ts | Follow strictly in all outputs |
-| Tone | Voice, personality, communication style | Match in all copy and responses |
-| Visual | Colors, fonts, image style preferences | Reference when discussing creatives |
-| Content | Product info, key messages, USPs | Use in ad copy and strategy |
-| Crawled | Auto-extracted from website/social | Background context for the brand |
+| **Website Crawl** | AI-crawled from any URL | User provides URL → AI extracts brand info |
+| **Page Crawl** | AI-crawled from FB/IG pages | User's connected pages → AI analyzes posts & profile |
+| **Documents** | Uploaded PDF, TXT, docs | User uploads brand guidelines, pitch decks, etc. |
+| **Saved from Chat** | Saved during conversations | AI suggests saving useful insights from chat |
+
+## When User Asks to Set Up Brand Memory
+
+Guide them through a structured conversation:
+
+1. **"What does your brand do?"** → Save as content/guidelines
+2. **"Who is your target customer?"** → Save audience profile
+3. **"How should your brand sound?"** → Save tone of voice
+4. **"Any brand rules or no-go topics?"** → Save guidelines
+5. **"Share your website URL"** → Offer to crawl it
+6. **"Upload any brand docs you have"** → They can upload in the Brand Memory module
+
+After each answer, save it to brand memory with a clear name (e.g., "Target Audience Profile", "Brand Voice Guidelines").
+
+Use `save_to_brand_memory(name, content, type)` to save items. Types: guidelines, tone, visual, content.
 
 ## Rules
 
 - Always read brand memory context before generating any ad copy
 - Never contradict brand memory unless user explicitly asks to
 - When multiple brand memory items are active, synthesize them — don't pick one over another
-- If brand memory is empty, ask: "Would you like to set up your brand profile? I can crawl your website or you can upload your brand guidelines."
+- If brand memory is empty, suggest: "Let's set up your brand profile — tell me about your brand, or I can crawl your website to get started."
+- When saving from chat, set metadata `source: 'chat'` so it appears in the Saved from Chat folder

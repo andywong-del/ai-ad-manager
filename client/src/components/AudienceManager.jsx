@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Users, Plus, RefreshCw, Trash2, Copy, Target, Globe, Hash, X, AlertTriangle, Search, Film, ClipboardCopy, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, FolderOpen, Smartphone, ShoppingBag, BookOpen, CalendarDays, Database, FileText, Building2, ChevronRight, Link2, Lock, LogOut } from 'lucide-react';
+import { Users, Plus, RefreshCw, Trash2, Copy, Target, Globe, Hash, X, AlertTriangle, Search, Film, ClipboardCopy, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, FolderOpen, Smartphone, ShoppingBag, BookOpen, CalendarDays, Database, FileText, Building2, ChevronRight, Link2, Lock, LogOut, MessageSquare } from 'lucide-react';
 import api from '../services/api.js';
 import { useBusinesses } from '../hooks/useBusinesses.js';
 import { useAdAccounts } from '../hooks/useAdAccounts.js';
@@ -1722,13 +1722,13 @@ const AccountSelector = ({ token, onLogin, onLogout, selectedAccount, selectedBu
   );
 };
 
-export const AudienceManager = ({ adAccountId, onSendToChat, onBack, token, onLogin, onLogout, selectedAccount, selectedBusiness, onSelectAccount }) => {
+export const AudienceManager = ({ adAccountId, onSendToChat, onPrefillChat, onBack, token, onLogin, onLogout, selectedAccount, selectedBusiness, onSelectAccount }) => {
   const [audiences, setAudiences] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [showCreate, setShowCreate] = useState(false);
-  const [createDefaultTab, setCreateDefaultTab] = useState('website');
-  const [showCreateMenu, setShowCreateMenu] = useState(false);
+  const [expandedCreateCard, setExpandedCreateCard] = useState(null);
+  const [createRetention, setCreateRetention] = useState(30);
+  const [createEngagement, setCreateEngagement] = useState('75');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortKey, setSortKey] = useState('time_created');
   const [sortDir, setSortDir] = useState('desc');
@@ -1746,7 +1746,10 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack, token, onLo
       return stored[audName]?.bullets || null;
     } catch (_) { return null; }
   };
-  const createMenuRef = useRef(null);
+  const handleCreateViaChat = useCallback((prompt) => {
+    if (onPrefillChat) onPrefillChat(prompt, 'Audience');
+    else if (onSendToChat) onSendToChat(prompt);
+  }, [onPrefillChat, onSendToChat]);
 
   const fetchAudiences = useCallback(async () => {
     if (!adAccountId) return;
@@ -1785,14 +1788,6 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack, token, onLo
     fetchAudiences();
   }, [adAccountId, fetchAudiences]);
 
-  // Close create menu on outside click
-  useEffect(() => {
-    const handler = (e) => {
-      if (createMenuRef.current && !createMenuRef.current.contains(e.target)) setShowCreateMenu(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
 
   // Filter + search
   const toggleSort = (key) => {
@@ -1867,18 +1862,7 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack, token, onLo
     return 0;
   });
 
-  const handleOpenCreate = (type) => {
-    setShowCreateMenu(false);
-    if (type === 'lookalike') setCreateDefaultTab('lookalike');
-    else if (type === 'saved') {
-      // Saved audiences are interest/behavior-based — send to chat
-      onSendToChat('Create a saved audience with interest and behavior targeting');
-      return;
-    } else setCreateDefaultTab('website');
-    setShowCreate(true);
-  };
-
-  const [confirmAction, setConfirmAction] = useState(null); // { title, message, details, confirmLabel, confirmColor, onConfirm }
+  const [confirmAction, setConfirmAction] = useState(null);
 
   const handleUse = (aud) => onSendToChat(`Create an ad set targeting custom audience "${aud.name}" (ID: ${aud.id})`);
 
@@ -1941,29 +1925,10 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack, token, onLo
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-white/10 border border-slate-700 transition-colors disabled:opacity-50">
               <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
             </button>
-            {/* Create Audience dropdown */}
-            <div className="relative" ref={createMenuRef}>
-              <button onClick={() => setShowCreateMenu(v => !v)} disabled={!adAccountId}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-600 hover:to-amber-600 transition-colors shadow-lg shadow-orange-500/30 disabled:opacity-50 disabled:cursor-not-allowed">
-                Create Audience <ChevronDown size={12} />
-              </button>
-              {showCreateMenu && (
-                <div className="absolute right-0 top-full mt-1 w-52 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-30">
-                  <button onClick={() => handleOpenCreate('custom')}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left">
-                    <Users size={16} className="text-slate-400" /> Custom Audience
-                  </button>
-                  <button onClick={() => handleOpenCreate('lookalike')}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left">
-                    <Copy size={16} className="text-slate-400" /> Lookalike Audience
-                  </button>
-                  <button onClick={() => handleOpenCreate('saved')}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left">
-                    <FolderOpen size={16} className="text-slate-400" /> Saved Audience
-                  </button>
-                </div>
-              )}
-            </div>
+            <button onClick={() => { setExpandedAudienceId(null); setExpandedCreateCard(null); }} disabled={!adAccountId}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-600 hover:to-amber-600 transition-colors shadow-lg shadow-orange-500/30 disabled:opacity-50 disabled:cursor-not-allowed">
+              <Plus size={13} /> New Audience
+            </button>
           </div>
         </div>
 
@@ -2096,195 +2061,203 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onBack, token, onLo
         </div>
       )}
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto px-6 py-4">
-        {!adAccountId && (
-          <div className="flex flex-col items-center justify-center py-20">
-            <p className="text-sm font-semibold text-slate-700 mb-1">{!token ? 'Connect an ad platform' : 'Select an ad account'}</p>
-            <p className="text-xs text-slate-400">Use the account selector above to get started.</p>
-          </div>
-        )}
-
-        {error && (
-          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg">{typeof error === 'string' ? error : error?.message || 'An error occurred'}</div>
-        )}
-
-        {loading && !audiences.length && (
-          <div className="text-center py-16">
-            <RefreshCw size={24} className="animate-spin text-slate-300 mx-auto mb-2" />
-            <p className="text-sm text-slate-400">Loading audiences...</p>
-          </div>
-        )}
-
-        {!loading && adAccountId && !audiences.length && !error && (
-          <div className="text-center py-16">
-            <Users size={36} className="text-slate-200 mx-auto mb-3" />
-            <p className="text-sm font-medium text-slate-500 mb-1">No custom audiences yet</p>
-            <p className="text-xs text-slate-400 mb-4">Create your first audience to start targeting</p>
-            <button onClick={() => handleOpenCreate('custom')}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-600 hover:to-amber-600 shadow-lg shadow-orange-500/30">
-              <Plus size={14} /> Create Audience
-            </button>
-          </div>
-        )}
-
-        {sorted.length > 0 && (
-          <div className="bg-white rounded-xl border border-slate-200/80 overflow-hidden shadow-sm shadow-slate-100">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200/80">
-                {[
-                  { label: 'Name', col: 'name', align: 'left', w: null },
-                  { label: 'Type', col: 'subtype', align: 'left', w: 'w-[130px]' },
-                  { label: 'Size', col: 'size', align: 'right', w: 'w-[140px]' },
-                  { label: 'Status', col: null, align: 'left', w: 'w-[120px]' },
-                  { label: 'ID', col: null, align: 'left', w: 'w-[110px]' },
-                  { label: 'Created', col: 'time_created', align: 'right', w: 'w-[80px]' },
-                  { label: '', col: null, align: 'right', w: 'w-[100px]' },
-                ].map((h, hi) => (
-                  <th key={hi} className={`text-${h.align} py-2 px-3 text-[10px] font-semibold text-slate-400 uppercase tracking-[0.08em] ${h.w || ''} ${h.col ? 'cursor-pointer select-none hover:text-slate-600 transition-colors' : ''}`}
-                    onClick={h.col ? () => toggleSort(h.col) : undefined}>
-                    {h.label && <span className="inline-flex items-center gap-1">{h.label} {h.col && <SortIcon col={h.col} />}</span>}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.map((aud, i) => {
+      {/* Two-panel content */}
+      <div className="flex-1 flex min-h-0">
+        {/* ── Left panel: Audience card list ── */}
+        <div className="w-[340px] shrink-0 border-r border-slate-200 flex flex-col bg-white">
+          {!adAccountId ? (
+            <div className="flex flex-col items-center justify-center flex-1 px-4">
+              <p className="text-sm font-semibold text-slate-700 mb-1">{!token ? 'Connect an ad platform' : 'Select an ad account'}</p>
+              <p className="text-xs text-slate-400 text-center">Use the account selector above to get started.</p>
+            </div>
+          ) : loading && !audiences.length ? (
+            <div className="flex items-center justify-center flex-1">
+              <RefreshCw size={20} className="animate-spin text-slate-300" />
+            </div>
+          ) : (
+            <div className="flex-1 overflow-auto">
+              {error && (
+                <div className="mx-3 mt-3 bg-red-50 border border-red-200 text-red-700 text-[11px] px-3 py-2 rounded-lg">{typeof error === 'string' ? error : error?.message || 'An error occurred'}</div>
+              )}
+              {!audiences.length && !error && (
+                <div className="flex flex-col items-center justify-center flex-1 py-16 px-4">
+                  <Users size={28} className="text-slate-200 mb-2" />
+                  <p className="text-[12px] font-medium text-slate-500 mb-1">No audiences yet</p>
+                  <p className="text-[10px] text-slate-400 text-center mb-3">Create your first audience to start targeting</p>
+                  <p className="text-[10px] text-slate-400 text-center">Use the panel on the right to create one.</p>
+                </div>
+              )}
+              {sorted.map((aud) => {
                 const subtype = aud.subtype || 'CUSTOM';
                 const typeInfo = getTypeDisplay(aud);
                 const sizeInfo = fmtSize(aud.approximate_count_lower_bound, aud.approximate_count_upper_bound, aud);
                 const avail = getAvailability(aud);
-                const isExpanded = expandedAudienceId === aud.id;
-                const bullets = isExpanded ? getAudienceSummary(aud.name) : null;
+                const isSelected = expandedAudienceId === aud.id;
                 return (
-                  <React.Fragment key={aud.id}>
-                  <tr onClick={() => setExpandedAudienceId(isExpanded ? null : aud.id)}
-                    style={{ animationDelay: `${i * 40}ms` }}
-                    className="group border-t border-slate-100 hover:bg-orange-50/30 transition-colors duration-150 cursor-pointer animate-[fadeSlideUp_0.3s_ease-out_both]">
-                    {/* Name */}
-                    <td className="py-2.5 px-3">
-                      <div className="flex items-center gap-2.5">
-                        <div className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 ${
-                          subtype === 'LOOKALIKE' ? 'bg-violet-500/10 text-violet-500' :
-                          subtype === 'SAVED' || aud._isSaved ? 'bg-sky-500/10 text-sky-500' :
-                          'bg-orange-500/10 text-orange-500'
-                        }`}>
-                          {subtype === 'LOOKALIKE' ? <Copy size={13} /> : subtype === 'SAVED' || aud._isSaved ? <FolderOpen size={13} /> : <Users size={13} />}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-[12px] font-medium text-slate-800 truncate max-w-[300px] leading-tight">{aud.name}</p>
-                          {typeInfo.detail && <p className="text-[10px] text-slate-400 mt-0.5">{typeInfo.detail}</p>}
-                        </div>
-                      </div>
-                    </td>
-                    {/* Type badge */}
-                    <td className="py-2.5 px-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold tracking-wide ${
-                        subtype === 'LOOKALIKE' ? 'bg-violet-50 text-violet-600 border border-violet-100' :
-                        subtype === 'SAVED' || aud._isSaved ? 'bg-sky-50 text-sky-600 border border-sky-100' :
-                        'bg-orange-50 text-orange-600 border border-orange-100'
+                  <div key={aud.id}
+                    className="px-3 py-3 border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                    <div className="flex items-start gap-2.5">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
+                        subtype === 'LOOKALIKE' ? 'bg-violet-500/10 text-violet-500' :
+                        subtype === 'SAVED' || aud._isSaved ? 'bg-sky-500/10 text-sky-500' :
+                        'bg-orange-500/10 text-orange-500'
                       }`}>
-                        {subtype === 'LOOKALIKE' ? 'Lookalike' : subtype === 'SAVED' || aud._isSaved ? 'Saved' : 'Custom'}
-                      </span>
-                    </td>
-                    {/* Size */}
-                    <td className="py-2.5 px-3 text-right">
-                      {sizeInfo ? (
-                        <div>
-                          <span className={`text-[13px] font-semibold tabular-nums whitespace-nowrap ${
-                            (aud.approximate_count_lower_bound || 0) >= 10000
-                              ? 'text-orange-600'
-                              : 'text-slate-800'
-                          }`}>{sizeInfo.text}</span>
-                          {sizeInfo.sub && <p className="text-[9px] text-slate-400 mt-0.5">{sizeInfo.sub}</p>}
-                        </div>
-                      ) : (
-                        <span className="text-[11px] text-slate-300">—</span>
-                      )}
-                    </td>
-                    {/* Status */}
-                    <td className="py-2.5 px-3">
-                      <div className="flex items-center gap-1.5 relative group/avail">
-                        <span className={`w-1.5 h-1.5 rounded-full ${avail.dot} shrink-0`} />
-                        <span className={`text-[11px] font-medium ${avail.color}`}>{avail.label}</span>
-                        {avail.tooltip && (
-                          <div className="absolute bottom-full left-0 mb-1 hidden group-hover/avail:block z-20 w-52 bg-slate-900 text-white text-[10px] rounded-md px-2.5 py-1.5 shadow-lg pointer-events-none leading-relaxed">
-                            {avail.tooltip}
-                          </div>
-                        )}
+                        {subtype === 'LOOKALIKE' ? <Copy size={14} /> : subtype === 'SAVED' || aud._isSaved ? <FolderOpen size={14} /> : <Users size={14} />}
                       </div>
-                    </td>
-                    {/* ID */}
-                    <td className="py-2.5 px-3">
-                      <CopyableId id={aud.id} />
-                    </td>
-                    {/* Created */}
-                    <td className="py-2.5 px-3 text-right">
-                      <span className="text-[10px] text-slate-400 whitespace-pre-line leading-tight">{fmtDate(aud.time_created)}</span>
-                    </td>
-                    {/* Actions */}
-                    <td className="py-2.5 px-3 text-right">
-                      <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                        <button onClick={(e) => { e.stopPropagation(); handleUse(aud); }} title="Use in campaign"
-                          className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-semibold bg-slate-900 text-white hover:bg-slate-800 transition-colors">
-                          <Target size={9} /> Use
-                        </button>
-                        {subtype !== 'LOOKALIKE' && !aud._isSaved && (
-                          <button onClick={(e) => { e.stopPropagation(); handleCreateLookalike(aud); }} title="Create lookalike"
-                            className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-semibold text-slate-600 hover:bg-slate-100 transition-colors border border-slate-200">
-                            <Copy size={9} /> LAL
-                          </button>
-                        )}
-                        <button onClick={(e) => { e.stopPropagation(); handleDelete(aud); }} title="Delete"
-                          className="p-1 rounded-md text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors">
-                          <Trash2 size={10} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                  {isExpanded && (
-                    <tr className="bg-slate-50/60">
-                      <td colSpan={7} className="px-3 py-0">
-                        <div className="ml-9 pl-3 py-2.5 border-l-2 border-orange-300/60">
-                          {bullets && bullets.length > 0 ? (
-                            <div className="space-y-1">
-                              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Configuration</p>
-                              {bullets.map((b, bi) => (
-                                <p key={bi} className="text-[11px] text-slate-600 leading-relaxed">· {b}</p>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="text-[11px] text-slate-400">No configuration details saved.</p>
-                          )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[12px] font-semibold text-slate-800 truncate leading-tight">{aud.name}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wide ${
+                            subtype === 'LOOKALIKE' ? 'bg-violet-50 text-violet-600' :
+                            subtype === 'SAVED' || aud._isSaved ? 'bg-sky-50 text-sky-600' :
+                            'bg-orange-50 text-orange-600'
+                          }`}>
+                            {subtype === 'LOOKALIKE' ? 'LAL' : subtype === 'SAVED' || aud._isSaved ? 'Saved' : 'Custom'}
+                          </span>
+                          {sizeInfo && <span className="text-[10px] text-slate-400 tabular-nums">{sizeInfo.text}</span>}
+                          <span className="flex items-center gap-1">
+                            <span className={`w-1.5 h-1.5 rounded-full ${avail.dot}`} />
+                            <span className={`text-[9px] font-medium ${avail.color}`}>{avail.label}</span>
+                          </span>
                         </div>
-                      </td>
-                    </tr>
-                  )}
-                  </React.Fragment>
+                        {typeInfo.detail && <p className="text-[9px] text-slate-400 mt-0.5">{typeInfo.detail}</p>}
+                        <p className="text-[9px] font-mono text-slate-300 mt-0.5">ID: {aud.id}</p>
+                      </div>
+                    </div>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
-          </div>
-        )}
+              {audiences.length > 0 && sorted.length === 0 && (
+                <div className="text-center py-8 text-[11px] text-slate-400">No audiences match your search</div>
+              )}
+            </div>
+          )}
+        </div>
 
-        {audiences.length > 0 && sorted.length === 0 && (
-          <div className="text-center py-12 text-sm text-slate-400">
-            No audiences match your search
-          </div>
-        )}
+        {/* ── Right panel: Always show create cards ── */}
+        <div className="flex-1 overflow-auto">
+          {adAccountId && (
+            <div className="p-6">
+              <h3 className="text-[13px] font-bold text-slate-800 mb-1">Create Audience</h3>
+              <p className="text-[11px] text-slate-400 mb-5">Choose a source, fill in a few details, and AI handles the rest.</p>
+
+              <div className="grid grid-cols-2 gap-3">
+                {/* Website Visitors — expandable */}
+                {(() => {
+                  const isOpen = expandedCreateCard === 'website';
+                  return (
+                    <div className={`bg-white rounded-xl border transition-all ${isOpen ? 'border-orange-300 shadow-md col-span-2' : 'border-slate-200 hover:border-orange-200 hover:shadow-sm cursor-pointer'}`}
+                      onClick={() => !isOpen && setExpandedCreateCard('website')}>
+                      <div className="px-4 py-3 flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                          <Globe size={16} className="text-blue-500" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-[12px] font-semibold text-slate-700">Website Visitors</p>
+                          <p className="text-[10px] text-slate-400">People who visited your site</p>
+                        </div>
+                        {isOpen && <button onClick={(e) => { e.stopPropagation(); setExpandedCreateCard(null); }} className="text-slate-300 hover:text-slate-500"><X size={14} /></button>}
+                      </div>
+                      {isOpen && (
+                        <div className="px-4 pb-4 pt-1 border-t border-slate-100 space-y-3">
+                          <div>
+                            <label className="text-[10px] font-semibold text-slate-500 uppercase mb-1 block">Visitors</label>
+                            <div className="flex gap-2">
+                              {['All visitors', 'Specific pages'].map(opt => (
+                                <button key={opt} className="px-3 py-1.5 rounded-lg border border-slate-200 text-[11px] font-medium text-slate-600 hover:border-orange-300 hover:bg-orange-50/50 transition-colors">
+                                  {opt}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-semibold text-slate-500 uppercase mb-1 block">Retention</label>
+                            <div className="flex gap-1.5">
+                              {[7, 14, 30, 60, 90, 180].map(d => (
+                                <button key={d} onClick={(e) => { e.stopPropagation(); setCreateRetention(d); }}
+                                  className={`px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-colors ${createRetention === d ? 'bg-orange-500 text-white' : 'border border-slate-200 text-slate-600 hover:border-orange-300'}`}>
+                                  {d}d
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <button onClick={(e) => { e.stopPropagation(); handleCreateViaChat(`Create a custom audience of all website visitors from the last ${createRetention} days`); }}
+                            className="w-full py-2 rounded-lg text-[11px] font-semibold bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-600 hover:to-amber-600 transition-colors shadow-sm">
+                            Create with AI
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Video Viewers — expandable */}
+                {(() => {
+                  const isOpen = expandedCreateCard === 'video';
+                  return (
+                    <div className={`bg-white rounded-xl border transition-all ${isOpen ? 'border-orange-300 shadow-md col-span-2' : 'border-slate-200 hover:border-orange-200 hover:shadow-sm cursor-pointer'}`}
+                      onClick={() => !isOpen && setExpandedCreateCard('video')}>
+                      <div className="px-4 py-3 flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-lg bg-pink-50 flex items-center justify-center shrink-0">
+                          <Film size={16} className="text-pink-500" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-[12px] font-semibold text-slate-700">Video Viewers</p>
+                          <p className="text-[10px] text-slate-400">People who watched your videos</p>
+                        </div>
+                        {isOpen && <button onClick={(e) => { e.stopPropagation(); setExpandedCreateCard(null); }} className="text-slate-300 hover:text-slate-500"><X size={14} /></button>}
+                      </div>
+                      {isOpen && (
+                        <div className="px-4 pb-4 pt-1 border-t border-slate-100 space-y-3">
+                          <div>
+                            <label className="text-[10px] font-semibold text-slate-500 uppercase mb-1 block">Engagement Level</label>
+                            <div className="flex gap-1.5">
+                              {[['25', '25% watched'], ['50', '50% watched'], ['75', '75% watched'], ['95', '95% watched']].map(([val, label]) => (
+                                <button key={val} onClick={(e) => { e.stopPropagation(); setCreateEngagement(val); }}
+                                  className={`px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors ${createEngagement === val ? 'bg-orange-500 text-white' : 'border border-slate-200 text-slate-600 hover:border-orange-300'}`}>
+                                  {label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <button onClick={(e) => { e.stopPropagation(); handleCreateViaChat(`Create a custom audience of people who watched ${createEngagement}% of my videos in the last 365 days`); }}
+                            className="w-full py-2 rounded-lg text-[11px] font-semibold bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-600 hover:to-amber-600 transition-colors shadow-sm">
+                            Create with AI
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Remaining 6 cards — direct to AI chat */}
+                {[
+                  { icon: Copy, color: 'text-violet-500', bg: 'bg-violet-50', border: 'hover:border-violet-200', title: 'Lookalike', desc: 'Find similar people', prompt: 'Create a lookalike audience based on my best performing custom audience' },
+                  { icon: Database, color: 'text-emerald-500', bg: 'bg-emerald-50', border: 'hover:border-emerald-200', title: 'Customer List', desc: 'Upload emails or phones', prompt: 'Create a custom audience from my customer email list. I will upload a CSV file.' },
+                  { icon: Hash, color: 'text-pink-500', bg: 'bg-pink-50', border: 'hover:border-pink-200', title: 'IG / FB Engagers', desc: 'Profile visitors, messagers', prompt: 'Create a custom audience of people who engaged with my Instagram account in the last 90 days' },
+                  { icon: ClipboardCopy, color: 'text-amber-500', bg: 'bg-amber-50', border: 'hover:border-amber-200', title: 'Lead Form', desc: 'People who submitted forms', prompt: 'Create a custom audience from people who submitted my lead forms in the last 90 days' },
+                  { icon: Target, color: 'text-sky-500', bg: 'bg-sky-50', border: 'hover:border-sky-200', title: 'Interest & Behavior', desc: 'Describe your ideal customer', prompt: 'Help me create a saved audience with interest and behavior targeting. I want to describe my ideal customer.' },
+                  { icon: MessageSquare, color: 'text-orange-500', bg: 'bg-orange-50', border: 'hover:border-orange-200', title: 'Custom Request', desc: 'AI builds any audience for you', prompt: 'Help me create a custom audience. I need something specific.' },
+                ].map(card => {
+                  const Icon = card.icon;
+                  return (
+                    <button key={card.title} onClick={() => handleCreateViaChat(card.prompt)}
+                      className={`bg-white rounded-xl border border-slate-200 ${card.border} hover:shadow-md transition-all text-left px-4 py-3.5 flex items-center gap-3 group`}>
+                      <div className={`w-9 h-9 rounded-lg ${card.bg} flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform`}>
+                        <Icon size={16} className={card.color} />
+                      </div>
+                      <div>
+                        <p className="text-[12px] font-semibold text-slate-700">{card.title}</p>
+                        <p className="text-[10px] text-slate-400">{card.desc}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-
-      {/* Create Modal */}
-      {showCreate && (
-        <CreateAudienceModal
-          adAccountId={adAccountId}
-          defaultTab={createDefaultTab}
-          onClose={() => setShowCreate(false)}
-          onCreateViaChat={(prompt) => onSendToChat(prompt)}
-        />
-      )}
 
       {/* Confirm Dialog */}
       {confirmAction && (

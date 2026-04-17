@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { RefreshCw, Loader2, TrendingUp, TrendingDown, Download, Calendar, Filter, ChevronDown } from 'lucide-react';
+import { RefreshCw, Loader2, TrendingUp, TrendingDown, Download, Calendar, Filter, ChevronDown, Sparkles, Zap, ArrowRight } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Area, AreaChart } from 'recharts';
 import { AccountSelector } from './AccountSelector.jsx';
 import api from '../services/api.js';
@@ -133,7 +133,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 // ── Main Report Dashboard ──
-export const ReportDashboard = ({ adAccountId, token, onLogin, onLogout, selectedAccount, selectedBusiness, onSelectAccount }) => {
+export const ReportDashboard = ({ adAccountId, token, onLogin, onLogout, selectedAccount, selectedBusiness, onSelectAccount, onNavigateToOptimizations }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [datePreset, setDatePreset] = useState('last_7d');
@@ -347,6 +347,58 @@ export const ReportDashboard = ({ adAccountId, token, onLogin, onLogout, selecte
             {/* ── OVERVIEW TAB ── */}
             {activeTab === 'overview' && kpis && (
               <>
+                {/* AI Summary Insights */}
+                <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-2xl p-5 relative overflow-hidden">
+                  <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(249,115,22,0.15),transparent_60%)] pointer-events-none" />
+                  <div className="relative">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center">
+                        <Sparkles size={14} className="text-white" />
+                      </div>
+                      <h3 className="text-[13px] font-bold text-white">AI Summary</h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="bg-white/10 backdrop-blur-sm rounded-xl px-4 py-3 border border-white/10">
+                        <p className="text-[10px] font-bold text-orange-400 uppercase mb-1">Top Insight</p>
+                        <p className="text-[12px] text-slate-200 leading-relaxed">
+                          {kpis.ctr.curr > (kpis.ctr.prev || 0)
+                            ? `CTR improved ${pctChange(kpis.ctr.curr, kpis.ctr.prev) || ''} — your creatives are resonating better this period.`
+                            : kpis.spend.curr > (kpis.spend.prev || 0) * 1.2
+                            ? `Spend increased significantly. Monitor ROAS closely to ensure efficiency.`
+                            : `Performance is stable. Look for scaling opportunities in top campaigns.`}
+                        </p>
+                      </div>
+                      <div className="bg-white/10 backdrop-blur-sm rounded-xl px-4 py-3 border border-white/10">
+                        <p className="text-[10px] font-bold text-amber-400 uppercase mb-1">Watch Out</p>
+                        <p className="text-[12px] text-slate-200 leading-relaxed">
+                          {(kpis.frequency?.curr || 0) > 3
+                            ? `Frequency is ${Number(kpis.frequency.curr).toFixed(1)} — audiences may be fatigued. Consider refreshing creatives.`
+                            : kpis.ctr.curr < (kpis.ctr.prev || 0)
+                            ? `CTR dropped ${pctChange(kpis.ctr.curr, kpis.ctr.prev) || ''}. Review underperforming ad sets for creative fatigue.`
+                            : `No major alerts. Keep monitoring daily trends for early signals.`}
+                        </p>
+                      </div>
+                      <div className="bg-white/10 backdrop-blur-sm rounded-xl px-4 py-3 border border-white/10">
+                        <p className="text-[10px] font-bold text-emerald-400 uppercase mb-1">Key Observation</p>
+                        <p className="text-[12px] text-slate-200 leading-relaxed">
+                          {kpis.roas?.curr >= 2
+                            ? `ROAS is strong at ${fmtX(kpis.roas.curr)}. Your best-performing campaigns are delivering efficiently.`
+                            : kpis.roas?.curr > 0
+                            ? `ROAS is at ${fmtX(kpis.roas.curr)}. Some campaigns may need budget reallocation for better efficiency.`
+                            : `Conversion tracking data is limited. Ensure your pixel events are configured correctly.`}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  {onNavigateToOptimizations && (
+                    <button onClick={onNavigateToOptimizations}
+                      className="mt-3 flex items-center gap-1.5 px-4 py-2 rounded-lg text-[11px] font-bold bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white transition-all shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50">
+                      <Zap size={12} /> View Optimizations <ArrowRight size={12} />
+                    </button>
+                  )}
+                </div>
+
+
                 {/* KPI Cards */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                   <KpiCard label="Total Spend" value={kpis.spend.curr} prevValue={kpis.spend.prev} isCost prefix={currency} />
