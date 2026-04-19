@@ -1,4 +1,4 @@
-import { GoogleAdsApi } from 'google-ads-api';
+const { GoogleAdsApi } = await import('google-ads-api');
 
 const VALID_DATE_RANGES = [
   'TODAY', 'YESTERDAY', 'LAST_7_DAYS', 'LAST_14_DAYS', 'LAST_30_DAYS',

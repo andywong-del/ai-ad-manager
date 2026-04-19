@@ -1,6 +1,14 @@
 import { FunctionTool } from '@google/adk';
-import { enums } from 'google-ads-api';
 import { getCustomer, handleApiError, parseDateRange, statusLabel } from '../api/google/client.js';
+
+// Lazy-load google-ads-api enums to avoid crashing on import if package is missing
+let enums;
+try {
+  const gaa = await import('google-ads-api');
+  enums = gaa.enums;
+} catch {
+  enums = {};
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const safe = (fn) => async (args, ctx) => {
