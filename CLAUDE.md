@@ -2,70 +2,109 @@
 
 ## Tech Stack
 - **Client:** React 18 + Vite + Tailwind CSS (`client/`)
-- **Server:** Express.js + Meta Marketing API v25.0 (`server/`)
+- **Server:** Express.js (`server/`) — Meta Marketing API v25.0 + Google Ads API
 - **Database:** Supabase (PostgreSQL)
-- **AI:** Google Gemini (via `@google/genai`) for chat, crawling, skill generation
-- **Deploy:** `git push origin main` — auto-deploys to Vercel, gamma link updates automatically (`client-gamma-neon-66.vercel.app` is set as production domain)
+- **AI:** Google Gemini via `@google/genai` + `@google/adk` (tool-use agent)
+- **Deploy:** `git push origin main` → Vercel auto-deploys. Production = `client-gamma-neon-66.vercel.app`. If Vercel "Staged Promotions" is on, deploys land as staged and need manual promote.
 
 ## File Structure
 ```
 client/src/
-  components/    — All UI modules (ChatInterface, AdLibrary, CreativeLibrary, AudienceManager, CampaignManager, BrandLibrary, Optimizations, ReportDashboard, CanvasPanel, Sidebar, Dashboard, etc.)
-  hooks/         — useSkills, useBrandLibrary, useChat, etc.
-  services/      — api.js (axios instance)
-  index.css      — Global styles + CSS custom properties
+  components/      — All UI modules
+  hooks/           — useSkills, useBrandLibrary, useChat, useGoogleAuth, useGoogleAccounts, useAuth, useAdAccounts, useBusinesses
+  services/api.js  — axios instance, baseURL=/api, reads fb_long_lived_token from localStorage
+  App.jsx          — top-level state: selectedAccount (Meta), googleCustomerId, auth tokens
 
 server/
-  src/api/       — Express routers (chat, campaigns, adsets, ads, creatives, assets, audiences, brandLibrary, skills, reports)
-  src/lib/       — instructions.js (AI system prompt), supabase.js, tools.js (Meta API tool definitions), pdfExtract.js (PDF text extraction via pdfjs-dist)
-  skills/system/ — Always-on AI context (campaigns, analytics-engine, audiences, brand-memory)
-  skills/official/ — Toggleable skills (skill-creator). Frontmatter supports: name, description, preview, starter_prompt
-  skills/custom/ — User-created skills (stored in Supabase, cached on disk)
-  sql/           — Database schema files
+  src/
+    api/
+      meta/        — 15 Meta routers (campaigns, adsets, ads, creatives, assets, targeting, rules, labels, pixels, conversions, leads, catalogs, previews, insights, meta)
+      google/      — Google routers (auth, accounts, campaigns, reports, audiences, client helper)
+      tiktok/      — future placeholder
+      auth.js, chat.js, skills.js, brandLibrary.js, creativeSets.js  — platform-agnostic
+    lib/
+      tools.js     — Meta AI tools + load_skill + create_skill (shared)
+      googleTools.js — 23 Google AI tools
+      instructions.js — AI system prompts
+      supabase.js, pdfExtract.js
+  skills/
+    system/meta/   — Meta-only skills (campaigns, audiences, ad-gallery, creative-hub, lead-forms, automations, analytics-engine)
+    system/google/ — Google-only skills (campaigns; TODO: keywords, audiences, conversions, analytics-engine)
+    system/shared/ — platform-agnostic (brand-memory, account-infrastructure)
+    system/tiktok/ — future
+    official/      — Toggleable skills (skill-creator)
+    custom/        — User-created (stored in Supabase)
 
-api/index.mjs   — Vercel serverless entry point (re-exports Express app)
+api/index.mjs      — Vercel serverless entry (re-exports Express app)
+vercel.json        — buildCommand, includeFiles: server/{src,skills}/**
 ```
+
+## Routes — HTTP paths unchanged despite folder reorg
+- Meta: `/api/campaigns`, `/api/adsets`, `/api/ads`, `/api/meta/pages`, `/api/insights`, etc.
+- Google: `/api/google/auth/*`, `/api/google/accounts`, `/api/google/campaigns`, `/api/google/reports`, `/api/google/audiences`
+- Shared: `/api/auth`, `/api/chat`, `/api/skills`, `/api/brand-library`
+
+## Google Ads integration
+- **Env-token mode** (current default): hardcoded refresh token in `server/.env`. All users share same Google account. Good for team/agency use.
+  - Needs `ALLOW_GOOGLE_ENV_FALLBACK=true` on Vercel for production to use env token. Otherwise production requires OAuth (and OAuth app must be Google-verified for external users).
+- **Per-user OAuth** (built but needs Supabase + Google Cloud Console setup): `/api/google/auth/connect` opens popup → callback stores refresh_token in `platform_tokens` Supabase table keyed by `fb_user_id`.
+  - SQL: `server/sql/platform_tokens.sql`
+  - Google Cloud Console: add redirect URIs + test users for unverified app
+- **MCC handling:** Google rejects metrics queries on manager accounts. Account picker flattens MCC children and filters out managers. Always pass `loginCustomerId=<MCC_ID>` alongside `accountId=<child>` in API calls.
+- Cost values in **micros** (1 HKD = 1,000,000 micros)
+
+## Critical Vercel gotchas (learned the hard way)
+- **`pdfjs-dist` CANNOT be imported at module top level** — expects browser globals (`DOMMatrix`) that crash Node.js serverless cold start → `FUNCTION_INVOCATION_FAILED`. Always import lazily inside the function that uses it. See `server/src/lib/pdfExtract.js`.
+- **`google-ads-api` static imports** work fine. Do NOT use `await import('google-ads-api')` at top level — top-level await is unreliable on Vercel serverless.
+- **`NODE_ENV=production`** on Vercel means dev fallbacks don't trigger. Env fallback for Google needs explicit `ALLOW_GOOGLE_ENV_FALLBACK=true`.
+- **Server entry**: `app.listen()` is gated on `NODE_ENV !== 'production'` so the module exports the Express app for Vercel's function wrapper.
+- **`.vercelignore`** excludes `node_modules`, `.env*`, logs, `server/skills/custom` — keeps upload size down (~50MB vs 700MB).
 
 ## Design System
 - **Font:** DM Sans (Google Fonts)
-- **Brand colors:** Orange theme — CSS vars `--brand-orange`, `--brand-amber`
-- **Headers:** Dark gradient backgrounds (slate-900 → slate-800)
+- **Brand colors:** Orange — CSS vars `--brand-orange`, `--brand-amber`
+- **Headers:** Dark gradient (slate-900 → slate-800)
 - **Cards:** White with subtle borders, hover shadows, `rounded-2xl backdrop-blur-sm`
 - **Buttons:** Orange gradient (`from-orange-500 to-amber-500`)
-- **Optimizations module:** Full dark theme (`bg-slate-950`) with bento grid layout
+- **Optimizations module:** Full dark theme (`bg-slate-950`) bento grid
 - **"Upgrade the design"** = apply modern futuristic orange theme with premium feel
 
 ## Key Patterns
-- `AccountSelector` — ad account dropdown, used in most module headers
+- `PlatformAccountSelector` (in header) + `AccountConnector` (in ChatInterface) — both support Meta + Google. Dropdown uses React portal to escape parent overflow/stacking contexts.
 - `AskAIButton` / `AskAIPopup` — AI integration button for modules
 - `onPrefillChat(message, pillName)` — navigate to chat with prefilled prompt + action pill
 - `onSendToChat(message)` — send message from module to active chat
-- System skills = always-on background context injected into every AI message
-- Official skills = toggleable by user in Skills Library. Support `starter_prompt` frontmatter field — auto-fills chat input when skill is selected via `/` or `+` menu
-- Custom skills = user-created via Skill Creator, AI generation, or file upload (PDF/DOC/XLS → server extracts text → Gemini generates skill)
-- Skill file upload: `POST /api/skills/upload-doc` (multer + pdfjs-dist). Chat doc upload: `POST /api/chat/parse-doc`
-- PDF parsing: always use `pdfExtract.js` (pdfjs-dist). Do NOT use pdf-parse v2 — it changed API and is broken in ESM
-- Slash `/` picker shows ALL skills (not just enabled). Selecting skill adds it as a one-off chip (same as `+` menu)
-- **Audiences module:** Two-panel layout — left card list + right 8 create cards (no modal). Creation goes to AI chat, not forms.
-- **Brand Memory:** 4-folder layout (Website Crawl, Page Crawl, Documents, Saved from Chat) with AI Summary banner on top. Items grouped by source metadata. Header has Refresh + "Ask AI Agent" button. Brand-memory system skill guides setup flow.
-- **Reports → Optimizations:** Reports has insights-only AI Summary (no action buttons). Subtle "See recommendations →" link to Optimizations.
+- **System skills** = AI-only context, loaded on demand via `load_skill` tool. Path formats: `meta/campaigns`, `google/campaigns`, or bare `campaigns` (resolves shared→meta→google).
+- **Official skills** = user-toggleable in Skills Library. Frontmatter supports: name, description, preview, starter_prompt
+- **Custom skills** = user-created via Skill Creator, AI generation, or file upload (PDF/DOC/XLS → server extracts → Gemini generates skill)
+- Skill file upload: `POST /api/skills/upload-doc` (multer + pdfExtract). Chat doc upload: `POST /api/chat/parse-doc`
+- PDF parsing: use `pdfExtract.js`. Never `pdf-parse` (broken in ESM).
+- Slash `/` picker shows ALL skills. Selecting adds it as a one-off chip (same as `+` menu)
+- **Audiences module:** Two-panel — left card list + right 8 create cards. Creation goes to AI chat.
+- **Brand Memory:** 4-folder (Website Crawl, Page Crawl, Documents, Saved from Chat) + AI Summary banner + Refresh + Ask AI Agent buttons.
+- **Reports → Optimizations:** Reports shows insights-only AI Summary. Subtle "See recommendations →" links to Optimizations.
 
-## Module Names
-Ads Gallery | Creative Hub | Brand Memory | Audiences | Campaigns | Reports | Optimizations | Skills
-
-## Sidebar Navigation (planned)
-```
-Ads — Campaigns, Audiences, Ad Gallery, Creative Hub
-Insights — Brand Memory, Reports, Optimizations
-▸ More Tools (collapsed) — Automations, Lead Forms, Events Manager
-── Settings
-```
+## Module Coverage (Meta vs Google)
+| Module | Meta | Google | Notes |
+|---|---|---|---|
+| Campaigns | ✅ full | ⚠️ list-only (Phase 2 pending) | need ad groups CRUD, RSA creation, keyword CRUD expansion |
+| Audiences | ✅ full | ⚠️ list-only | need customer match, lookalike equivalents |
+| Reports | ✅ full | ✅ working | both platforms with breakdowns |
+| Optimizations | demo data only | — | both TBD |
+| Ad Gallery | ✅ | ❌ N/A | Meta-only (Google has no public ad library API) |
+| Creative Hub | ✅ | ❌ N/A | Meta-only for now |
+| Brand Memory | ✅ | ❌ N/A | Meta-only (Facebook Pages) |
+| Events Manager | ✅ | ⚠️ conversions only | no pixel equivalent |
+| Automations | ✅ | — | internal feature, can extend |
+| Lead Forms | ✅ | ❌ N/A | Meta-only |
+| Google Keywords | — | pending | new module (Phase 2) |
+| Google Search Terms | — | pending | new module (Phase 2) |
+| Google Recommendations | — | pending | new module (Phase 2) |
 
 ## Server Notes
 - ESM codebase (`"type": "module"` in package.json)
 - CJS packages in ESM: use `createRequire(import.meta.url)` pattern
-- Lazy-load optional deps (multer) with try/catch for Vercel compatibility
-- PDF extraction: use `import { extractPdfText } from '../lib/pdfExtract.js'` — wraps pdfjs-dist legacy build
-- Excel extraction: lazy `createRequire(import.meta.url)('xlsx')` inside route handler
+- Lazy-load optional/heavy deps inside function handlers (not top-level) for Vercel compat
+- Excel extraction: lazy `createRequire(import.meta.url)('xlsx')` inside route
 - Meta API calls use user's FB access token from `Authorization: Bearer <token>` header
-- Local dev: run server from `server/` directory (`cd server && node src/index.js`) so `.env` loads correctly
+- Local dev: `cd server && node src/index.js` (so `.env` loads). Client: `cd client && npm run dev` (Vite proxies `/api` → localhost:3001).
