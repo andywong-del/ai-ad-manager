@@ -2800,7 +2800,7 @@ const ActionPills = ({ onSelect, activePill, setActivePill }) => {
   );
 };
 
-const ChatInput = ({ input, setInput, onKeyDown, onSend, onStop, onFilesAdded, attachments, onRemoveAttachment, onRetryUpload, fileRef, isTyping, handleFileUpload, isOver, activeSkill, activeSkills = [], onDeactivateSkill, skills = [], onSlashSelect, slashSkills = [], onRemoveSlashSkill, onClearAllSlash, onToggleSkill, onManageSkills, token, onLogin, onLogout, isLoginLoading, loginError, selectedAccount, selectedBusiness, onSelectAccount, enabledSkillIds = [], activeSkillIds, brandEnabledCount = 0, isEmptyState = false, activePill, setActivePill }) => {
+const ChatInput = ({ input, setInput, onKeyDown, onSend, onStop, onFilesAdded, attachments, onRemoveAttachment, onRetryUpload, fileRef, isTyping, handleFileUpload, isOver, activeSkill, activeSkills = [], onDeactivateSkill, skills = [], onSlashSelect, slashSkills = [], onRemoveSlashSkill, onClearAllSlash, onToggleSkill, onManageSkills, token, onLogin, onLogout, isLoginLoading, loginError, selectedAccount, selectedBusiness, onSelectAccount, enabledSkillIds = [], activeSkillIds, brandEnabledCount = 0, isEmptyState = false, activePill, setActivePill, googleCustomerId, onOpenSettings }) => {
   const [skillsOpen, setSkillsOpen] = useState(false);
   const [plusMenuOpen, setPlusMenuOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -3393,6 +3393,7 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, activityLog = 
                 brandEnabledCount={brandEnabledCount}
                 isEmptyState={true}
                 activePill={activePill} setActivePill={setActivePill}
+                googleCustomerId={googleCustomerId} onOpenSettings={onOpenSettings}
               />
             </div>
             <ActionPills activePill={activePill} setActivePill={setActivePill} onSelect={(prompt) => { setInput(prompt); setTimeout(() => { const el = document.querySelector('textarea'); if (el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 300) + 'px'; } }, 0); }} />
@@ -3451,6 +3452,7 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, activityLog = 
                 token={token} onLogin={onLogin} isLoginLoading={isLoginLoading} loginError={loginError} selectedAccount={selectedAccount} selectedBusiness={selectedBusiness} onSelectAccount={onSelectAccount}
                 brandEnabledCount={brandEnabledCount}
                 activePill={activePill} setActivePill={setActivePill}
+                googleCustomerId={googleCustomerId} onOpenSettings={onOpenSettings}
               />
             </div>
           </div>
