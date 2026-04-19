@@ -569,12 +569,16 @@ export const SkillsLibrary = ({ skills, onCreate, onDelete, onBack, onBuildWithA
       await onCreate({ name, description, content, preview, type: 'strategy' });
     };
 
-    try {
-      await Promise.all(files.map(parseAndCreate));
-      if (onRefresh) await onRefresh();
-    } catch (err) {
-      setUploadError(err.response?.data?.error || err.message || 'Upload failed');
-    }
+    const errors = [];
+    await Promise.all(files.map(async (file) => {
+      try { await parseAndCreate(file); }
+      catch (err) {
+        const msg = err.response?.data?.error;
+        errors.push(typeof msg === 'string' ? msg : (err.message || 'Upload failed'));
+      }
+    }));
+    if (onRefresh) await onRefresh();
+    if (errors.length) setUploadError(errors.join('; '));
     e.target.value = '';
   };
 
