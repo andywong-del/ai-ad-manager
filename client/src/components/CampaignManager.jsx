@@ -517,7 +517,15 @@ const GoogleCampaignsPanel = ({ googleConnected, googleCustomerId, onGoogleConne
   );
 
   if (loading) return <div className="flex-1 flex items-center justify-center py-20"><Loader2 size={24} className="animate-spin text-slate-400" /><span className="ml-2 text-sm text-slate-400">Loading campaigns…</span></div>;
-  if (error) return <div className="flex-1 flex items-center justify-center py-20 text-sm text-red-500">{error}</div>;
+  if (error) {
+    const isManagerErr = /manager account/i.test(error);
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center py-24 gap-3 px-6 text-center">
+        <p className="text-sm font-semibold text-slate-700">{isManagerErr ? 'This is a manager (MCC) account' : 'Could not load campaigns'}</p>
+        <p className="text-xs text-slate-400 max-w-md">{isManagerErr ? 'Google Ads API doesn\u2019t return metrics for manager accounts. Pick a child account from the selector above.' : error}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 overflow-auto px-6 py-4">
@@ -1059,7 +1067,7 @@ export const CampaignManager = ({ adAccountId, onBack, onSendToChat, onPrefillCh
             <div>
               <h1 className="text-lg font-bold text-white">Campaigns</h1>
               <p className="text-xs text-slate-400 mt-0.5">
-                {loading ? 'Loading...' : `${currentData.length} ${levelLabel.toLowerCase()}s · ${activeCount} active · ${pausedCount} paused`}
+                {platform === 'google' ? 'Google Ads campaigns' : loading ? 'Loading...' : `${currentData.length} ${levelLabel.toLowerCase()}s · ${activeCount} active · ${pausedCount} paused`}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -1090,8 +1098,8 @@ export const CampaignManager = ({ adAccountId, onBack, onSendToChat, onPrefillCh
         <PlatformTabs platform={platform} onChange={setPlatform} enabled={['meta', 'google']} variant="dark" />
       </div>
 
-      {/* Level tabs (Campaigns | Ad Sets | Ads) + Breadcrumb */}
-      <div className="bg-white border-b border-slate-200 shrink-0">
+      {/* Level tabs (Campaigns | Ad Sets | Ads) + Breadcrumb — Meta-only */}
+      {platform === 'meta' && <div className="bg-white border-b border-slate-200 shrink-0">
         <div className="flex items-center justify-between px-6">
           <div className="flex items-center gap-0">
             {['campaigns', 'adsets', 'ads'].map(tab => (
@@ -1128,12 +1136,12 @@ export const CampaignManager = ({ adAccountId, onBack, onSendToChat, onPrefillCh
             </div>
           )}
         </div>
-      </div>
+      </div>}
 
       {/* Bulk action bar removed — checkboxes kept for multi-select drill-down */}
 
-      {/* Filters */}
-      <div className="px-6 py-3 flex items-center gap-3 shrink-0 bg-white/80 backdrop-blur-sm border-b border-slate-100 flex-wrap">
+      {/* Filters — Meta-only */}
+      {platform === 'meta' && <div className="px-6 py-3 flex items-center gap-3 shrink-0 bg-white/80 backdrop-blur-sm border-b border-slate-100 flex-wrap">
         <div className="relative flex-1 max-w-sm">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-400/60" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={`Search ${levelLabel.toLowerCase()}s...`}
@@ -1241,7 +1249,7 @@ export const CampaignManager = ({ adAccountId, onBack, onSendToChat, onPrefillCh
           )}
         </div>
       </div>
-      </div>
+      </div>}
 
       {/* Error */}
       {error && (

@@ -169,7 +169,15 @@ const GoogleReportsPanel = ({ googleConnected, googleCustomerId, onGoogleConnect
   );
 
   if (loading) return <div className="flex-1 flex items-center justify-center py-20"><Loader2 size={24} className="animate-spin text-slate-400" /></div>;
-  if (error) return <div className="flex-1 flex items-center justify-center py-20 text-sm text-red-500">{error}</div>;
+  if (error) {
+    const isManagerErr = /manager account/i.test(error);
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center py-24 gap-3 px-6 text-center">
+        <p className="text-sm font-semibold text-slate-700">{isManagerErr ? 'This is a manager (MCC) account' : 'Could not load reports'}</p>
+        <p className="text-xs text-slate-400 max-w-md">{isManagerErr ? 'Google Ads API doesn\u2019t return metrics for manager accounts. Pick a child account from the selector above.' : error}</p>
+      </div>
+    );
+  }
   if (!data) return null;
 
   const { metrics, account } = data;

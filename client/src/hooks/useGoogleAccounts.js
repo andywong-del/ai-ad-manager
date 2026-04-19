@@ -12,10 +12,11 @@ const flatten = (accounts = []) => {
   const flat = [];
   accounts.forEach(acc => {
     if (acc.isManager && Array.isArray(acc.children)) {
-      acc.children.forEach(c => flat.push({ ...c, mccId: acc.id, mccName: acc.name }));
-    } else {
+      acc.children.forEach(c => { if (!c.isManager) flat.push({ ...c, mccId: acc.id, mccName: acc.name }); });
+    } else if (!acc.isManager) {
       flat.push(acc);
     }
+    // Manager accounts are never selectable — Google Ads API doesn't allow metrics on manager accounts.
   });
   return flat;
 };

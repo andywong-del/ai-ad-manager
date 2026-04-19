@@ -104,7 +104,7 @@ export const PlatformAccountSelector = ({
   };
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="relative isolate">
       <button onClick={handleButtonClick}
         className={`inline-flex items-center gap-2 border font-medium transition-colors ${s.rounded} ${s.size} ${s[buttonState]}`}>
         {isMeta ? <Building2 size={12} /> : <GoogleIcon />}
@@ -113,7 +113,7 @@ export const PlatformAccountSelector = ({
       </button>
 
       {open && (
-        <div className={`absolute left-0 w-[280px] bg-white border border-slate-200 rounded-xl shadow-xl z-[100] overflow-hidden ${dropUp ? 'bottom-full mb-2' : 'top-full mt-1'}`}>
+        <div className={`absolute left-0 w-[280px] bg-white border border-slate-200 rounded-xl shadow-2xl z-[9999] overflow-hidden ${dropUp ? 'bottom-full mb-2' : 'top-full mt-1'}`}>
           {/* Meta: business level */}
           {level === 'meta_business' && (
             <>

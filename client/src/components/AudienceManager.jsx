@@ -1756,7 +1756,15 @@ const GoogleAudiencesPanel = ({ googleConnected, googleCustomerId, onGoogleConne
   );
 
   if (loading) return <div className="flex-1 flex items-center justify-center py-20"><RefreshCw size={20} className="animate-spin text-slate-400" /><span className="ml-2 text-sm text-slate-400">Loading audiences…</span></div>;
-  if (error) return <div className="flex-1 flex items-center justify-center py-20 text-sm text-red-500">{error}</div>;
+  if (error) {
+    const isManagerErr = /manager account/i.test(error);
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center py-24 gap-3 px-6 text-center">
+        <p className="text-sm font-semibold text-slate-700">{isManagerErr ? 'This is a manager (MCC) account' : 'Could not load audiences'}</p>
+        <p className="text-xs text-slate-400 max-w-md">{isManagerErr ? 'Google Ads API doesn\u2019t return data for manager accounts. Pick a child account from the selector above.' : error}</p>
+      </div>
+    );
+  }
 
   const allItems = [...(data?.audiences || []), ...(data?.userLists || [])];
   return (
@@ -1973,7 +1981,7 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onPrefillChat, onBa
                 Audiences
               </h1>
               <p className="text-xs text-slate-400 mt-0.5">
-                {audiences.length} audiences
+                {platform === 'google' ? 'Google Ads audiences' : `${audiences.length} audiences`}
               </p>
             </div>
             {/* Account selector */}
@@ -2002,8 +2010,8 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onPrefillChat, onBa
         <PlatformTabs platform={platform} onChange={setPlatform} enabled={['meta', 'google']} variant="dark" />
       </div>
 
-      {/* Filter bar — 3 dimensions: Type, Availability, Status + search */}
-      {audiences.length > 0 && (
+      {/* Filter bar — 3 dimensions: Type, Availability, Status + search (Meta-only) */}
+      {platform === 'meta' && audiences.length > 0 && (
         <div ref={filterBarRef} className="relative z-20 bg-white/90 backdrop-blur-md border-b border-slate-200/60 px-6 py-2.5 flex items-center gap-2 shrink-0">
           {/* Audience count */}
           <span className="text-[11px] font-semibold text-slate-400 tabular-nums mr-1">{filtered.length} of {audiences.length}</span>

@@ -120,9 +120,10 @@ router.get('/status', async (req, res) => {
       if (data) return res.json({ connected: true, customerId: data.customer_id, loginCustomerId: data.login_customer_id });
     }
 
-    // Env fallback for local solo dev
+    // Env fallback for local solo dev — connected but no account picked yet.
+    // (Don't auto-select GOOGLE_ADS_CUSTOMER_ID since it's typically an MCC root, which the API rejects for metrics.)
     if (process.env.GOOGLE_ADS_REFRESH_TOKEN && process.env.NODE_ENV !== 'production') {
-      return res.json({ connected: true, customerId: process.env.GOOGLE_ADS_CUSTOMER_ID || null, loginCustomerId: null, source: 'env' });
+      return res.json({ connected: true, customerId: null, loginCustomerId: null, source: 'env' });
     }
 
     res.json({ connected: false });
