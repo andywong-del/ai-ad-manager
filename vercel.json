@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "cd client && npm install && npm run build && cd ../server && npm install",
+  "buildCommand": "cd client && npm ci && npm run build && cd ../server && npm ci",
   "outputDirectory": "client/dist",
   "functions": {
     "api/**": {
