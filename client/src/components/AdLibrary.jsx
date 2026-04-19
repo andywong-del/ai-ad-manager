@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { Search, RefreshCw, Loader2, X, Eye, ChevronDown, Palette, Sparkles } from 'lucide-react';
 import { PlatformAccountSelector } from './PlatformAccountSelector.jsx';
+import { PlatformTabs } from './PlatformTabs.jsx';
 import api from '../services/api.js';
 
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
@@ -283,7 +284,8 @@ const DateFilter = ({ datePreset, setDatePreset, customFrom, setCustomFrom, cust
 };
 
 // ── Main Component ──
-export const AdLibrary = ({ adAccountId, token, onLogin, onLogout, selectedAccount, selectedBusiness, onSelectAccount, onSendToChat, onPrefillChat }) => {
+export const AdLibrary = ({ adAccountId, token, onLogin, onLogout, selectedAccount, selectedBusiness, onSelectAccount, onSendToChat, onPrefillChat, googleConnected, googleCustomerId, onGoogleConnect, onGoogleDisconnect, onSelectGoogleAccount }) => {
+  const [platform, setPlatform] = useState('meta');
   const [showAskAI, setShowAskAI] = useState(false);
   const [ads, setAds] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -497,9 +499,11 @@ if (filterAdType !== 'all') {
               </p>
             </div>
             <span className="text-xs text-slate-400 font-medium">Ad Account:</span>
-            <PlatformAccountSelector platform="meta"
+            <PlatformAccountSelector platform={platform}
               token={token} onLoginMeta={onLogin} onLogoutMeta={onLogout}
               selectedAccount={selectedAccount} selectedBusiness={selectedBusiness} onSelectMetaAccount={onSelectAccount}
+              googleConnected={googleConnected} googleCustomerId={googleCustomerId}
+              onGoogleConnect={onGoogleConnect} onGoogleDisconnect={onGoogleDisconnect} onSelectGoogleAccount={onSelectGoogleAccount}
               variant="header" />
           </div>
           <div className="flex items-center gap-2">
@@ -513,6 +517,7 @@ if (filterAdType !== 'all') {
             </button>
           </div>
         </div>
+        <PlatformTabs platform={platform} onChange={setPlatform} enabled={['meta']} variant="dark" />
       </div>
 
       {/* Page pills — only show when multiple pages exist (cross-posting) */}

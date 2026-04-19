@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { RefreshCw, Loader2, TrendingUp, TrendingDown, Download, Calendar, Filter, ChevronDown, Sparkles, Zap, ArrowRight } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Area, AreaChart } from 'recharts';
 import { PlatformAccountSelector } from './PlatformAccountSelector.jsx';
+import { PlatformTabs } from './PlatformTabs.jsx';
 import api from '../services/api.js';
 
 // ── Formatting ──
@@ -379,14 +380,8 @@ export const ReportDashboard = ({ adAccountId, token, onLogin, onLogout, selecte
         </div>
       </div>
 
-      {/* Platform tabs */}
-      <div className="flex items-center gap-0 px-6 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-b border-slate-700">
-        {[{ id: 'meta', label: 'Meta Ads' }, { id: 'google', label: 'Google Ads' }].map(p => (
-          <button key={p.id} onClick={() => setPlatform(p.id)}
-            className={`px-4 py-2.5 text-xs font-medium border-b-2 transition-colors ${platform === p.id ? 'border-orange-400 text-white' : 'border-transparent text-slate-400 hover:text-slate-300'}`}>
-            {p.label}
-          </button>
-        ))}
+      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-b border-slate-700">
+        <PlatformTabs platform={platform} onChange={setPlatform} enabled={['meta', 'google']} variant="dark" />
       </div>
 
       {/* Tabs + Date + Filters */}

@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Search, RefreshCw, Plus, Loader2, X, Activity, Radio, Clock, CheckCircle, AlertTriangle, XCircle, Zap, ChevronDown, Copy, Check, BarChart3, Hash, Sparkles, ArrowRight } from 'lucide-react';
 import { PlatformAccountSelector } from './PlatformAccountSelector.jsx';
+import { PlatformTabs } from './PlatformTabs.jsx';
 import { AskAIButton, AskAIPopup } from './AskAIPopup.jsx';
 import api from '../services/api.js';
 
@@ -247,7 +248,8 @@ const ConversionCard = ({ conversion, onDelete }) => (
 );
 
 // ── Main Component ──
-export const EventsManager = ({ adAccountId, token, onLogin, onLogout, selectedAccount, selectedBusiness, onSelectAccount, onSendToChat, onPrefillChat }) => {
+export const EventsManager = ({ adAccountId, token, onLogin, onLogout, selectedAccount, selectedBusiness, onSelectAccount, onSendToChat, onPrefillChat, googleConnected, googleCustomerId, onGoogleConnect, onGoogleDisconnect, onSelectGoogleAccount }) => {
+  const [platform, setPlatform] = useState('meta');
   const [showAskAI, setShowAskAI] = useState(false);
   const [activeTab, setActiveTab] = useState('events'); // 'events' | 'pixels' | 'conversions'
   const [pixels, setPixels] = useState([]);
@@ -378,9 +380,11 @@ export const EventsManager = ({ adAccountId, token, onLogin, onLogout, selectedA
               </p>
             </div>
             <span className="text-xs text-slate-400 font-medium">Ad Account:</span>
-            <PlatformAccountSelector platform="meta"
+            <PlatformAccountSelector platform={platform}
               token={token} onLoginMeta={onLogin} onLogoutMeta={onLogout}
               selectedAccount={selectedAccount} selectedBusiness={selectedBusiness} onSelectMetaAccount={onSelectAccount}
+              googleConnected={googleConnected} googleCustomerId={googleCustomerId}
+              onGoogleConnect={onGoogleConnect} onGoogleDisconnect={onGoogleDisconnect} onSelectGoogleAccount={onSelectGoogleAccount}
               variant="header" />
           </div>
           <div className="flex items-center gap-2">
@@ -394,6 +398,7 @@ export const EventsManager = ({ adAccountId, token, onLogin, onLogout, selectedA
             </button>
           </div>
         </div>
+        <PlatformTabs platform={platform} onChange={setPlatform} enabled={['meta']} variant="dark" />
         {/* Tabs */}
         <div className="relative flex items-center gap-1 px-6 pb-2">
           {[['events', `Events (${aggregatedEvents.length})`], ['pixels', `Pixels (${pixels.length})`], ['conversions', `Custom Conversions (${conversions.length})`]].map(([tab, label]) => (

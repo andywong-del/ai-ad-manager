@@ -4,6 +4,7 @@ import api from '../services/api.js';
 import { useBusinesses } from '../hooks/useBusinesses.js';
 import { useAdAccounts } from '../hooks/useAdAccounts.js';
 import { PlatformAccountSelector } from './PlatformAccountSelector.jsx';
+import { PlatformTabs } from './PlatformTabs.jsx';
 
 // ── Confirm Dialog ──────────────────────────────────────────────────────────
 const ConfirmDialog = ({ title, message, details, confirmLabel, confirmColor = 'blue', onConfirm, onCancel }) => (
@@ -1998,22 +1999,7 @@ export const AudienceManager = ({ adAccountId, onSendToChat, onPrefillChat, onBa
           </div>
         </div>
 
-        {/* Platform tabs */}
-        <div className="relative flex items-center gap-1 px-6 pb-0">
-          <button onClick={() => setPlatform('meta')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-medium border-b-2 transition-colors ${platform === 'meta' ? 'border-orange-400 text-white' : 'border-transparent text-slate-400 hover:text-slate-300'}`}>
-            <MetaIcon /> Meta Ads
-          </button>
-          <button onClick={() => setPlatform('google')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-medium border-b-2 transition-colors ${platform === 'google' ? 'border-orange-400 text-white' : 'border-transparent text-slate-400 hover:text-slate-300'}`}>
-            <GoogleIcon /> Google Ads
-          </button>
-          <button onClick={() => setPlatform('tiktok')} disabled
-            className="flex items-center gap-2 px-4 py-2.5 text-xs font-medium border-b-2 border-transparent text-slate-500 cursor-not-allowed">
-            <TikTokIcon /> TikTok Ads
-            <span className="text-[9px] bg-slate-700 text-slate-400 px-1.5 py-0.5 rounded-full font-semibold">Soon</span>
-          </button>
-        </div>
+        <PlatformTabs platform={platform} onChange={setPlatform} enabled={['meta', 'google']} variant="dark" />
       </div>
 
       {/* Filter bar — 3 dimensions: Type, Availability, Status + search */}

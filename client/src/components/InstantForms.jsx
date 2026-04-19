@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Search, RefreshCw, Loader2, X, ChevronDown, FileText, Download, Clock, Eye, Plus, Archive, MessageSquare, Users, Trash2, AlertTriangle, Palette, Zap, Smartphone, Sparkles, ArrowRight, Copy } from 'lucide-react';
 import { PlatformAccountSelector } from './PlatformAccountSelector.jsx';
+import { PlatformTabs } from './PlatformTabs.jsx';
 import { AskAIButton, AskAIPopup } from './AskAIPopup.jsx';
 import api from '../services/api.js';
 
@@ -695,7 +696,8 @@ const FormPhonePreview = ({ form, pageName }) => {
 };
 
 // ── Main Component ──
-export const InstantForms = ({ adAccountId, token, onLogin, onLogout, selectedAccount, selectedBusiness, onSelectAccount, onSendToChat, onPrefillChat }) => {
+export const InstantForms = ({ adAccountId, token, onLogin, onLogout, selectedAccount, selectedBusiness, onSelectAccount, onSendToChat, onPrefillChat, googleConnected, googleCustomerId, onGoogleConnect, onGoogleDisconnect, onSelectGoogleAccount }) => {
+  const [platform, setPlatform] = useState('meta');
   const [showAskAI, setShowAskAI] = useState(false);
   const [forms, setForms] = useState([]);
   const [pages, setPages] = useState([]);
@@ -792,9 +794,11 @@ export const InstantForms = ({ adAccountId, token, onLogin, onLogout, selectedAc
             </div>
             <div className="flex items-center gap-1.5">
               <span className="text-[10px] font-semibold text-slate-400">Ad Account:</span>
-              <PlatformAccountSelector platform="meta"
+              <PlatformAccountSelector platform={platform}
                 token={token} onLoginMeta={onLogin} onLogoutMeta={onLogout}
                 selectedAccount={selectedAccount} selectedBusiness={selectedBusiness} onSelectMetaAccount={onSelectAccount}
+                googleConnected={googleConnected} googleCustomerId={googleCustomerId}
+                onGoogleConnect={onGoogleConnect} onGoogleDisconnect={onGoogleDisconnect} onSelectGoogleAccount={onSelectGoogleAccount}
                 variant="header" />
             </div>
             {pages.length > 0 && (
@@ -818,6 +822,7 @@ export const InstantForms = ({ adAccountId, token, onLogin, onLogout, selectedAc
             </button>
           </div>
         </div>
+        <PlatformTabs platform={platform} onChange={setPlatform} enabled={['meta']} variant="dark" />
       </div>
 
 

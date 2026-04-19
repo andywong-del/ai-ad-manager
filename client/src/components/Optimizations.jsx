@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { RefreshCw, Sparkles, TrendingUp, AlertTriangle, CheckCircle, ArrowRight, Zap, DollarSign, Users, Shield, Palette, MessageSquare } from 'lucide-react';
 import { PlatformAccountSelector } from './PlatformAccountSelector.jsx';
+import { PlatformTabs } from './PlatformTabs.jsx';
 
 // ── Config ──
 const SEVERITY = {
@@ -105,8 +106,9 @@ const BentoCard = ({ rec, size = 'sm', onAction }) => {
 };
 
 // ── Main Component ──
-export const Optimizations = ({ adAccountId, token, onLogin, onLogout, selectedAccount, selectedBusiness, onSelectAccount, onSendToChat, onPrefillChat, activeSkills = [] }) => {
+export const Optimizations = ({ adAccountId, token, onLogin, onLogout, selectedAccount, selectedBusiness, onSelectAccount, onSendToChat, onPrefillChat, activeSkills = [], googleConnected, googleCustomerId, onGoogleConnect, onGoogleDisconnect, onSelectGoogleAccount }) => {
   const [recommendations] = useState(DEMO);
+  const [platform, setPlatform] = useState('meta');
 
   const criticalCount = recommendations.filter(r => r.severity === 'critical').length;
   const warningCount = recommendations.filter(r => r.severity === 'warning').length;
@@ -146,15 +148,18 @@ export const Optimizations = ({ adAccountId, token, onLogin, onLogout, selectedA
               <p className="text-xs text-slate-500 mt-0.5">{recommendations.length} recommendations · Last scan: just now</p>
             </div>
             <span className="text-xs text-slate-500 font-medium">Ad Account:</span>
-            <PlatformAccountSelector platform="meta"
+            <PlatformAccountSelector platform={platform}
               token={token} onLoginMeta={onLogin} onLogoutMeta={onLogout}
               selectedAccount={selectedAccount} selectedBusiness={selectedBusiness} onSelectMetaAccount={onSelectAccount}
+              googleConnected={googleConnected} googleCustomerId={googleCustomerId}
+              onGoogleConnect={onGoogleConnect} onGoogleDisconnect={onGoogleDisconnect} onSelectGoogleAccount={onSelectGoogleAccount}
               variant="header" />
           </div>
           <button className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 border border-slate-700/60 transition-colors">
             <RefreshCw size={13} /> Refresh
           </button>
         </div>
+        <PlatformTabs platform={platform} onChange={setPlatform} enabled={['meta']} variant="dark" />
       </div>
 
       {/* Active skills bar */}

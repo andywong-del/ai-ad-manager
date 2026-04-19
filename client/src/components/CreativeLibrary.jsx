@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { Search, RefreshCw, Image as ImageIcon, Film, Loader2, Trash2, X, Download, Clock, Maximize2, Grid, List, Plus, Layers, Edit3, Check, Upload, Sparkles } from 'lucide-react';
 import { PlatformAccountSelector } from './PlatformAccountSelector.jsx';
+import { PlatformTabs } from './PlatformTabs.jsx';
 import { AskAIButton, AskAIPopup } from './AskAIPopup.jsx';
 import { useCreativeSets } from '../hooks/useCreativeSets.js';
 import api from '../services/api.js';
@@ -286,7 +287,8 @@ const BrowseForSetModal = ({ adAccountId, existingIds, onClose, onAdd }) => {
   );
 };
 
-export const CreativeLibrary = ({ adAccountId, token, onLogin, onLogout, selectedAccount, selectedBusiness, onSelectAccount, onBack, onSendToChat, onPrefillChat }) => {
+export const CreativeLibrary = ({ adAccountId, token, onLogin, onLogout, selectedAccount, selectedBusiness, onSelectAccount, onBack, onSendToChat, onPrefillChat, googleConnected, googleCustomerId, onGoogleConnect, onGoogleDisconnect, onSelectGoogleAccount }) => {
+  const [platform, setPlatform] = useState('meta');
   const [showAskAI, setShowAskAI] = useState(false);
   // Creative Sets
   const { sets, loading: setsLoading, fetchSets, createSet, updateSet, deleteSet, addItems: addSetItems, removeItem: removeSetItem } = useCreativeSets(adAccountId);
@@ -565,9 +567,11 @@ export const CreativeLibrary = ({ adAccountId, token, onLogin, onLogout, selecte
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs text-slate-400 font-medium">Ad Account:</span>
-              <PlatformAccountSelector platform="meta"
+              <PlatformAccountSelector platform={platform}
                 token={token} onLoginMeta={onLogin} onLogoutMeta={onLogout}
                 selectedAccount={selectedAccount} selectedBusiness={selectedBusiness} onSelectMetaAccount={onSelectAccount}
+                googleConnected={googleConnected} googleCustomerId={googleCustomerId}
+                onGoogleConnect={onGoogleConnect} onGoogleDisconnect={onGoogleDisconnect} onSelectGoogleAccount={onSelectGoogleAccount}
                 variant="header" />
             </div>
           </div>
@@ -582,6 +586,7 @@ export const CreativeLibrary = ({ adAccountId, token, onLogin, onLogout, selecte
             </button>
           </div>
         </div>
+        <PlatformTabs platform={platform} onChange={setPlatform} enabled={['meta']} variant="dark" />
       </div>
 
       {/* Bulk action bar */}

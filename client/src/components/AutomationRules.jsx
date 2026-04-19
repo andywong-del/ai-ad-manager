@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { Search, RefreshCw, Plus, Loader2, Trash2, X, Play, Pause, ChevronDown, ChevronRight, Clock, AlertTriangle, CheckCircle, Settings2, Edit3, Sparkles, ArrowRight, TrendingUp, Zap, Target, BarChart3, Shield, DollarSign, Eye } from 'lucide-react';
 import { PlatformAccountSelector } from './PlatformAccountSelector.jsx';
+import { PlatformTabs } from './PlatformTabs.jsx';
 import api from '../services/api.js';
 
 // ── Helpers ──
@@ -623,7 +624,8 @@ const HistoryModal = ({ ruleId, onClose }) => {
 };
 
 // ── Main Component ──
-export const AutomationRules = ({ adAccountId, token, onLogin, onLogout, selectedAccount, selectedBusiness, onSelectAccount, onBack, onSendToChat, onPrefillChat }) => {
+export const AutomationRules = ({ adAccountId, token, onLogin, onLogout, selectedAccount, selectedBusiness, onSelectAccount, onBack, onSendToChat, onPrefillChat, googleConnected, googleCustomerId, onGoogleConnect, onGoogleDisconnect, onSelectGoogleAccount }) => {
+  const [platform, setPlatform] = useState('meta');
   const [rules, setRules] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -715,9 +717,11 @@ export const AutomationRules = ({ adAccountId, token, onLogin, onLogout, selecte
             </div>
             <div className="flex items-center gap-1.5">
               <span className="text-[10px] font-semibold text-slate-400">Ad Account:</span>
-              <PlatformAccountSelector platform="meta"
+              <PlatformAccountSelector platform={platform}
                 token={token} onLoginMeta={onLogin} onLogoutMeta={onLogout}
                 selectedAccount={selectedAccount} selectedBusiness={selectedBusiness} onSelectMetaAccount={onSelectAccount}
+                googleConnected={googleConnected} googleCustomerId={googleCustomerId}
+                onGoogleConnect={onGoogleConnect} onGoogleDisconnect={onGoogleDisconnect} onSelectGoogleAccount={onSelectGoogleAccount}
                 variant="header" />
             </div>
           </div>
@@ -732,6 +736,7 @@ export const AutomationRules = ({ adAccountId, token, onLogin, onLogout, selecte
             </button>
           </div>
         </div>
+        <PlatformTabs platform={platform} onChange={setPlatform} enabled={['meta']} variant="dark" />
       </div>
 
       {error && <div className="mx-6 mt-3 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg">{error}</div>}
