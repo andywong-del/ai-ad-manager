@@ -2555,16 +2555,36 @@ const AccountConnector = ({ token, onLogin, onLogout, isLoginLoading, loginError
 
   const isConnected = !!token && !!selectedAccount;
   const isLoggedIn = !!token;
+  const googleActive = googleConnected && googleCustomerId;
+  const googleAcc = googleActive ? googleAccounts.find(a => a.id === googleCustomerId) : null;
+  const googleName = googleAcc?.name || (googleActive ? `Account ${googleCustomerId}` : null);
+
+  // Multi-platform button state
+  const bothConnected = isConnected && googleActive;
+  const sameName = bothConnected && googleName && selectedAccount.name === googleName;
+  let buttonContent;
+  if (bothConnected) {
+    buttonContent = sameName
+      ? <><img src="/meta-icon.svg" alt="Meta" className="w-3 h-3" /><GoogleIcon /><span className="truncate max-w-[140px]">{selectedAccount.name}</span></>
+      : <><img src="/meta-icon.svg" alt="Meta" className="w-3 h-3" /><span className="truncate max-w-[90px]">{selectedAccount.name}</span><span className="text-slate-300">·</span><GoogleIcon /><span className="truncate max-w-[90px]">{googleName}</span></>;
+  } else if (isConnected) {
+    buttonContent = <><img src="/meta-icon.svg" alt="Meta" className="w-3 h-3" /><span className="truncate max-w-[160px]">{selectedAccount.name}</span></>;
+  } else if (googleActive) {
+    buttonContent = <><GoogleIcon /><span className="truncate max-w-[160px]">{googleName}</span></>;
+  } else {
+    buttonContent = <><Link2 size={12} /><span>{isLoggedIn ? 'Select Account' : 'Connect'}</span></>;
+  }
+
+  const buttonStyle = (bothConnected || isConnected || googleActive)
+    ? 'border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
+    : isLoggedIn ? 'border-amber-200 text-amber-600 bg-amber-50 hover:bg-amber-100'
+    : 'border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50';
 
   return (
     <div ref={ref} className="relative">
       <button onClick={() => { setOpen(v => { if (!v) setLevel(getInitialLevel()); return !v; }); }}
-        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[11px] font-medium transition-colors
-          ${isConnected ? 'border-emerald-200 text-emerald-600 bg-emerald-50 hover:bg-emerald-100'
-            : isLoggedIn ? 'border-amber-200 text-amber-600 bg-amber-50 hover:bg-amber-100'
-            : 'border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50'}`}>
-        <Link2 size={12} />
-        {isConnected ? selectedAccount.name : isLoggedIn ? 'Select Account' : 'Connect'}
+        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[11px] font-medium transition-colors ${buttonStyle}`}>
+        {buttonContent}
       </button>
 
       {open && (

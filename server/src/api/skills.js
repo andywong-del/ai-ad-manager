@@ -41,15 +41,24 @@ const parseMd = (content, filename) => {
   };
 };
 
-// Read all .md skills from a directory
-const readSkillsFrom = async (dir, extraProps = {}) => {
+// Read all .md skills from a directory, optionally recursing into subfolders.
+// When recursive, each file's id is prefixed with its subfolder ("meta/campaigns").
+const readSkillsFrom = async (dir, extraProps = {}, { recursive = false, prefix = '' } = {}) => {
   const skills = [];
   try {
-    const files = await fs.readdir(dir);
-    for (const file of files.filter(f => f.endsWith('.md'))) {
-      const content = await fs.readFile(path.join(dir, file), 'utf-8');
-      const skill = parseMd(content, file);
-      const stat = await fs.stat(path.join(dir, file));
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory() && recursive) {
+        const subSkills = await readSkillsFrom(fullPath, extraProps, { recursive: true, prefix: prefix ? `${prefix}/${entry.name}` : entry.name });
+        skills.push(...subSkills);
+        continue;
+      }
+      if (!entry.isFile() || !entry.name.endsWith('.md')) continue;
+      const content = await fs.readFile(fullPath, 'utf-8');
+      const skill = parseMd(content, entry.name);
+      if (prefix) skill.id = `${prefix}/${skill.id}`;
+      const stat = await fs.stat(fullPath);
       Object.assign(skill, { updatedAt: stat.mtime.toISOString(), ...extraProps });
       skills.push(skill);
     }
@@ -202,15 +211,24 @@ router.get('/:id', async (req, res) => {
       }
     }
 
-    // Check official + system files
-    const filename = `${id}.md`;
+    // Check official (flat) + system (subfolder-organized) files
     const SYSTEM_DIR = path.join(SKILLS_DIR, 'system');
-    for (const dir of [OFFICIAL_DIR, SYSTEM_DIR]) {
+    // Official: flat filename
+    try {
+      const content = await fs.readFile(path.join(OFFICIAL_DIR, `${id}.md`), 'utf-8');
+      const skill = parseMd(content, `${id}.md`);
+      Object.assign(skill, { isDefault: true, visibility: 'official' });
+      return res.json(skill);
+    } catch {}
+    // System: support "meta/campaigns" (namespaced) or bare "campaigns" (search shared/meta/google)
+    const systemCandidates = id.includes('/')
+      ? [path.join(SYSTEM_DIR, `${id}.md`)]
+      : ['shared', 'meta', 'google'].map(sub => path.join(SYSTEM_DIR, sub, `${id}.md`));
+    for (const fp of systemCandidates) {
       try {
-        const content = await fs.readFile(path.join(dir, filename), 'utf-8');
-        const skill = parseMd(content, filename);
-        skill.isDefault = dir === OFFICIAL_DIR;
-        skill.visibility = dir === OFFICIAL_DIR ? 'official' : 'system';
+        const content = await fs.readFile(fp, 'utf-8');
+        const skill = parseMd(content, `${id}.md`);
+        Object.assign(skill, { isDefault: false, visibility: 'system', id });
         return res.json(skill);
       } catch {}
     }

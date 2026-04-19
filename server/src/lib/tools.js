@@ -1506,7 +1506,7 @@ const adTools = [
     obj({ campaign_id: str('Campaign ID to validate') }, ['campaign_id'])),
 
   // ── Skill Loader ──────────────────────────────────────────────────────
-  T('load_skill', 'Load a skill\'s detailed workflow guidance. System skills (API/tools layer): campaigns, audiences, ad-gallery, creative-hub, lead-forms, automations, analytics-engine, account-infrastructure. Official skills (strategy layer): data-analysis, campaign-manager, creative-manager, targeting-audiences, skill-creator.',
+  T('load_skill', 'Load a skill\'s detailed workflow guidance. System skills are organized by platform: meta/* (campaigns, audiences, ad-gallery, creative-hub, lead-forms, automations, analytics-engine), google/* (campaigns + more), shared/* (brand-memory, account-infrastructure). You may use namespaced IDs like "meta/campaigns" or "google/campaigns", OR bare names like "campaigns" (resolves in this order: shared → meta → google). Official skills live in the official/ folder: data-analysis, campaign-manager, creative-manager, targeting-audiences, skill-creator.',
     async (_args, context) => {
       const { skill_name } = _args;
       const fbUserId = await resolveFbUserId(context);
@@ -1524,13 +1524,27 @@ const adTools = [
         if (data?.content) return { skill: skill_name, layer: 'custom', content: data.content };
       }
 
-      // 3. Search official + system .md files
-      for (const dir of [OFFICIAL_SKILLS_DIR, SYSTEM_SKILLS_DIR]) {
+      // 3. Search official (flat) + system (subfolder-organized) .md files
+      const readAndStrip = async (fp) => {
+        const content = await fs.readFile(fp, 'utf-8');
+        return content.replace(/^---\n[\s\S]*?\n---\n?/, '').trim();
+      };
+
+      // 3a. Official skills are flat
+      try {
+        const body = await readAndStrip(path.join(OFFICIAL_SKILLS_DIR, `${skill_name}.md`));
+        return { skill: skill_name, layer: 'official', content: body };
+      } catch { /* not in official */ }
+
+      // 3b. System skills — support both namespaced ("meta/campaigns") and bare ("campaigns")
+      const systemCandidates = skill_name.includes('/')
+        ? [path.join(SYSTEM_SKILLS_DIR, `${skill_name}.md`)]
+        : ['shared', 'meta', 'google'].map(sub => path.join(SYSTEM_SKILLS_DIR, sub, `${skill_name}.md`));
+
+      for (const fp of systemCandidates) {
         try {
-          const filepath = path.join(dir, `${skill_name}.md`);
-          const content = await fs.readFile(filepath, 'utf-8');
-          const body = content.replace(/^---\n[\s\S]*?\n---\n?/, '').trim();
-          return { skill: skill_name, layer: dir === OFFICIAL_SKILLS_DIR ? 'official' : 'system', content: body };
+          const body = await readAndStrip(fp);
+          return { skill: skill_name, layer: 'system', content: body };
         } catch { /* try next */ }
       }
 
