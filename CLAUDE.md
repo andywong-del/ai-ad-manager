@@ -5,7 +5,7 @@
 - **Server:** Express.js + Meta Marketing API v25.0 (`server/`)
 - **Database:** Supabase (PostgreSQL)
 - **AI:** Google Gemini (via `@google/genai`) for chat, crawling, skill generation
-- **Deploy:** Vercel serverless — `vercel --prod` then `vercel alias <url> client-gamma-neon-66.vercel.app`
+- **Deploy:** `git push origin main` — auto-deploys to Vercel, gamma link updates automatically (`client-gamma-neon-66.vercel.app` is set as production domain)
 
 ## File Structure
 ```
