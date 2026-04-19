@@ -81,8 +81,8 @@ export const PlatformAccountSelector = ({
     };
   }, [open, dropUp]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Reset level when opening / when platform changes
-  useEffect(() => { setLevel('main'); }, [platform, open]);
+  // Reset level when platform changes (not when opening — handler sets level)
+  useEffect(() => { setLevel('main'); }, [platform]);
 
   const s = variantStyles[variant];
   const isMeta = platform === 'meta';
