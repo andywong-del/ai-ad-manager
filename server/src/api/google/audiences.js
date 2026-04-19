@@ -1,5 +1,5 @@
 import { Router } from 'express';
-const { enums } = await import('google-ads-api');
+import { enums } from 'google-ads-api';
 import { getCustomer, handleApiError } from './client.js';
 
 const router = Router();

@@ -1,4 +1,4 @@
-const { GoogleAdsApi } = await import('google-ads-api');
+import { GoogleAdsApi } from 'google-ads-api';
 import axios from 'axios';
 import { supabase } from '../../lib/supabase.js';
 
