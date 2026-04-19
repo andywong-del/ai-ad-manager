@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Building2, ChevronDown, ChevronLeft, Check, Link2 } from 'lucide-react';
 import { useBusinesses } from '../hooks/useBusinesses.js';
 import { useAdAccounts } from '../hooks/useAdAccounts.js';
@@ -49,17 +50,46 @@ export const PlatformAccountSelector = ({
   const [open, setOpen] = useState(false);
   const [level, setLevel] = useState('main');
   const [activeBiz, setActiveBiz] = useState(selectedBusiness);
+  const [pos, setPos] = useState(null); // { top, left, bottom } viewport coords for portal dropdown
   const ref = useRef(null);
+  const btnRef = useRef(null);
 
   const { businesses, isLoading: bizLoading } = useBusinesses();
   const { adAccounts: metaAccounts, isLoading: metaAccLoading } = useAdAccounts(activeBiz?.id);
   const { accounts: googleAccounts, isLoading: googleLoading } = useGoogleAccounts(googleConnected);
 
   useEffect(() => {
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const handler = (e) => {
+      if (ref.current && ref.current.contains(e.target)) return;
+      // Allow clicks inside portal-rendered dropdown too
+      if (e.target.closest?.('[data-pas-dropdown]')) return;
+      setOpen(false);
+    };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  // Compute dropdown position on open / resize / scroll
+  useLayoutEffect(() => {
+    if (!open || !btnRef.current) return;
+    const update = () => {
+      const r = btnRef.current.getBoundingClientRect();
+      const DROPDOWN_W = 280;
+      // keep within viewport on the right
+      const left = Math.min(r.left, window.innerWidth - DROPDOWN_W - 8);
+      setPos(dropUp
+        ? { left, bottom: window.innerHeight - r.top + 4 }
+        : { left, top: r.bottom + 4 }
+      );
+    };
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, true);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', update, true);
+    };
+  }, [open, dropUp]);
 
   // Reset level when opening / when platform changes
   useEffect(() => { setLevel('main'); }, [platform, open]);
@@ -104,16 +134,18 @@ export const PlatformAccountSelector = ({
   };
 
   return (
-    <div ref={ref} className="relative isolate">
-      <button onClick={handleButtonClick}
+    <div ref={ref} className="relative">
+      <button ref={btnRef} onClick={handleButtonClick}
         className={`inline-flex items-center gap-2 border font-medium transition-colors ${s.rounded} ${s.size} ${s[buttonState]}`}>
         {isMeta ? <Building2 size={12} /> : <GoogleIcon />}
         <span className="truncate max-w-[180px]">{buttonLabel}</span>
         {(buttonState === 'connected' || buttonState === 'needsAction') && <ChevronDown size={12} />}
       </button>
 
-      {open && (
-        <div className={`absolute left-0 w-[280px] bg-white border border-slate-200 rounded-xl shadow-2xl z-[9999] overflow-hidden ${dropUp ? 'bottom-full mb-2' : 'top-full mt-1'}`}>
+      {open && pos && createPortal(
+        <div data-pas-dropdown
+          style={{ position: 'fixed', left: pos.left, top: pos.top, bottom: pos.bottom, width: 280, zIndex: 99999 }}
+          className="bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden">
           {/* Meta: business level */}
           {level === 'meta_business' && (
             <>
@@ -204,7 +236,8 @@ export const PlatformAccountSelector = ({
               {loginError && <div className="px-3 py-2 text-[11px] text-red-500">{loginError}</div>}
             </>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
