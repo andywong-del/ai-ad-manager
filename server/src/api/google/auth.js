@@ -22,8 +22,9 @@ const resolveUser = async (req, _res, next) => {
     req.token = auth.slice(7);
     req.fbUserId = await getFbUserId(req.token);
   }
-  // Dev fallback so localhost works without Meta login
-  if (!req.fbUserId && process.env.NODE_ENV !== 'production') {
+  // Env fallback so localhost (and production with ALLOW_GOOGLE_ENV_FALLBACK=true) works without Meta login
+  const allowEnvFallback = process.env.NODE_ENV !== 'production' || process.env.ALLOW_GOOGLE_ENV_FALLBACK === 'true';
+  if (!req.fbUserId && allowEnvFallback) {
     req.fbUserId = process.env.DEV_FB_USER_ID || '_solo';
   }
   next();
@@ -120,9 +121,10 @@ router.get('/status', async (req, res) => {
       if (data) return res.json({ connected: true, customerId: data.customer_id, loginCustomerId: data.login_customer_id });
     }
 
-    // Env fallback for local solo dev — connected but no account picked yet.
-    // (Don't auto-select GOOGLE_ADS_CUSTOMER_ID since it's typically an MCC root, which the API rejects for metrics.)
-    if (process.env.GOOGLE_ADS_REFRESH_TOKEN && process.env.NODE_ENV !== 'production') {
+    // Env fallback — local dev (always), or production with ALLOW_GOOGLE_ENV_FALLBACK=true.
+    // Don't auto-select GOOGLE_ADS_CUSTOMER_ID since it's typically an MCC root, which the API rejects for metrics.
+    const allowEnvFallback = process.env.NODE_ENV !== 'production' || process.env.ALLOW_GOOGLE_ENV_FALLBACK === 'true';
+    if (process.env.GOOGLE_ADS_REFRESH_TOKEN && allowEnvFallback) {
       return res.json({ connected: true, customerId: null, loginCustomerId: null, source: 'env' });
     }
 

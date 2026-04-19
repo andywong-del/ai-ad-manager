@@ -38,7 +38,8 @@ async function resolveUserTokens(req) {
   const token = auth?.startsWith('Bearer ') ? auth.slice(7) : null;
   let fbUserId = req?.fbUserId;
   if (!fbUserId && token) fbUserId = await getFbUserId(token);
-  if (!fbUserId && process.env.NODE_ENV !== 'production') fbUserId = process.env.DEV_FB_USER_ID || '_solo';
+  const allowEnvFallback = process.env.NODE_ENV !== 'production' || process.env.ALLOW_GOOGLE_ENV_FALLBACK === 'true';
+  if (!fbUserId && allowEnvFallback) fbUserId = process.env.DEV_FB_USER_ID || '_solo';
 
   if (supabase && fbUserId) {
     const { data } = await supabase.from('platform_tokens')
