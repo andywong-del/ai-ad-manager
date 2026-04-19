@@ -2,20 +2,16 @@ import { Router } from 'express';
 import axios from 'axios';
 import { GoogleGenAI } from '@google/genai';
 import { supabase } from '../lib/supabase.js';
+import { extractPdfText } from '../lib/pdfExtract.js';
 
 const router = Router();
 
-// Lazy-load multer and pdf-parse (may not be available in all environments)
-let upload, pdfParse;
+// Lazy-load multer
+let upload;
 try {
   const { default: multer } = await import('multer');
   upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 } catch { upload = null; }
-try {
-  const { createRequire } = await import('module');
-  const req = createRequire(import.meta.url);
-  pdfParse = req('pdf-parse');
-} catch { pdfParse = null; }
 
 // ── FB User ID extraction (cached) ──
 const userIdCache = new Map();
@@ -299,10 +295,8 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     const { originalname, mimetype, buffer } = req.file;
     let text = '';
 
-    if (mimetype === 'application/pdf' && pdfParse) {
-      // Parse PDF
-      const data = await pdfParse(buffer);
-      text = data.text || '';
+    if (mimetype === 'application/pdf') {
+      text = await extractPdfText(buffer);
     } else {
       // TXT, MD, DOC (plain text fallback)
       text = buffer.toString('utf-8');

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { runner, sessionService } from '../services/adAgent.js';
 import { activeSessions } from '../lib/sessionBus.js';
+import { extractPdfText } from '../lib/pdfExtract.js';
 
 const router = Router();
 
@@ -14,16 +15,11 @@ router.post('/parse-doc', async (req, res) => {
     let text = '';
 
     if (type === 'application/pdf' || name?.endsWith('.pdf')) {
-      const { createRequire } = await import('module');
-      const cjsRequire = createRequire(import.meta.url);
-      const pdfParse = cjsRequire('pdf-parse');
-      const pdf = await pdfParse(buffer);
-      text = pdf.text;
+      text = await extractPdfText(buffer);
     } else if (name?.endsWith('.xlsx') || name?.endsWith('.xls') || type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
       // Excel: convert each sheet to a markdown table
       const { createRequire } = await import('module');
-      const cjsRequire = createRequire(import.meta.url);
-      const XLSX = cjsRequire('xlsx');
+      const XLSX = createRequire(import.meta.url)('xlsx');
       const workbook = XLSX.read(buffer, { type: 'buffer' });
       const parts = [];
       for (const sheetName of workbook.SheetNames) {
