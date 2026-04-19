@@ -777,6 +777,9 @@ export const Dashboard = ({
               brandEnabledCount={brandEnabledCount}
               onSaveToBrand={createBrandItem}
               userName={userName}
+              googleCustomerId={googleCustomerId}
+              onGoogleConnect={onGoogleConnect}
+              onGoogleDisconnect={onGoogleDisconnect}
             />
           )}
         </div>
