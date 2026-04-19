@@ -14,12 +14,16 @@ router.post('/parse-doc', async (req, res) => {
     let text = '';
 
     if (type === 'application/pdf' || name?.endsWith('.pdf')) {
-      const pdfParse = (await import('pdf-parse')).default;
+      const { createRequire } = await import('module');
+      const cjsRequire = createRequire(import.meta.url);
+      const pdfParse = cjsRequire('pdf-parse');
       const pdf = await pdfParse(buffer);
       text = pdf.text;
     } else if (name?.endsWith('.xlsx') || name?.endsWith('.xls') || type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
       // Excel: convert each sheet to a markdown table
-      const XLSX = (await import('xlsx')).default;
+      const { createRequire } = await import('module');
+      const cjsRequire = createRequire(import.meta.url);
+      const XLSX = cjsRequire('xlsx');
       const workbook = XLSX.read(buffer, { type: 'buffer' });
       const parts = [];
       for (const sheetName of workbook.SheetNames) {
