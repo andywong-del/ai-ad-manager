@@ -26,9 +26,28 @@ const CARD_CATEGORIES = [];
 const QUICK_CHIPS = [];
 
 // ── Settings View — left sidebar + right panel like Claude settings ──
-const SettingsView = ({ onClose, onLogout, token, userName }) => {
+const SettingsView = ({ onClose, onLogout, token, userName, googleCustomerId, onGoogleConnect, onGoogleDisconnect }) => {
   const [activeTab, setActiveTab] = useState('account');
   const [showTeamHelp, setShowTeamHelp] = useState(false);
+  const [googleConnecting, setGoogleConnecting] = useState(false);
+  const [googleError, setGoogleError] = useState(null);
+
+  const handleGoogleConnect = async () => {
+    setGoogleConnecting(true);
+    setGoogleError(null);
+    try {
+      const res = await fetch(`/api/google/accounts`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to connect');
+      const accounts = data.accounts || [];
+      const id = accounts[0]?.customerId || import.meta.env.VITE_GOOGLE_CUSTOMER_ID || '';
+      onGoogleConnect(id, accounts);
+    } catch (e) {
+      setGoogleError(e.message);
+    } finally {
+      setGoogleConnecting(false);
+    }
+  };
 
   const navItems = [
     { id: 'account', label: 'Account', icon: User },
@@ -122,17 +141,30 @@ const SettingsView = ({ onClose, onLogout, token, userName }) => {
                   </span>
                 )}
               </div>
-              <div className="flex items-center justify-between py-3 border-b border-slate-100 opacity-40">
+              <div className="flex items-center justify-between py-3 border-b border-slate-100">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-lg bg-red-500 flex items-center justify-center">
                     <span className="text-white text-[11px] font-bold">G</span>
                   </div>
                   <div>
                     <p className="text-[13px] font-medium text-slate-700">Google Ads</p>
-                    <p className="text-[11px] text-slate-400">Search, Display, YouTube campaigns</p>
+                    <p className="text-[11px] text-slate-400">
+                      {googleCustomerId ? `Account: ${googleCustomerId}` : 'Search, Display, YouTube campaigns'}
+                    </p>
+                    {googleError && <p className="text-[10px] text-red-500 mt-0.5">{googleError}</p>}
                   </div>
                 </div>
-                <span className="text-[11px] text-slate-300 font-medium">Coming Soon</span>
+                {googleCustomerId ? (
+                  <button onClick={onGoogleDisconnect} className="flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 hover:bg-red-50 hover:text-red-500 transition-colors group">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 group-hover:bg-red-500 transition-colors" />
+                    <span className="group-hover:hidden">Connected</span>
+                    <span className="hidden group-hover:inline">Disconnect</span>
+                  </button>
+                ) : (
+                  <button onClick={handleGoogleConnect} disabled={googleConnecting} className="text-[11px] font-medium px-3 py-1.5 rounded-full bg-orange-500 text-white hover:bg-orange-600 transition-colors disabled:opacity-50">
+                    {googleConnecting ? 'Connecting…' : 'Connect'}
+                  </button>
+                )}
               </div>
               <div className="flex items-center justify-between py-3 opacity-40">
                 <div className="flex items-center gap-3">
@@ -241,6 +273,16 @@ export const Dashboard = ({
   const [activeView, setActiveView] = useState({ type: 'chat' });
   const [canvasData, setCanvasData] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [googleCustomerId, setGoogleCustomerId] = useState(() => localStorage.getItem('aam_google_customer_id') || '');
+
+  const handleGoogleConnect = (id) => {
+    setGoogleCustomerId(id);
+    localStorage.setItem('aam_google_customer_id', id);
+  };
+  const handleGoogleDisconnect = () => {
+    setGoogleCustomerId('');
+    localStorage.removeItem('aam_google_customer_id');
+  };
 
   const {
     skills, activeSkill, activeSkills, activeSkillId, activeSkillIds, toggleSkill,
@@ -757,6 +799,9 @@ export const Dashboard = ({
           onLogout={onLogout}
           token={token}
           userName={userName}
+          googleCustomerId={googleCustomerId}
+          onGoogleConnect={handleGoogleConnect}
+          onGoogleDisconnect={handleGoogleDisconnect}
         />
       )}
 
