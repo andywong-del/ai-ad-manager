@@ -2579,7 +2579,10 @@ const AccountConnector = ({ token, onLogin, onLogout, isLoginLoading, loginError
                 <button onClick={handleMetaClick}
                   className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-slate-50 transition-colors">
                   <MetaIcon />
-                  <span className="text-[12px] font-medium text-slate-700 flex-1">Meta Ads Manager</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[12px] font-medium text-slate-700 truncate">Meta Ads</p>
+                    {isConnected && <p className="text-[10px] text-slate-400 truncate">{selectedAccount.name}</p>}
+                  </div>
                   {isConnected ? (
                     <button
                       onClick={(e) => { e.stopPropagation(); onLogout?.(); setOpen(false); }}
@@ -2607,23 +2610,31 @@ const AccountConnector = ({ token, onLogin, onLogout, isLoginLoading, loginError
                 )}
                 {/* Google Ads */}
                 <button onClick={handleGoogleClick}
-                  className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-slate-50 transition-colors">
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-slate-50 transition-colors">
                   <GoogleIcon />
-                  <span className="text-[12px] font-medium text-slate-700 flex-1">Google Ads</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[12px] font-medium text-slate-700 truncate">Google Ads</p>
+                    {googleConnected && googleCustomerId && (
+                      <p className="text-[10px] text-slate-400 truncate">{googleAccounts.find(a => a.id === googleCustomerId)?.name || `Account ${googleCustomerId}`}</p>
+                    )}
+                    {googleConnected && !googleCustomerId && (
+                      <p className="text-[10px] text-amber-600 truncate">Click to select account</p>
+                    )}
+                  </div>
                   {googleConnected ? (
                     <button
                       onClick={(e) => { e.stopPropagation(); onGoogleDisconnect?.(); setOpen(false); }}
-                      className="relative w-8 h-[18px] rounded-full bg-emerald-500 hover:bg-red-500 transition-colors group"
+                      className="relative w-8 h-[18px] rounded-full bg-emerald-500 hover:bg-red-500 transition-colors group shrink-0"
                       title="Disconnect"
                     >
                       <span className="absolute top-[2px] right-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-all group-hover:right-[14px]" />
                     </button>
                   ) : (
-                    <span className="text-[10px] font-medium text-blue-600">Connect</span>
+                    <span className="text-[10px] font-medium text-blue-600 shrink-0">Connect</span>
                   )}
                 </button>
                 {/* TikTok Ads */}
-                <div className="w-full flex items-center gap-2.5 px-3 py-2.5 opacity-50 cursor-default">
+                <div className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left opacity-50 cursor-default">
                   <TikTokIcon />
                   <span className="text-[12px] font-medium text-slate-400 flex-1">TikTok Ads</span>
                   <span className="text-[9px] bg-slate-100 text-slate-400 px-1.5 py-0.5 rounded-full font-semibold">Soon</span>

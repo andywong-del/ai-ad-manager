@@ -12,6 +12,7 @@ export const useGoogleAuth = () => {
   const [connected, setConnected] = useState(false);
   const [customerId, setCustomerId] = useState('');
   const [loginCustomerId, setLoginCustomerId] = useState('');
+  const [source, setSource] = useState(null); // 'env' (solo/local) | 'oauth' (per-user)
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const mounted = useRef(true);
@@ -23,6 +24,7 @@ export const useGoogleAuth = () => {
       setConnected(!!data.connected);
       setCustomerId(data.customerId || '');
       setLoginCustomerId(data.loginCustomerId || '');
+      setSource(data.source || null);
       setError(null);
     } catch (e) {
       if (!mounted.current) return;
@@ -51,7 +53,12 @@ export const useGoogleAuth = () => {
   }, [fetchStatus]);
 
   // connect: opens OAuth popup. Parent polls status when popup closes.
+  // In env/solo mode, we're already connected via the server's hardcoded refresh token — no OAuth needed.
   const connect = useCallback(async () => {
+    if (source === 'env') {
+      await fetchStatus();
+      return;
+    }
     try {
       const { data } = await api.get('/google/auth/connect');
       if (!data.url) throw new Error('No OAuth URL returned');
@@ -71,7 +78,7 @@ export const useGoogleAuth = () => {
     } catch (e) {
       setError(e.response?.data?.error || e.message);
     }
-  }, [fetchStatus]);
+  }, [fetchStatus, source]);
 
   const disconnect = useCallback(async () => {
     try {
@@ -95,5 +102,5 @@ export const useGoogleAuth = () => {
     }
   }, []);
 
-  return { connected, customerId, loginCustomerId, isLoading, error, connect, disconnect, selectAccount, refresh: fetchStatus };
+  return { connected, customerId, loginCustomerId, source, isLoading, error, connect, disconnect, selectAccount, refresh: fetchStatus };
 };
