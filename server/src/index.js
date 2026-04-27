@@ -1,7 +1,10 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import { requireToken, optionalToken } from './middleware/requireToken.js';
+import { devOnly, devRoutesAllowed } from './middleware/devOnly.js';
+import { limitAi, limitAiDaily, limitDefault } from './middleware/rateLimit.js';
 import authRouter from './api/auth.js';
 import campaignsRouter from './api/meta/campaigns.js';
 import insightsRouter from './api/meta/insights.js';
@@ -19,9 +22,12 @@ import leadsRouter from './api/meta/leads.js';
 import catalogsRouter from './api/meta/catalogs.js';
 import previewsRouter from './api/meta/previews.js';
 import chatRouter from './api/chat.js';
+import chatHistoryRouter from './api/chatHistory.js';
+import confirmationsRouter from './api/confirmations.js';
 import skillsRouter from './api/skills.js';
 import brandLibraryRouter from './api/brandLibrary.js';
 import creativeSetsRouter from './api/creativeSets.js';
+import uploadsRouter from './api/uploads.js';
 import googleAccountsRouter from './api/google/accounts.js';
 import googleCampaignsRouter from './api/google/campaigns.js';
 import googleReportsRouter from './api/google/reports.js';
@@ -31,13 +37,35 @@ import googleAuthRouter from './api/google/auth.js';
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors({ origin: true }));
+// CORS — we now ship credentials (HttpOnly session cookie) on every request,
+// so we can't use `origin: '*'` or a blanket reflector. CLIENT_ORIGIN can be
+// a comma-separated allowlist (e.g. prod + preview domains). Same-origin
+// fetches don't trigger CORS at all, so a missing list still works for the
+// production deployment where /api is a Vercel rewrite of the same domain.
+const allowedOrigins = (process.env.CLIENT_ORIGIN || '')
+  .split(',').map(s => s.trim()).filter(Boolean);
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true);                     // same-origin / curl
+    if (allowedOrigins.length === 0) return cb(null, true); // permissive in dev
+    if (allowedOrigins.includes(origin)) return cb(null, true);
+    cb(new Error(`Origin ${origin} not allowed by CORS`));
+  },
+  credentials: true,
+}));
+app.use(cookieParser());
 app.use(express.json({ limit: '50mb' }));
 
 app.get('/api/ping', (_req, res) => res.json({ ok: true }));
 
-// Dev config — lets localhost skip login by seeding token + ad account
-app.get('/api/dev-config', (_req, res) => {
+// Dev-only routes — /api/dev-config and /api/debug were leaking secrets
+// (META_DEMO_TOKEN, env presence flags, internal tool catalog) on production.
+// `devOnly` returns 404 in prod so the routes look non-existent. See
+// middleware/devOnly.js for the override knob (ALLOW_DEV_ROUTES).
+
+// Dev config — lets localhost skip login by seeding token + ad account.
+// Returns the team's META_DEMO_TOKEN; MUST never be reachable in prod.
+app.get('/api/dev-config', devOnly, (_req, res) => {
   if (!process.env.META_DEMO_TOKEN) return res.json({ enabled: false });
   res.json({
     enabled: true,
@@ -45,7 +73,11 @@ app.get('/api/dev-config', (_req, res) => {
     adAccountId: process.env.AD_ACCOUNT_ID || null,
   });
 });
-app.get('/api/debug', async (_req, res) => {
+
+// Debug — reports env-var presence, Node version, AI tool catalog. Useful
+// info for an attacker doing reconnaissance, so gated behind the same
+// dev-only guard.
+app.get('/api/debug', devOnly, async (_req, res) => {
   const { rootTools, analystTools } = await import('./lib/tools.js');
   res.json({
     version: '2026-03-31-v4',
@@ -59,27 +91,39 @@ app.get('/api/debug', async (_req, res) => {
   });
 });
 
-// Auth route is public (no token required — it issues tokens)
+if (!devRoutesAllowed) console.log('[startup] dev routes disabled (NODE_ENV=production)');
+
+// Auth route is public (no token required — it issues tokens). Per-route
+// limits live inside authRouter itself (limitAuth on /token + /demo-session)
+// since the bucket needs to be IP-keyed before requireToken runs.
 app.use('/api/auth', authRouter);
 
-// All other routes require a valid Bearer token
-app.use('/api/campaigns', requireToken, campaignsRouter);
-app.use('/api/insights', requireToken, insightsRouter);
-app.use('/api/meta', requireToken, metaRouter);
-app.use('/api/adsets', requireToken, adsetsRouter);
-app.use('/api/ads', requireToken, adsRouter);
-app.use('/api/creatives', requireToken, creativesRouter);
-app.use('/api/assets', requireToken, assetsRouter);
-app.use('/api/targeting', requireToken, targetingRouter);
-app.use('/api/rules', requireToken, rulesRouter);
-app.use('/api/labels', requireToken, labelsRouter);
-app.use('/api/pixels', requireToken, pixelsRouter);
-app.use('/api/conversions', requireToken, conversionsRouter);
-app.use('/api/leads', requireToken, leadsRouter);
-app.use('/api/catalogs', requireToken, catalogsRouter);
-app.use('/api/previews', requireToken, previewsRouter);
-app.use('/api/chat', optionalToken, chatRouter);
-app.use('/api/skills', skillsRouter); // Skills API handles its own auth via resolveUser middleware
+// All other routes require a valid Bearer token. `limitDefault` is keyed
+// by fb_user_id (set by requireToken) and acts as a broad ceiling so a
+// rogue script can't drain the underlying Meta/Google API quota for the
+// whole team.
+app.use('/api/campaigns', requireToken, limitDefault, campaignsRouter);
+app.use('/api/insights', requireToken, limitDefault, insightsRouter);
+app.use('/api/meta', requireToken, limitDefault, metaRouter);
+app.use('/api/adsets', requireToken, limitDefault, adsetsRouter);
+app.use('/api/ads', requireToken, limitDefault, adsRouter);
+app.use('/api/creatives', requireToken, limitDefault, creativesRouter);
+app.use('/api/assets', requireToken, limitDefault, assetsRouter);
+app.use('/api/targeting', requireToken, limitDefault, targetingRouter);
+app.use('/api/rules', requireToken, limitDefault, rulesRouter);
+app.use('/api/labels', requireToken, limitDefault, labelsRouter);
+app.use('/api/pixels', requireToken, limitDefault, pixelsRouter);
+app.use('/api/conversions', requireToken, limitDefault, conversionsRouter);
+app.use('/api/leads', requireToken, limitDefault, leadsRouter);
+app.use('/api/catalogs', requireToken, limitDefault, catalogsRouter);
+app.use('/api/previews', requireToken, limitDefault, previewsRouter);
+app.use('/api/chat/history', chatHistoryRouter);  // mount BEFORE /api/chat catch-all
+app.use('/api/confirmations', confirmationsRouter);
+// Chat is the most expensive endpoint — every message is a Gemini call.
+// Stack a per-minute and a per-day limit so neither a runaway loop nor a
+// leak of credentials can run up an unbounded bill overnight.
+app.use('/api/chat', optionalToken, limitAi, limitAiDaily, chatRouter);
+app.use('/api/skills', limitAi, skillsRouter); // skill creation also calls Gemini
 
 // One-time cleanup: remove accidentally created custom skill_creator rows (official skill lives in filesystem)
 import('./lib/supabase.js').then(({ supabase }) => {
@@ -87,15 +131,19 @@ import('./lib/supabase.js').then(({ supabase }) => {
     if (!error) console.log('[startup] Cleaned up accidental skill_creator custom skill (if any)');
   });
 }).catch(() => {});
-app.use('/api/brand-library', brandLibraryRouter);
-app.use('/api/creative-sets', creativeSetsRouter);
+// Brand-library has crawl-url / crawl-social / upload-doc routes that all
+// hit Gemini, so the whole router shares the AI budget. List/CRUD ops are
+// cheap but staying in the same bucket is fine — 30/min is plenty for UI.
+app.use('/api/brand-library', limitAi, brandLibraryRouter);
+app.use('/api/creative-sets', limitDefault, creativeSetsRouter);
+app.use('/api/uploads', limitDefault, uploadsRouter); // GCS signed-URL uploads; auth handled internally
 
 // Google Ads API routes (no Meta token required — uses own credentials)
 app.use('/api/google/auth', googleAuthRouter);
-app.use('/api/google/accounts', googleAccountsRouter);
-app.use('/api/google/campaigns', googleCampaignsRouter);
-app.use('/api/google/reports', googleReportsRouter);
-app.use('/api/google/audiences', googleAudiencesRouter);
+app.use('/api/google/accounts', limitDefault, googleAccountsRouter);
+app.use('/api/google/campaigns', limitDefault, googleCampaignsRouter);
+app.use('/api/google/reports', limitDefault, googleReportsRouter);
+app.use('/api/google/audiences', limitDefault, googleAudiencesRouter);
 
 app.use((err, _req, res, _next) => {
   console.error('EXPRESS ERROR:', err?.message, err?.stack);

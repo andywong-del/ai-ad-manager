@@ -1,6 +1,7 @@
 import { LlmAgent, Runner, InMemorySessionService } from '@google/adk';
 import { rootTools, analystTools, executorTools, googleReadTools, googleWriteTools } from '../lib/tools.js';
 import { buildInstruction, buildAnalystInstruction, buildExecutorInstruction } from '../lib/instructions.js';
+import { SupabaseSessionService } from './supabaseSessionService.js';
 
 // ── 2 Sub-agents ─────────────────────────────────────────────────────────────
 
@@ -25,7 +26,13 @@ console.log(`[adAgent] Tool counts — root: ${rootTools.length} (${rootTools.ma
 
 // ── Root agent + runner ──────────────────────────────────────────────────────
 
-const sessionService = new InMemorySessionService();
+// Use Supabase-backed session service when DB is configured; fall back to
+// in-memory for local dev without Supabase. Persisting agent state lets
+// conversations survive Vercel cold starts and horizontal scale-out.
+const sessionService = (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY)
+  ? new SupabaseSessionService()
+  : new InMemorySessionService();
+console.log(`[adAgent] session service: ${sessionService.constructor.name}`);
 
 const agent = new LlmAgent({
   name: 'ad_manager',

@@ -212,8 +212,15 @@ router.get('/usage', async (req, res) => {
 });
 
 // ── Bulk Upload (for chat attachments) ────────────────────────────
-// POST /bulk-upload - Upload multiple images/videos at once
-// Body: { adAccountId, files: [{ name, type, base64 }] }
+// POST /bulk-upload — Register multiple images/videos with the ad account.
+// Body: { adAccountId, files: [{ name, type, url? , base64? }] }
+//
+// For each file, prefer URL-based registration (Meta pulls from the provided
+// URL — e.g. our GCS CDN). Falls back to base64 bytes upload if no URL given
+// (legacy path for backward compat; kept so older clients don't break).
+//
+// Per-file response is the same shape as before — adding a path marker so
+// the client / audit can tell which route was taken.
 router.post('/bulk-upload', async (req, res) => {
   try {
     const { adAccountId, files } = req.body;
@@ -225,35 +232,40 @@ router.post('/bulk-upload', async (req, res) => {
     const results = [];
 
     for (const file of files) {
+      const hasUrl = typeof file.url === 'string' && file.url.length > 0;
+      const hasBase64 = typeof file.base64 === 'string' && file.base64.length > 0;
+      if (!hasUrl && !hasBase64) {
+        results.push({ name: file.name, type: 'unknown', status: 'error', message: 'Either url or base64 is required' });
+        continue;
+      }
+      const path = hasUrl ? 'url' : 'bytes';
+
       try {
         if (file.type?.startsWith('image/')) {
-          const data = await metaClient.uploadAdImage(token, adAccountId, {
-            bytes: file.base64,
-            name: file.name,
-          });
-          // Meta returns { images: { [name]: { hash, url, ... } } }
+          const data = hasUrl
+            ? await metaClient.uploadAdImage(token, adAccountId, { url: file.url, name: file.name })
+            : await metaClient.uploadAdImage(token, adAccountId, { bytes: file.base64, name: file.name });
           const imgKey = Object.keys(data.images || {})[0];
           const imgData = data.images?.[imgKey] || {};
           results.push({
             name: file.name,
             type: 'image',
             status: 'success',
+            path,
             image_hash: imgData.hash,
             url: imgData.url,
             width: imgData.width,
             height: imgData.height,
           });
         } else if (file.type?.startsWith('video/')) {
-          // Convert base64 to Buffer and upload via multipart/form-data
-          const videoBuffer = Buffer.from(file.base64, 'base64');
-          const data = await metaClient.uploadAdVideo(token, adAccountId, {
-            source: videoBuffer,
-            title: file.name,
-          });
+          const data = hasUrl
+            ? await metaClient.uploadAdVideo(token, adAccountId, { file_url: file.url, title: file.name })
+            : await metaClient.uploadAdVideo(token, adAccountId, { source: Buffer.from(file.base64, 'base64'), title: file.name });
           results.push({
             name: file.name,
             type: 'video',
             status: 'success',
+            path,
             video_id: data.id,
           });
         } else {
@@ -261,11 +273,12 @@ router.post('/bulk-upload', async (req, res) => {
         }
       } catch (err) {
         const metaErr = err.response?.data?.error;
-        console.error(`[assets] bulk-upload error for ${file.name}:`, metaErr || err.message);
+        console.error(`[assets] bulk-upload error for ${file.name} (path=${path}):`, metaErr || err.message);
         results.push({
           name: file.name,
           type: file.type?.startsWith('image/') ? 'image' : 'video',
           status: 'error',
+          path,
           message: metaErr?.message || err.message,
         });
       }

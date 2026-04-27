@@ -379,12 +379,37 @@ export const getAdImages = async (token, adAccountId) => {
   return data?.data || [];
 };
 
+// Upload an image to an ad account. Accepts either:
+//   { bytes, name? }  — base64-encoded bytes (direct path)
+//   { url,   name? }  — any HTTPS URL (server fetches bytes then uploads them).
+//                        Meta's /adimages `url` param requires an app
+//                        capability most apps don't have — so we always land
+//                        on the `bytes` path after an internal fetch.
+// Legacy string signature (raw base64) is still honored for backward compat.
 export const uploadAdImage = async (token, adAccountId, imageData) => {
-  const bytes = typeof imageData === 'string' ? imageData : imageData?.bytes || imageData;
+  let bytes;
+  let name = imageData?.name;
+
+  if (imageData && typeof imageData === 'object' && imageData.url) {
+    const resp = await axios.get(imageData.url, {
+      responseType: 'arraybuffer',
+      timeout: 60000,
+      maxContentLength: 50 * 1024 * 1024, // hard ceiling: 50MB for images
+    });
+    bytes = Buffer.from(resp.data).toString('base64');
+    if (!name) {
+      // Best-effort: take the last path segment of the URL as the name.
+      try { name = new URL(imageData.url).pathname.split('/').pop() || undefined; } catch { /* ignore */ }
+    }
+  } else {
+    bytes = typeof imageData === 'string' ? imageData : imageData?.bytes || imageData;
+  }
+
   const formData = new URLSearchParams();
   formData.append('access_token', token);
   formData.append('bytes', bytes);
-  if (imageData?.name) formData.append('name', imageData.name);
+  if (name) formData.append('name', name);
+
   const { data } = await metaApi.post(`/${adAccountId}/adimages`, formData.toString(), {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     maxBodyLength: Infinity,

@@ -1,15 +1,64 @@
 import { FunctionTool } from '@google/adk';
 import { enums } from 'google-ads-api';
 import { getCustomer, handleApiError, parseDateRange, statusLabel } from '../api/google/client.js';
+import { isWriteTool, logAudit } from './auditLog.js';
+import { isDryRun, assessRisk, buildConfirmationRequiredResponse, buildDryRunResponse, stripConfirm, createPendingConfirmation, verifyConfirmation } from './safeMode.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-const safe = (fn) => async (args, ctx) => {
-  try { return await fn(args, ctx); }
-  catch (e) { return { error: e?.message || String(e) }; }
+const safe = (name, fn) => async (args, ctx) => {
+  const shouldAudit = isWriteTool(name);
+  const startedAt = shouldAudit ? Date.now() : 0;
+
+  if (shouldAudit) {
+    if (isDryRun()) {
+      const dry = buildDryRunResponse({ toolName: name, args });
+      console.log(`[safeMode] DRY RUN blocked ${name}`);
+      logAudit({ toolName: name, ctx, args, result: dry, success: true, errorMessage: '[DRY RUN]', durationMs: 0 });
+      return dry;
+    }
+    const risk = assessRisk(name, args);
+    if (risk.high) {
+      const verify = await verifyConfirmation({ toolName: name, args, ctx });
+      if (!verify.valid) {
+        const pendingId = await createPendingConfirmation({ toolName: name, args, reason: risk.reason, ctx });
+        const blocked = buildConfirmationRequiredResponse({ toolName: name, args, reason: risk.reason, pendingId });
+        const why = verify.reason ? ` (retry_reject=${verify.reason})` : '';
+        console.log(`[safeMode] confirmation required for ${name}: ${risk.reason}${why} → pending_id=${pendingId}`);
+        logAudit({ toolName: name, ctx, args, result: null, success: false, errorMessage: `CONFIRMATION_REQUIRED: ${risk.reason}${why}`, durationMs: 0 });
+        return blocked;
+      }
+      console.log(`[safeMode] confirmation verified for ${name} via ${args.confirm_id}`);
+    }
+  }
+
+  const callArgs = shouldAudit ? stripConfirm(args) : args;
+
+  try {
+    const result = await fn(callArgs, ctx);
+    if (shouldAudit) {
+      logAudit({
+        toolName: name, ctx, args, result,
+        success: !result?.error,
+        errorMessage: result?.error || null,
+        durationMs: Date.now() - startedAt,
+      });
+    }
+    return result;
+  } catch (e) {
+    const msg = e?.message || String(e);
+    if (shouldAudit) {
+      logAudit({
+        toolName: name, ctx, args, result: null,
+        success: false, errorMessage: msg,
+        durationMs: Date.now() - startedAt,
+      });
+    }
+    return { error: msg };
+  }
 };
 
 const T = (name, description, execute, parameters) => {
-  const opts = { name, description, execute: safe(execute) };
+  const opts = { name, description, execute: safe(name, execute) };
   if (parameters) opts.parameters = parameters;
   return new FunctionTool(opts);
 };

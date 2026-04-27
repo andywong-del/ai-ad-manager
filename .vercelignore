@@ -3,3 +3,7 @@
 **/*.log
 server/skills/custom
 .git
+# GCP keys
+pl-web-*.json
+*.json.key
+service-account*.json

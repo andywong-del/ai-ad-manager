@@ -2,6 +2,12 @@ import { Router } from 'express';
 import { runner, sessionService } from '../services/adAgent.js';
 import { activeSessions } from '../lib/sessionBus.js';
 import { extractPdfText } from '../lib/pdfExtract.js';
+import { createBlockFilter } from '../lib/streamFilter.js';
+
+// M1 — enable structured-block validation by default. Set
+// CHAT_BLOCK_VALIDATION=off to bypass and reproduce pre-M1 behavior (useful
+// for A/B testing the !demo-bad-json trigger).
+const BLOCK_VALIDATION_ON = process.env.CHAT_BLOCK_VALIDATION !== 'off';
 
 const router = Router();
 
@@ -93,8 +99,10 @@ router.post('/parse-doc', async (req, res) => {
   }
 });
 
-// In-memory map: chatSessionId → ADK sessionId
-const sessionMap = new Map();
+// Previously: in-memory chatSessionId → adkSessionId map.
+// Now removed — chatSessionId IS the adkSessionId, state persists to Supabase
+// via SupabaseSessionService, so cold-start / multi-instance deployments no
+// longer lose agent context.
 
 // Human-readable labels for tool calls shown in the activity log
 function toolCallLabel(name, args) {
@@ -193,21 +201,60 @@ router.post('/', async (req, res) => {
     });
 
     const userId = 'user';
-    adkSessionId = clientSessionId ? sessionMap.get(clientSessionId) : null;
 
-    // Create or reuse ADK session
-    if (!adkSessionId) {
-      const session = await sessionService.createSession({
-        appName: 'ai_ad_manager',
-        userId,
-        state: { token: userToken, adAccountId: adAccountId || null, activeCustomSkill },
-      });
-      adkSessionId = session.id;
-      if (clientSessionId) sessionMap.set(clientSessionId, adkSessionId);
-      console.log(`[chat] created session ${adkSessionId}`);
-    } else {
-      console.log(`[chat] reusing session ${adkSessionId}`);
+    // ── M1: streaming block-validation filter ─────────────────────────────
+    // Text chunks (both agent output and !demo-bad-json) are fed through
+    // createBlockFilter; rich blocks are buffered until close-fence and
+    // validated. Toggle off via CHAT_BLOCK_VALIDATION=off to reproduce raw
+    // pre-M1 behavior.
+    const filter = BLOCK_VALIDATION_ON
+      ? createBlockFilter({
+          emit: (text) => sse(res, { type: 'text', content: text }),
+          onValidationFail: (result) => {
+            console.warn('[chat] block validation failed', {
+              type: result.type,
+              reason: result.reason,
+              issues: result.issues?.slice(0, 3),
+            });
+          },
+          debugPlaceholder: process.env.CHAT_BLOCK_DEBUG === 'on',
+        })
+      : null;
+    const emitText = (text) => {
+      if (filter) filter.feed(text);
+      else sse(res, { type: 'text', content: text });
+    };
+
+    // DEMO TRIGGER (kept as a diagnostic after M1) — streams a hand-crafted
+    // malformed `metrics` block (trailing comma) + a valid `quickreplies`
+    // block, so you can A/B the schema filter:
+    //   CHAT_BLOCK_VALIDATION=on  (default) → bad metrics dropped, quickreplies renders
+    //   CHAT_BLOCK_VALIDATION=off           → pre-M1 behavior, raw JSON code block
+    if (typeof message === 'string' && message.trim().startsWith('!demo-bad-json')) {
+      console.log('[chat] !demo-bad-json trigger hit');
+      emitText("Here's your campaign snapshot:\n\n");
+      emitText("```metrics\n[\n  { \"label\": \"ROAS\", \"value\": \"2.4x\", \"trend\": \"up\" },\n  { \"label\": \"Spend\", \"value\": \"$1,200\", \"trend\": \"up\" },\n  { \"label\": \"CTR\", \"value\": \"1.8%\", \"trend\": \"down\" },\n]\n```\n\n");
+      emitText("Want to dig deeper?\n\n");
+      emitText("```quickreplies\n[\"Top campaigns\", \"Export CSV\", \"Pause underperformers\"]\n```\n");
+      filter?.flush();
+      sse(res, { type: 'done', sessionId: clientSessionId || 'demo-session' });
+      res.end();
+      return;
     }
+
+    // Reuse existing persisted session if the client sent an id we already
+    // know; otherwise create a new one using that id (so chatSessionId ===
+    // adkSessionId going forward).
+    const sessionInitState = { token: userToken, adAccountId: adAccountId || null, activeCustomSkill };
+    const session = await sessionService.getOrCreateSession({
+      appName: 'ai_ad_manager',
+      userId,
+      sessionId: clientSessionId || undefined,
+      state: sessionInitState,
+    });
+    adkSessionId = session.id;
+    const reused = session.events?.length > 0;
+    console.log(`[chat] ${reused ? 'resumed' : 'created'} session ${adkSessionId} (${session.events?.length || 0} prior events)`);
 
     // Build the user message in Gemini Content format
     // Language instruction
@@ -232,16 +279,24 @@ router.post('/', async (req, res) => {
     let fullText = '';
     let eventCount = 0;
 
+    // Cap how many times the model is allowed to call transfer_to_agent in a
+    // single user turn. Without this, root ↔ analyst ↔ executor can ping-pong
+    // forever — every hop reloads the target agent's full system prompt and
+    // tool schema into the Gemini context, so a runaway loop burns tokens
+    // and wall-clock fast. 8 is generous: a normal turn does 1–2 transfers,
+    // even mixed analyze+execute flows top out around 4. The counter spans
+    // ALL retry attempts on purpose — if a session is genuinely stuck, retry
+    // shouldn't reset its budget.
+    const TRANSFER_CAP = 8;
+    let transferCount = 0;
+    let transferCapped = false;
+
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       if (attempt > 0) {
-        console.log(`[chat] retry attempt ${attempt} — creating fresh session`);
-        const retrySession = await sessionService.createSession({
-          appName: 'ai_ad_manager',
-          userId,
-          state: { token: userToken, adAccountId: adAccountId || null, activeCustomSkill },
-        });
-        adkSessionId = retrySession.id;
-        if (clientSessionId) sessionMap.set(clientSessionId, adkSessionId);
+        // Retry path: MALFORMED_FUNCTION_CALL / Gemini 500. We keep the same
+        // session id so prior persisted events remain; the retry just runs
+        // another turn on top of the same session.
+        console.log(`[chat] retry attempt ${attempt} — reusing session ${adkSessionId}`);
         activeSessions.set(adkSessionId, (data) => sse(res, data));
       }
 
@@ -278,7 +333,7 @@ router.post('/', async (req, res) => {
             continue;
           }
           console.error(`[chat] ADK error: ${event.errorCode} ${event.errorMessage}`);
-          sse(res, { type: 'text', content: `Error: ${event.errorMessage}` });
+          emitText(`Error: ${event.errorMessage}`);
           fullText += event.errorMessage;
         }
 
@@ -286,11 +341,36 @@ router.post('/', async (req, res) => {
           for (const part of event.content.parts) {
             if (part.text) {
               fullText += part.text;
-              sse(res, { type: 'text', content: part.text });
+              emitText(part.text);
             }
             if (part.functionCall) {
               const name = part.functionCall.name;
               const args = part.functionCall.args || {};
+
+              // Transfer-cap check BEFORE we hand control back to the runner.
+              // If we've blown the budget, surface a tool_call event so the
+              // UI shows what happened, write a user-visible note into the
+              // text stream, and abort this turn.
+              if (name === 'transfer_to_agent') {
+                transferCount++;
+                if (transferCount > TRANSFER_CAP) {
+                  console.warn(
+                    `[chat] transfer cap (${TRANSFER_CAP}) hit on session ${adkSessionId} — aborting turn`
+                  );
+                  sse(res, {
+                    type: 'tool_call',
+                    name: 'transfer_to_agent',
+                    label: `Transfer cap reached (${TRANSFER_CAP}) — aborting turn`,
+                  });
+                  emitText(
+                    '\n\n_Stopped: the agents kept handing the request back and forth. ' +
+                    'Try rephrasing or breaking the task into smaller steps._'
+                  );
+                  transferCapped = true;
+                  break; // out of parts loop
+                }
+              }
+
               const label = toolCallLabel(name, args);
               const payload = { type: 'tool_call', name, label };
               if (name === 'transfer_to_agent') payload.target = args.agentName || args.agent_name;
@@ -302,8 +382,13 @@ router.post('/', async (req, res) => {
               }
             }
           }
+          if (transferCapped) break; // out of events loop
         }
       }
+
+      // If we hit the transfer cap, stop completely — don't let retry
+      // re-enter the same loop on the same session.
+      if (transferCapped) break;
 
       // If we got text or no retryable error, stop
       if (fullText || !shouldRetry) break;
@@ -312,8 +397,11 @@ router.post('/', async (req, res) => {
     console.log(`[chat] done: ${eventCount} events, ${fullText.length} chars of text`);
 
     if (!fullText) {
-      sse(res, { type: 'text', content: `I received your message but couldn't generate a response. Please try again. (adAccountId: ${adAccountId || 'none'})` });
+      emitText(`I received your message but couldn't generate a response. Please try again. (adAccountId: ${adAccountId || 'none'})`);
     }
+
+    // Flush any residual text / report unclosed blocks before closing SSE.
+    filter?.flush();
 
     activeSessions.delete(adkSessionId);
     sse(res, { type: 'done', sessionId: adkSessionId });

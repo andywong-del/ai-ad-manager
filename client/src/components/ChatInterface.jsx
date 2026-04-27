@@ -8,6 +8,7 @@ import SavedAudienceCard from './SavedAudienceCard.jsx';
 import WebsiteAudienceCard from './WebsiteAudienceCard.jsx';
 import { useAdAccounts } from '../hooks/useAdAccounts.js';
 import { useBusinesses } from '../hooks/useBusinesses.js';
+import { uploadToGcs } from '../hooks/useGcsUpload.js';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
@@ -1705,7 +1706,7 @@ const AttachmentChip = ({ attachment, onRemove, onRetry }) => {
   const isDoc = attachment.isDoc || attachment.file?.name?.match(/\.(pdf|txt|doc|docx)$/i);
   return (
     <div className="relative group flex-shrink-0">
-      <div className={`w-20 h-20 rounded-xl border overflow-hidden flex items-center justify-center
+      <div className={`relative w-20 h-20 rounded-xl border overflow-hidden flex items-center justify-center
         ${attachment.status === 'error' ? 'border-red-300 bg-red-50' :
           attachment.status === 'done' ? 'border-emerald-300 bg-white' :
           'border-slate-200 bg-slate-50'}`}>
@@ -1730,8 +1731,8 @@ const AttachmentChip = ({ attachment, onRemove, onRetry }) => {
           </div>
         )}
         {attachment.status === 'done' && (
-          <div className="absolute bottom-1 right-1">
-            <CheckCircle2 size={14} className="text-emerald-500 bg-white rounded-full" />
+          <div className="absolute bottom-1 right-1 bg-white rounded-full shadow-sm ring-1 ring-emerald-100">
+            <CheckCircle2 size={14} className="text-emerald-500" />
           </div>
         )}
         {attachment.status === 'error' && (
@@ -1774,21 +1775,62 @@ const AttachmentBar = ({ attachments, onRemove, onRetry }) => {
 };
 
 // ── Message attachment thumbnails (in user bubble) ───────────────────────────
+// Resolution order: gcs_public_url (survives reload) → preview (blob, works
+// only in the session that created it). Doc attachments have no thumbnail —
+// render a filename chip that links to the GCS original when available.
 const MessageAttachments = ({ attachments }) => {
   if (!attachments?.length) return null;
+  const isImage = (a) => (a.type || '').startsWith('image/');
+  const isVideo = (a) => (a.type || '').startsWith('video/');
   return (
     <div className="flex gap-1.5 flex-wrap mb-2">
-      {attachments.map((a, i) => (
-        <div key={i} className="w-16 h-16 rounded-lg overflow-hidden border border-white/30">
-          {a.preview ? (
-            <img src={a.preview} alt={a.name} className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full bg-white/10 flex items-center justify-center">
+      {attachments.map((a, i) => {
+        const thumbUrl = a.gcs_public_url || a.preview;
+        if (isImage(a) && thumbUrl) {
+          return (
+            <a
+              key={i}
+              href={a.gcs_public_url || thumbUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-16 h-16 rounded-lg overflow-hidden border border-white/30 block"
+              title={a.name}
+            >
+              <img src={thumbUrl} alt={a.name} className="w-full h-full object-cover" />
+            </a>
+          );
+        }
+        if (isVideo(a)) {
+          return (
+            <a
+              key={i}
+              href={a.gcs_public_url || '#'}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={a.gcs_public_url ? undefined : (e) => e.preventDefault()}
+              className="w-16 h-16 rounded-lg overflow-hidden border border-white/30 bg-white/10 flex items-center justify-center block"
+              title={a.name}
+            >
               <Film size={16} className="text-white/70" />
-            </div>
-          )}
-        </div>
-      ))}
+            </a>
+          );
+        }
+        // Document fallback — filename chip
+        return (
+          <a
+            key={i}
+            href={a.gcs_public_url || '#'}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={a.gcs_public_url ? undefined : (e) => e.preventDefault()}
+            className="px-2 py-1 h-16 rounded-lg border border-white/30 bg-white/10 flex items-center gap-1.5 max-w-[180px]"
+            title={a.name}
+          >
+            <FileText size={14} className="text-white/70 shrink-0" />
+            <span className="text-[11px] text-white/90 truncate">{a.name}</span>
+          </a>
+        );
+      })}
     </div>
   );
 };
@@ -2211,8 +2253,14 @@ const MessageBubble = ({ message, isLatest, onSend, isTyping, onSaveItem, folder
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center shrink-0 mb-0.5">
             <Zap size={15} className="text-white" />
           </div>
-          <div className={hasWide ? 'max-w-[95%] flex-1 min-w-0' : 'max-w-[80%]'}>
-            <div className="bg-white/80 backdrop-blur-sm border border-slate-200 text-slate-700 rounded-2xl rounded-bl-sm px-4 py-3 text-sm leading-relaxed shadow-sm relative">
+          <div className={hasWide ? 'max-w-[95%] flex-1 min-w-0' : 'max-w-[80%] min-w-0'}>
+            {/* break-words + overflow-wrap:anywhere so long tokens (file
+                hashes, URLs, image_hash:xxxx strings) wrap inside the bubble
+                instead of pushing the bubble past its max-width. min-w-0 on
+                the flex parent above is also required — without it the
+                flex item's intrinsic min-width is `auto` and the unbroken
+                word still wins. */}
+            <div className="bg-white/80 backdrop-blur-sm border border-slate-200 text-slate-700 rounded-2xl rounded-bl-sm px-4 py-3 text-sm leading-relaxed shadow-sm relative break-words [overflow-wrap:anywhere]">
               {/* Save as Skill button moved below message */}
               {segments.map((seg, i) => {
                 switch (seg.type) {
@@ -2270,8 +2318,12 @@ const MessageBubble = ({ message, isLatest, onSend, isTyping, onSaveItem, folder
   // User message
   return (
     <div className="flex items-end justify-end gap-3 mb-6 group">
-      <div className="max-w-[75%]">
-        <div className="bg-gradient-to-br from-slate-800 to-slate-900 text-white rounded-2xl rounded-br-sm px-4 py-3 text-sm leading-relaxed shadow-md shadow-slate-300/20">
+      <div className="max-w-[75%] min-w-0">
+        {/* See agent bubble above for why break-words + [overflow-wrap:anywhere]
+            + min-w-0 are all needed together. The user-pasted hashes (e.g.
+            "[Uploaded image: 679667959_1024343...image_hash:404d27...]")
+            are the most common offender on this side. */}
+        <div className="bg-gradient-to-br from-slate-800 to-slate-900 text-white rounded-2xl rounded-br-sm px-4 py-3 text-sm leading-relaxed shadow-md shadow-slate-300/20 break-words [overflow-wrap:anywhere]">
           {message.attachments && <MessageAttachments attachments={message.attachments} />}
           {message.text}
         </div>
@@ -3161,40 +3213,68 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, activityLog = 
   useEffect(() => { if (initialPill) setActivePill(initialPill); }, [initialPill]);
   const dragCounter = useRef(0);
 
-  // Upload a single file to Meta via our bulk-upload endpoint
+  // Upload a file: GCS-first, then register with Meta via URL.
+  //
+  //   Step 1: Upload bytes to GCS (direct, with real progress events).
+  //   Step 2: Tell /api/assets/bulk-upload to register that GCS URL with Meta
+  //           — Meta pulls the object and returns image_hash / video_id.
+  //
+  // Bytes only traverse the user's network once. If GCS fails, we fall back to
+  // the legacy base64 → bulk-upload path so the user always succeeds.
   const uploadFile = useCallback(async (attachment) => {
     if (!adAccountId) {
       setAttachments(prev => prev.map(a => a.id === attachment.id ? { ...a, status: 'error', error: 'Select an ad account first' } : a));
       return;
     }
 
-    setAttachments(prev => prev.map(a => a.id === attachment.id ? { ...a, status: 'uploading', progress: 10 } : a));
+    setAttachments(prev => prev.map(a => a.id === attachment.id ? { ...a, status: 'uploading', progress: 2 } : a));
 
+    // Auth now flows via the HttpOnly aam_session cookie — no Bearer needed
+    // for the GCS sign endpoints or Meta bulk-upload, but we must opt in to
+    // sending credentials with fetch().
+
+    // ── Step 1: GCS direct upload (real progress 0–90%) ─────────────────────
+    let gcs = null;
     try {
-      // Read file as base64
-      const base64 = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result.split(',')[1]);
-        reader.onerror = reject;
-        reader.readAsDataURL(attachment.file);
+      gcs = await uploadToGcs(attachment.file, {
+        kind: 'chat',
+        onProgress: (p) => {
+          // Reserve 90–100% for the Meta register call.
+          const scaled = Math.round(p * 0.9);
+          setAttachments(prev => prev.map(a => a.id === attachment.id ? { ...a, progress: scaled } : a));
+        },
       });
+      setAttachments(prev => prev.map(a => a.id === attachment.id
+        ? { ...a, gcs: { objectKey: gcs.objectKey, publicUrl: gcs.publicUrl, size: gcs.size }, progress: 90 }
+        : a));
+    } catch (err) {
+      console.warn('[chat] GCS upload failed, falling back to base64:', err?.message || err);
+      gcs = null; // signal fallback
+    }
 
-      setAttachments(prev => prev.map(a => a.id === attachment.id ? { ...a, progress: 40 } : a));
+    // ── Step 2: register with Meta ─────────────────────────────────────────
+    try {
+      let bulkFile;
+      if (gcs) {
+        // Preferred path: tell Meta to pull from GCS CDN URL.
+        bulkFile = { name: attachment.file.name, type: attachment.file.type, url: gcs.publicUrl };
+      } else {
+        // Fallback: read file as base64 and upload the old way.
+        const base64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result.split(',')[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(attachment.file);
+        });
+        bulkFile = { name: attachment.file.name, type: attachment.file.type, base64 };
+      }
 
-      const bearerToken = localStorage.getItem('fb_long_lived_token');
       const res = await fetch('/api/assets/bulk-upload', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(bearerToken && { Authorization: `Bearer ${bearerToken}` }),
-        },
-        body: JSON.stringify({
-          adAccountId,
-          files: [{ name: attachment.file.name, type: attachment.file.type, base64 }],
-        }),
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adAccountId, files: [bulkFile] }),
       });
-
-      setAttachments(prev => prev.map(a => a.id === attachment.id ? { ...a, progress: 80 } : a));
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Upload failed');
@@ -3270,11 +3350,28 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, activityLog = 
       mediaAttachments.forEach(a => uploadFile(a));
     }
 
-    // Document files — parse text and add as attachment with extracted content
+    // Document files — parse text and add as attachment with extracted content.
+    // A2 fix: side-car upload original file to GCS so the raw bytes are persisted
+    // (AI only sees a truncated extract — without the original we can't replay/debug).
+    // GCS failure is non-fatal: we log + continue with parse-doc only.
     const docFiles = files.filter(isDoc);
     docFiles.forEach(async (file) => {
       const id = Date.now().toString(36) + Math.random().toString(36).slice(2);
-      setAttachments(prev => [...prev, { id, file, preview: null, status: 'uploading', progress: 30, result: null, isDoc: true }]);
+      setAttachments(prev => [...prev, { id, file, preview: null, status: 'uploading', progress: 10, result: null, isDoc: true }]);
+
+      // Fire GCS upload in parallel with parse-doc base64 prep
+      const gcsPromise = uploadToGcs(file, {
+        kind: 'chat',
+        onProgress: (p) => {
+          // Doc UI has a single progress bar — show GCS progress up to 60%,
+          // leave 60-100% for parse-doc. Good enough signal; not exact.
+          const scaled = Math.round(p * 0.6);
+          setAttachments(prev => prev.map(a => a.id === id && a.progress < 60 ? { ...a, progress: scaled } : a));
+        },
+      }).catch(err => {
+        console.warn('[chat] doc GCS upload failed (parse-doc will still run):', err?.message || err);
+        return null;
+      });
 
       try {
         const base64 = await new Promise((resolve, reject) => {
@@ -3284,20 +3381,23 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, activityLog = 
           reader.readAsDataURL(file);
         });
 
-        const docBearerToken = localStorage.getItem('fb_long_lived_token');
+        // Cookie session carries auth — no Bearer header.
         const res = await fetch('/api/chat/parse-doc', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(docBearerToken && { Authorization: `Bearer ${docBearerToken}` }),
-          },
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ base64, type: file.type, name: file.name }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
 
+        // Wait for GCS side-car to settle before marking done (it's usually
+        // faster than parse-doc so this rarely blocks).
+        const gcs = await gcsPromise;
+
         setAttachments(prev => prev.map(a => a.id === id ? {
           ...a, status: 'done', progress: 100,
+          gcs: gcs ? { objectKey: gcs.objectKey, publicUrl: gcs.publicUrl, size: gcs.size } : null,
           result: { type: 'document', text: data.text, charCount: data.charCount, truncated: data.truncated },
         } : a));
       } catch (err) {
@@ -3417,16 +3517,30 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, activityLog = 
       msgText = lines.join('\n') + (t ? '\n\n' + t : defaultPrompt);
     }
 
-    // Pass attachment previews so user message shows thumbnails
+    // Pass attachment metadata on user message. Shape designed to round-trip
+    // through Supabase `chat_messages.metadata.attachments` — so we deliberately
+    // keep the blob `preview` (used only for the in-memory first render) next
+    // to the durable `gcs_public_url` (used on reload). The save layer strips
+    // the blob URL before persisting.
     const msgAttachments = doneAttachments.map(a => ({
       name: a.file.name,
-      preview: a.preview,
       type: a.file.type,
+      preview: a.preview,             // blob: URL — ephemeral, stripped on save
+      isDoc: !!a.isDoc,
       image_hash: a.result?.image_hash,
       video_id: a.result?.video_id,
+      // GCS side-car — persists images, videos, and documents to our bucket.
+      // Absent if the side-car upload failed (non-fatal; Meta / base64 paths still work).
+      gcs_object_key: a.gcs?.objectKey,
+      gcs_public_url: a.gcs?.publicUrl,
+      size: a.gcs?.size ?? a.file.size,
     }));
 
-    onSend(msgText, msgAttachments, currentSlashIds);
+    // 4th arg = displayText: what the USER sees in their own bubble.
+    // msgText is the AI-visible prompt (with [Uploaded image: ..., image_hash: ...]
+    // hints the agent needs). `t` is the raw user input — thumbnails already
+    // render above so no need to repeat filename/hash in the bubble body.
+    onSend(msgText, msgAttachments, currentSlashIds, t);
     setInput('');
     setAttachments([]);
     inputRef.current?.focus();
@@ -3506,8 +3620,13 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, activityLog = 
       {/* Chat messages */}
       {!isEmptyState && (
         <>
-          <div className="flex-1 overflow-y-auto">
-            <div className="max-w-3xl mx-auto px-4 pt-6 pb-2">
+          {/* overflow-x-hidden + min-w-0 here is the belt-and-braces fix for
+              the bottom horizontal scrollbar: when the chat is narrowed
+              (canvas open at 520px) any over-wide message content (tables,
+              charts, MetaCard) used to push the container, triggering a
+              page-level horizontal scroll. We clip it instead. */}
+          <div className="flex-1 overflow-y-auto overflow-x-hidden min-w-0">
+            <div className="max-w-3xl mx-auto px-4 pt-6 pb-2 min-w-0">
               {messages.map((msg, idx) => {
                 // Find the first user message after this agent message (if any)
                 const nextUserMsg = msg.role === 'agent'
@@ -3540,8 +3659,8 @@ export const ChatInterface = ({ messages, isTyping, thinkingText, activityLog = 
             </div>
           </div>
 
-          <div className="shrink-0 border-t border-slate-200 bg-white/70 backdrop-blur-xl px-4 py-3">
-            <div className="max-w-3xl mx-auto">
+          <div className="shrink-0 border-t border-slate-200 bg-white/70 backdrop-blur-xl px-4 py-3 overflow-x-hidden">
+            <div className="max-w-3xl mx-auto min-w-0">
               <ChatInput
                 input={input} setInput={setInput} onKeyDown={handleKeyDown}
                 onSend={() => handleSend()} onStop={onStop} onFilesAdded={addFiles}

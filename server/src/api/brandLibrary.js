@@ -3,6 +3,7 @@ import axios from 'axios';
 import { GoogleGenAI } from '@google/genai';
 import { supabase } from '../lib/supabase.js';
 import { extractPdfText } from '../lib/pdfExtract.js';
+import { resolveUser } from '../middleware/resolveUser.js';
 
 const router = Router();
 
@@ -24,16 +25,6 @@ const getFbUserId = async (token) => {
     if (data?.id) { userIdCache.set(token, data.id); return data.id; }
   } catch (err) { console.error('[brand-library] FB user ID error:', err.message); }
   return null;
-};
-
-// Middleware: resolve user
-const resolveUser = async (req, _res, next) => {
-  const auth = req.headers.authorization;
-  if (auth?.startsWith('Bearer ')) {
-    req.token = auth.slice(7);
-    req.fbUserId = await getFbUserId(req.token);
-  }
-  next();
 };
 
 router.use(resolveUser);

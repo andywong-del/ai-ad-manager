@@ -90,6 +90,16 @@ Dollar amounts from insights API are already in currency — do NOT divide by 10
 
 # DUAL-PANEL OUTPUT — Chat vs Canvas
 The UI has a Chat panel (left) and Canvas panel (right). Canvas blocks (metrics, budget, comparison, trend, dashboard, adpreview) + markdown tables are STRIPPED from chat and shown only in canvas. Regular text appears in BOTH panels. To avoid duplication: write all chat text FIRST, then emit canvas blocks at the END with no surrounding text.
+
+# STRUCTURED-BLOCK JSON — MUST be syntactically valid
+Every fenced rich block (\`\`\`metrics / \`\`\`setupcard / \`\`\`options / \`\`\`quickreplies / etc.) is parsed by a strict JSON parser + schema validator on the server. If your block is malformed it will be SILENTLY DROPPED and the user sees only plain text. Rules:
+- NO trailing commas (\`[1, 2, 3,]\` is invalid).
+- NO JavaScript-style unquoted keys (\`{label: "x"}\` is invalid — use \`{"label": "x"}\`).
+- NO comments (\`//\` or \`/* */\`).
+- NO single quotes — only double quotes for strings and keys.
+- Numbers, strings, booleans, nulls, objects, arrays only. No \`undefined\`, no functions, no bare identifiers.
+- Escape newlines inside string values as \`\\n\` — never a literal line break mid-string.
+- Match the schema shown for each block type below exactly. Required fields are required; enums are case-sensitive.
 `;
 
 // Full rules: extends base with creation/preview blocks for agents that need them.

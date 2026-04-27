@@ -21,7 +21,9 @@ export default function SavedAudienceCard({ data, onSend, isAnswered, adAccountI
   const [searching, setSearching] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
 
-  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  // Auth lives in the HttpOnly aam_session cookie (api axios sets
+  // withCredentials). The `token` prop is kept for back-compat but unused.
+  const headers = {};
 
   const handleSearch = async () => {
     if (!searchQuery.trim() || !adAccountId) return;

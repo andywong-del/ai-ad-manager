@@ -1,36 +1,22 @@
 import { Router } from 'express';
 import axios from 'axios';
 import { supabase } from '../../lib/supabase.js';
+import { resolveUser } from '../../middleware/resolveUser.js';
 
 const router = Router();
 
-// ── FB User ID resolution (reused pattern from skills.js) ───────────────────
-const userIdCache = new Map();
-const getFbUserId = async (token) => {
-  if (!token) return null;
-  if (userIdCache.has(token)) return userIdCache.get(token);
-  try {
-    const { data } = await axios.get(`https://graph.facebook.com/v25.0/me?fields=id&access_token=${token}`);
-    if (data?.id) { userIdCache.set(token, data.id); return data.id; }
-  } catch (err) { console.error('[google-auth] FB user ID error:', err.message); }
-  return null;
-};
-
-const resolveUser = async (req, _res, next) => {
-  const auth = req.headers.authorization;
-  if (auth?.startsWith('Bearer ')) {
-    req.token = auth.slice(7);
-    req.fbUserId = await getFbUserId(req.token);
-  }
-  // Env fallback so localhost (and production with ALLOW_GOOGLE_ENV_FALLBACK=true) works without Meta login
+// Identity comes from the shared resolver (cookie session or Bearer header).
+// Google auth additionally allows an env-based fallback so the team token
+// flow works on localhost and on production deployments that opt in via
+// ALLOW_GOOGLE_ENV_FALLBACK=true.
+router.use(resolveUser);
+router.use((req, _res, next) => {
   const allowEnvFallback = process.env.NODE_ENV !== 'production' || process.env.ALLOW_GOOGLE_ENV_FALLBACK === 'true';
   if (!req.fbUserId && allowEnvFallback) {
     req.fbUserId = process.env.DEV_FB_USER_ID || '_solo';
   }
   next();
-};
-
-router.use(resolveUser);
+});
 
 // ── OAuth configuration ─────────────────────────────────────────────────────
 const OAUTH_SCOPE = 'https://www.googleapis.com/auth/adwords';

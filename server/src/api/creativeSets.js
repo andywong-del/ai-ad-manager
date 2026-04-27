@@ -1,29 +1,8 @@
 import { Router } from 'express';
-import axios from 'axios';
 import { supabase } from '../lib/supabase.js';
+import { resolveUser } from '../middleware/resolveUser.js';
 
 const router = Router();
-
-// ── FB User ID extraction ──
-const userIdCache = new Map();
-const getFbUserId = async (token) => {
-  if (!token) return null;
-  if (userIdCache.has(token)) return userIdCache.get(token);
-  try {
-    const { data } = await axios.get(`https://graph.facebook.com/v25.0/me?fields=id&access_token=${token}`);
-    if (data?.id) { userIdCache.set(token, data.id); return data.id; }
-  } catch {}
-  return null;
-};
-
-const resolveUser = async (req, _res, next) => {
-  const auth = req.headers.authorization;
-  if (auth?.startsWith('Bearer ')) {
-    req.token = auth.slice(7);
-    req.fbUserId = await getFbUserId(req.token);
-  }
-  next();
-};
 
 router.use(resolveUser);
 

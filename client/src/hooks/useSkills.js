@@ -93,6 +93,33 @@ export const useSkills = () => {
     return data; // { name, description, content, preview }
   }, []);
 
+  // List revisions for a custom skill (newest first). Each entry has a
+  // contentPreview (240 chars) — call fetchRevision(id, version) to get the
+  // full content for diff/restore.
+  const fetchRevisions = useCallback(async (id) => {
+    try {
+      const { data } = await api.get(`/skills/${id}/revisions`);
+      return data?.revisions || [];
+    } catch (err) {
+      console.error('Failed to fetch revisions:', err);
+      return [];
+    }
+  }, []);
+
+  // Fetch a single full revision payload (used to preview before restoring).
+  const fetchRevision = useCallback(async (id, version) => {
+    const { data } = await api.get(`/skills/${id}/revisions/${version}`);
+    return data?.revision || null;
+  }, []);
+
+  // Restore a previous version. Server records this as a NEW revision
+  // (source='revert') so undo is always possible.
+  const revertSkill = useCallback(async (id, version) => {
+    const { data } = await api.post(`/skills/${id}/revert`, { version });
+    setSkills(prev => prev.map(s => s.id === id ? { ...data, isDefault: false } : s));
+    return data;
+  }, []);
+
   // Enrich an existing skill with AI-generated description + preview (keeps content)
   const enrichSkill = useCallback(async (name, content) => {
     try {
@@ -142,5 +169,8 @@ export const useSkills = () => {
     getSkillContext,
     getSkillContextById,
     fetchSkills,
+    fetchRevisions,
+    fetchRevision,
+    revertSkill,
   };
 };

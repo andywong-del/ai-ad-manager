@@ -1,0 +1,146 @@
+========================================================================
+ TASK — Meta 广告优化（Skills + Decision Tree + Chat UX）
+========================================================================
+
+背景：延续 OPTIMIZATION_LOG #1–#5 之后的下一批工作。
+本文件是「当前冲刺」的唯一 source of truth，做完一项就把 [ ] 改成 [x]。
+
+
+------------------------------------------------------------------------
+ 冲刺总览
+------------------------------------------------------------------------
+
+  ID    主题                                              状态
+  ----  ------------------------------------------------  --------
+  M1    结构化 block JSON schema 校验（server 侧护栏）    完成
+  M2    上传成功后 chat 气泡即时预览（图/视频缩略图）     待启动
+  M3    campaigns.md 增加 "ambiguous upload" 决策节点     待启动
+  M4    Skill eval framework MVP（vitest + runner.ask()） 待启动
+  M5    多文件并行上传进度 + 失败重试 UI                  待启动
+
+M1 落地记录：见 OPTIMIZATION_LOG.md #6。demo 触发器已清理；要复现
+pre-M1 行为设 CHAT_BLOCK_VALIDATION=off 启 server。
+
+
+========================================================================
+ #1 (M1) 结构化 block JSON schema 校验 — 5 个具体任务
+========================================================================
+
+背景说明：
+  AI 在 SSE 文本里输出 fenced block（```setupcard / ```metrics 等），
+  客户端 ChatInterface.jsx:211-261 对每个块 JSON.parse。
+  当前 server 零校验，AI 一旦吐出尾逗号 / 缺引号的 JSON，
+  客户端 catch 分支就把整段 fallback 成原始代码块 —— 用户
+  看到光秃秃的 JSON，而不是卡片 / 按钮。
+
+目标：
+  在 server SSE 管道里拦住坏 JSON，保证前端只收到合法块。
+
+
+------------------------------------------------------------------------
+ T1.1  定义所有 block 的 schema
+------------------------------------------------------------------------
+  [x]新建 server/src/lib/responseSchemas.js
+  [x]用 Zod 为以下 block 各写一个 schema：
+        setupcard / adpreview / copyvariations / postpicker /
+        mediagrid / options / quickreplies / metrics / dashboard
+  [x]schema 字段与 client/src/components/ChatInterface.jsx 渲染
+      逻辑逐一对应（读组件确认）
+  [x]导出 BLOCK_SCHEMAS 映射表 + listBlockTypes()
+
+
+------------------------------------------------------------------------
+ T1.2  写纯函数校验器 validateBlock(type, rawJsonString)
+------------------------------------------------------------------------
+  [x]输入：block 类型 + fenced 内文本
+  [x]行为：JSON.parse -> schema.safeParse
+           返回 { ok: true, data } 或 { ok: false, reason, issues }
+  [x]reason 枚举：parse_error / schema_error / unknown_type
+  [x]单测文件：server/src/lib/__tests__/responseSchemas.test.js
+       每个 block 至少 1 合法 + 1 非法（尾逗号 / 缺字段 / 类型错）
+
+
+------------------------------------------------------------------------
+ T1.3  把校验接入 SSE 管道
+------------------------------------------------------------------------
+  [x]server/src/api/chat.js 发送前缓冲 fullText
+  [x]策略 A「逐块缓冲，合法才放行」：
+        检测到 ``` 开头就缓冲该块 -> 收到闭合 ``` -> 整块校验
+        通过才一次性 sse({type:'text'}) 发出；失败吞掉
+  [x]纯文本部分仍按 token 粒度 stream，不引入感知延迟
+  [x]失败 telemetry：console.warn('[chat] block validation failed',
+      { type, reason, issues })，后续可接 audit_log
+
+
+------------------------------------------------------------------------
+ T1.4  降级 & 自愈策略
+------------------------------------------------------------------------
+  [x]失败默认静默丢弃该块 + 追加降级提示
+      "⚠️ (rich block skipped)"（debug 模式才显示）
+  [x]可选：一次 retry —— 把 { type, raw, issues } 塞回 ADK 让
+      AI 重出该块（超时 3s，最多 1 次）。本冲刺先不接 retry，
+      只记日志；在 TASK 留 follow-up
+  [x]server/src/lib/instructions.js 给 AI 补一条：
+      "Structured blocks MUST be valid JSON. No trailing commas,
+       no comments." —— 从源头减少坏块
+
+
+------------------------------------------------------------------------
+ T1.5  清理 demo 触发器 + 端到端验证
+------------------------------------------------------------------------
+  [x]删除 server/src/api/chat.js 里 !demo-bad-json 分支
+  [x]加 vitest 集成测试：mock SSE 发坏块，断言客户端收到降级
+      文本而非原始 JSON
+  [x]手测：让 AI 生成 metrics / setupcard / quickreplies 各一次
+  [x]更新 OPTIMIZATION_LOG.md 加 #6 条目
+      （impl 摘要 / 改动文件 / 验证步骤 / trade-off）
+
+
+========================================================================
+ M2 — 上传预览气泡
+========================================================================
+  [ ] 图片上传成功立即插入 user 气泡（缩略图 + 文件名 + 尺寸）
+  [ ] 视频同理，附时长
+  [ ] 失败状态：红边 + 重试按钮
+  [ ] 相关：ChatInterface.jsx 的 message list + FileUpload hook
+
+
+========================================================================
+ M3 — ambiguous upload 决策节点
+========================================================================
+  [ ] server/skills/system/meta/campaigns.md Flow 1 下加分支：
+      「若用户上传文件但未说明用途 → 先 quickreplies 澄清」
+  [ ] creative-hub.md 同步该分支
+  [ ] 跑一遍 skill eval（依赖 M4 就绪后自动跑）
+
+
+========================================================================
+ M4 — Skill eval framework MVP
+========================================================================
+  [ ] 新建 server/src/evals/runner.js
+      提供 ask(prompt, { skill, account }) ->
+        { text, toolCalls, blocks }
+  [ ] vitest 接入，断言风格：
+      expect(toolCalls).toContainToolNamed('create_campaign')
+  [ ] 5 个种子 case：
+      launch campaign / boost post / edit budget /
+      pause campaign / ambiguous upload
+  [ ] CI：本地 npm run eval，暂不上 pipeline
+
+
+========================================================================
+ M5 — 多文件并行上传 UX
+========================================================================
+  [ ] 文件队列组件：每个文件独立 progress bar + 状态
+      (queued / uploading / done / failed)
+  [ ] 并发上限 3，超出排队
+  [ ] 单文件失败可点击重试，不影响其他文件
+  [ ] 全部完成后合并成一条 chat 气泡
+
+
+========================================================================
+ 工作协议
+========================================================================
+  - 每完成一个任务：改本文件状态 + 在 OPTIMIZATION_LOG.md 追加条目
+  - 不要越级：M1 没跑通前不动 M2–M5
+  - Commit 粒度：每个 T* 一个 commit，信息以 m1/schema: 开头

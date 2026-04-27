@@ -7,6 +7,8 @@ import { fileURLToPath } from 'url';
 import * as meta from '../services/metaClient.js';
 import { activeSessions } from './sessionBus.js';
 import { supabase } from './supabase.js';
+import { isWriteTool, logAudit } from './auditLog.js';
+import { isDryRun, assessRisk, buildConfirmationRequiredResponse, buildDryRunResponse, stripConfirm, createPendingConfirmation, verifyConfirmation } from './safeMode.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SKILLS_BASE = path.resolve(__dirname, '../../skills');
@@ -126,19 +128,56 @@ function buildResultSummary(fnName, rawResult) {
 // Wrap every tool so:
 // 1. Thrown errors become { error } objects the LLM can read
 // 2. Responses are serialized to { result: "JSON string" } so Gemini can parse them
-const safe = (fn) => async (args, c) => {
+// `toolName` is the snake_case tool name (what the LLM sees). `fn.name` is
+// the JS function identifier (camelCase) — we can't use it for guardrail
+// matching. Callers pass both explicitly.
+const safe = (toolName, fn) => async (args, c) => {
+  const shouldAudit = isWriteTool(toolName);
+  const startedAt = shouldAudit ? Date.now() : 0;
+
+  if (shouldAudit) {
+    if (isDryRun()) {
+      const dry = buildDryRunResponse({ toolName, args });
+      console.log(`[safeMode] DRY RUN blocked ${toolName}`);
+      logAudit({ toolName, ctx: c, args, result: dry, success: true, errorMessage: '[DRY RUN]', durationMs: 0 });
+      return { result: JSON.stringify(dry) };
+    }
+    const risk = assessRisk(toolName, args);
+    if (risk.high) {
+      const verify = await verifyConfirmation({ toolName, args, ctx: c });
+      if (!verify.valid) {
+        const pendingId = await createPendingConfirmation({ toolName, args, reason: risk.reason, ctx: c });
+        const blocked = buildConfirmationRequiredResponse({ toolName, args, reason: risk.reason, pendingId });
+        const why = verify.reason ? ` (retry_reject=${verify.reason})` : '';
+        console.log(`[safeMode] confirmation required for ${toolName}: ${risk.reason}${why} → pending_id=${pendingId}`);
+        logAudit({ toolName, ctx: c, args, result: null, success: false, errorMessage: `CONFIRMATION_REQUIRED: ${risk.reason}${why}`, durationMs: 0 });
+        return { result: JSON.stringify(blocked) };
+      }
+      console.log(`[safeMode] confirmation verified for ${toolName} via ${args.confirm_id}`);
+    }
+  }
+
+  const callArgs = shouldAudit ? stripConfirm(args) : args;
+
   try {
-    console.log(`[tool] ${fn.name} called with:`, JSON.stringify(args).slice(0, 500));
-    const result = await fn(args, c);
-    // Gemini function calling needs simple objects — stringify complex API responses
+    console.log(`[tool] ${toolName} called with:`, JSON.stringify(callArgs).slice(0, 500));
+    const result = await fn(callArgs, c);
     const serialised = typeof result === 'string' ? { result } : { result: JSON.stringify(result) };
 
-    // Emit tool_result over SSE so the frontend activity log can show result counts
     const sessionId = c.session?.id;
     const sseFn = sessionId ? activeSessions.get(sessionId) : null;
     if (sseFn) {
-      const summary = buildResultSummary(fn.name, serialised);
-      if (summary) sseFn({ type: 'tool_result', name: fn.name, summary });
+      const summary = buildResultSummary(toolName, serialised);
+      if (summary) sseFn({ type: 'tool_result', name: toolName, summary });
+    }
+
+    if (shouldAudit) {
+      logAudit({
+        toolName, ctx: c, args, result,
+        success: !result?.error,
+        errorMessage: result?.error || null,
+        durationMs: Date.now() - startedAt,
+      });
     }
 
     return serialised;
@@ -147,8 +186,15 @@ const safe = (fn) => async (args, c) => {
     const msg = metaErr
       ? `Meta API error ${metaErr.code || ''}: ${metaErr.message || 'unknown'}${metaErr.error_subcode ? ` (subcode: ${metaErr.error_subcode})` : ''}${metaErr.error_user_title ? ` — ${metaErr.error_user_title}: ${metaErr.error_user_msg || ''}` : ''}`
       : err.message || 'Unknown error';
-    console.error(`[tool] ${fn.name} error:`, msg);
+    console.error(`[tool] ${toolName} error:`, msg);
     if (metaErr) console.error(`[tool] full meta error:`, JSON.stringify(metaErr));
+    if (shouldAudit) {
+      logAudit({
+        toolName, ctx: c, args, result: null,
+        success: false, errorMessage: msg,
+        durationMs: Date.now() - startedAt,
+      });
+    }
     return { error: msg };
   }
 };
@@ -1217,7 +1263,7 @@ async function preflightCheck({ campaign_id }, c) {
 
 // ─── Build FunctionTool instances ───────────────────────────────────────────
 const T = (name, description, execute, parameters) => {
-  const opts = { name, description, execute: safe(execute) };
+  const opts = { name, description, execute: safe(name, execute) };
   if (parameters) opts.parameters = parameters;
   return new FunctionTool(opts);
 };
@@ -1511,6 +1557,16 @@ const adTools = [
       const { skill_name } = _args;
       const fbUserId = await resolveFbUserId(context);
 
+      // Whitelist: lowercase letters/digits/_/- per segment, with at most one
+      // "/" for namespaced skills (e.g. "meta/campaigns"). Blocks "..", absolute
+      // paths, backslashes, URL-encoded escapes, and anything else that could
+      // break out of the skills directory. Length-capped to keep the regex
+      // pathological-input-safe.
+      const SAFE_SKILL_NAME = /^[a-z0-9][a-z0-9_-]{0,63}(\/[a-z0-9][a-z0-9_-]{0,63})?$/i;
+      if (typeof skill_name !== 'string' || !SAFE_SKILL_NAME.test(skill_name)) {
+        return { error: `Invalid skill name: ${skill_name}` };
+      }
+
       // 1. Check Supabase for custom skill override
       const customOverride = context.state?.get?.('activeCustomSkill');
       if (customOverride && supabase && fbUserId) {
@@ -1524,15 +1580,25 @@ const adTools = [
         if (data?.content) return { skill: skill_name, layer: 'custom', content: data.content };
       }
 
-      // 3. Search official (flat) + system (subfolder-organized) .md files
-      const readAndStrip = async (fp) => {
-        const content = await fs.readFile(fp, 'utf-8');
+      // 3. Search official (flat) + system (subfolder-organized) .md files.
+      //
+      // Defense-in-depth: even though SAFE_SKILL_NAME already rejects "..",
+      // we re-check that the resolved path lives inside the expected base
+      // directory before reading. If the regex is ever loosened (or a future
+      // Node path-resolution quirk shows up), this catches it.
+      const readWithinBase = async (baseDir, fp) => {
+        const resolvedBase = path.resolve(baseDir);
+        const resolved = path.resolve(fp);
+        if (resolved !== resolvedBase && !resolved.startsWith(resolvedBase + path.sep)) {
+          throw new Error('path escapes skills directory');
+        }
+        const content = await fs.readFile(resolved, 'utf-8');
         return content.replace(/^---\n[\s\S]*?\n---\n?/, '').trim();
       };
 
       // 3a. Official skills are flat
       try {
-        const body = await readAndStrip(path.join(OFFICIAL_SKILLS_DIR, `${skill_name}.md`));
+        const body = await readWithinBase(OFFICIAL_SKILLS_DIR, path.join(OFFICIAL_SKILLS_DIR, `${skill_name}.md`));
         return { skill: skill_name, layer: 'official', content: body };
       } catch { /* not in official */ }
 
@@ -1543,7 +1609,7 @@ const adTools = [
 
       for (const fp of systemCandidates) {
         try {
-          const body = await readAndStrip(fp);
+          const body = await readWithinBase(SYSTEM_SKILLS_DIR, fp);
           return { skill: skill_name, layer: 'system', content: body };
         } catch { /* try next */ }
       }

@@ -12,13 +12,9 @@ export const useBusinesses = () => {
   const mounted = useRef(true);
 
   const fetchBusinesses = useCallback((force = false) => {
-    const token = localStorage.getItem('fb_long_lived_token');
-    if (!token) {
-      setBusinesses([]);
-      setIsLoading(false);
-      _cache = { data: null, ts: 0, promise: null };
-      return;
-    }
+    // Auth state lives in the HttpOnly cookie now — we can't sniff it from
+    // JS. Just hit the endpoint; if the user isn't logged in the request
+    // returns 401 and we surface an empty list (handled in the catch).
 
     // Return cached data if fresh
     if (!force && _cache.data && Date.now() - _cache.ts < CACHE_TTL) {

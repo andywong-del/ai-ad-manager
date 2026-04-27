@@ -26,7 +26,7 @@ export default function LookalikeAudienceCard({ data, onSend, isAnswered, adAcco
   const [ratio, setRatio] = useState('0.01');
   const [confirmed, setConfirmed] = useState(false);
 
-  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  const headers = {}; // auth via HttpOnly aam_session cookie
 
   useEffect(() => {
     if (!adAccountId || audiences.length) return;

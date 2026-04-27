@@ -22,3 +22,9 @@ npm-debug.log*
 # Vite
 client/.vite/
 .vercel
+
+# GCP service account keys (NEVER commit)
+*.json.key
+pl-web-*.json
+gcp-*-key.json
+service-account*.json

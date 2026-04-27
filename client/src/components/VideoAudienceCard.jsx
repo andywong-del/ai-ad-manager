@@ -74,7 +74,7 @@ export default function VideoAudienceCard({ data, onSend, isAnswered, adAccountI
   // Fetch pages + IG accounts on mount if not provided via data
   useEffect(() => {
     if (!adAccountId) return;
-    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const headers = {}; // auth via HttpOnly aam_session cookie
     if (!data?.pages?.length) {
       api.get('/meta/pages', { headers }).then(r => {
         const p = r.data?.data || r.data || [];
@@ -134,7 +134,7 @@ export default function VideoAudienceCard({ data, onSend, isAnswered, adAccountI
 
     if (!url) { setLoading(false); return; }
 
-    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const headers = {}; // auth via HttpOnly aam_session cookie
     api.get(url, { headers }).then(r => {
       if (id !== fetchRef.current) return;
       const res = r.data || {};
@@ -170,7 +170,7 @@ export default function VideoAudienceCard({ data, onSend, isAnswered, adAccountI
       ? `/meta/pages/${selectedPageId}/videos?adAccountId=${adAccountId}`
       : `/meta/instagram/${selectedIgId}/media?adAccountId=${adAccountId}`;
     const url = `${base}&after=${nextCursor}`;
-    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const headers = {}; // auth via HttpOnly aam_session cookie
     api.get(url, { headers }).then(r => {
       const res = r.data || {};
       const raw = Array.isArray(res) ? res : (res.videos || res.media || []);

@@ -1,4 +1,5 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { Menu, Zap, Settings, Sparkles, Users, User, LogOut, ChevronRight, X } from 'lucide-react';
 import { useChatSessions } from '../hooks/useChatSessions.js';
 import { useSkills } from '../hooks/useSkills.js';
@@ -254,13 +255,40 @@ export const Dashboard = ({
 }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [chatLanguage, setChatLanguage] = useState('en');
-  const [activeView, setActiveView] = useState({ type: 'chat' });
   const [canvasData, setCanvasData] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
+
+  // ── Routing — URL is source of truth for the entire main view ─────────────
+  // Mapping:
+  //   /                         → chat (blank new)
+  //   /c/:sessionId             → chat (specific session)
+  //   /campaigns                → CampaignManager
+  //   /audiences                → AudienceManager
+  //   /reports                  → ReportDashboard
+  //   /optimizations            → Optimizations
+  //   /ad-gallery               → AdLibrary           (legacy: adLibrary)
+  //   /creative-hub             → CreativeLibrary
+  //   /automations              → AutomationRules
+  //   /lead-forms               → InstantForms
+  //   /events                   → EventsManager
+  //   /brand-memory             → BrandLibrary
+  //   /skills                   → SkillsLibrary
+  //   /skills/:skillId          → StrategistConfig (per-skill)
+  //   /projects/:projectId      → ProjectDetail
+  //   /saved/:itemId            → SavedItemView
+  const navigate = useNavigate();
+  const { sessionId: urlSessionId } = useParams();
+  const location = useLocation();
+
+  // Snapshot the URL session id at mount time so we boot the chat hook on the
+  // right transcript. Subsequent URL changes are handled by the URL-sync
+  // effect (so back/forward and sidebar clicks still work without re-init).
+  const initialUrlSessionIdRef = useRef(urlSessionId || null);
 
   const {
     skills, activeSkill, activeSkills, activeSkillId, activeSkillIds, toggleSkill,
     createSkill, updateSkill, deleteSkill, generateSkill, enrichSkill, getSkillContext, getSkillContextById, fetchSkills,
+    fetchRevisions, fetchRevision, revertSkill,
   } = useSkills();
 
   const {
@@ -268,7 +296,13 @@ export const Dashboard = ({
     messages, isTyping, thinkingText, activityLog, sendMessage, stopGeneration, notification,
     savedItems, saveItem, deleteSavedItem,
     folders, createFolder, deleteFolder, renameFolder, reorderFolders,
-  } = useChatSessions({ token, adAccountId, accountName: selectedAccount?.name, language: chatLanguage });
+  } = useChatSessions({
+    token,
+    adAccountId,
+    accountName: selectedAccount?.name,
+    language: chatLanguage,
+    initialSessionId: initialUrlSessionIdRef.current,
+  });
 
   const {
     projects, createProject, updateProject, deleteProject,
@@ -277,13 +311,46 @@ export const Dashboard = ({
 
   const { getBrandContext, enabledCount: brandEnabledCount, createItem: createBrandItem } = useBrandLibrary(adAccountId);
 
+  // Derive activeView from URL — single source of truth. Skills are needed
+  // here because /skills/:id resolves to a full skill object the render block
+  // can pass straight to <StrategistConfig />.
+  const activeView = useMemo(() => {
+    const path = location.pathname;
+    if (path === '/' || path === '/c' || path.startsWith('/c/')) return { type: 'chat' };
+    if (path === '/campaigns') return { type: 'campaigns' };
+    if (path === '/audiences') return { type: 'audiences' };
+    if (path === '/reports') return { type: 'report' };
+    if (path === '/optimizations') return { type: 'optimizations' };
+    if (path === '/ad-gallery') return { type: 'adLibrary' };
+    if (path === '/creative-hub') return { type: 'creativeLibrary' };
+    if (path === '/automations') return { type: 'automationRules' };
+    if (path === '/lead-forms') return { type: 'instantForms' };
+    if (path === '/events') return { type: 'eventsManager' };
+    if (path === '/brand-memory') return { type: 'brandLibrary' };
+    if (path === '/skills') return { type: 'skillsLibrary' };
+    if (path.startsWith('/skills/')) {
+      const skillId = decodeURIComponent(path.slice('/skills/'.length));
+      const skill = skills.find(s => s.id === skillId);
+      return { type: 'skillConfig', skillId, skill };
+    }
+    if (path.startsWith('/projects/')) return { type: 'projectDetail', projectId: decodeURIComponent(path.slice('/projects/'.length)) };
+    if (path.startsWith('/saved/')) return { type: 'saved', itemId: decodeURIComponent(path.slice('/saved/'.length)) };
+    return { type: 'chat' };
+  }, [location.pathname, skills]);
+
+  // Navigate "back to chat" without nuking the active session — land on
+  // /c/<activeId> if we have one, else `/` (which spins up a fresh chat).
+  const goToChat = useCallback(() => {
+    navigate(activeSessionId ? `/c/${activeSessionId}` : '/');
+  }, [navigate, activeSessionId]);
+
   const handleOpenBrandLibrary = useCallback(() => {
-    setActiveView({ type: 'brandLibrary' });
-  }, []);
+    navigate('/brand-memory');
+  }, [navigate]);
 
 
   const handleOpenProject = useCallback((projectId) => {
-    setActiveView({ type: 'projectDetail', projectId });
+    navigate(`/projects/${encodeURIComponent(projectId)}`);
     // Auto-switch to project's connected ad account
     const proj = projects.find(p => p.id === projectId);
     const connector = (proj?.connectors || [])[0];
@@ -304,11 +371,11 @@ export const Dashboard = ({
   const handleAccountSelect = useCallback((business, account, { stayOnPage } = {}) => {
     onSwitchBusiness(business);
     onSwitchAccount(account);
-    if (!stayOnPage) setActiveView({ type: 'chat' });
-  }, [onSwitchBusiness, onSwitchAccount]);
+    if (!stayOnPage) goToChat();
+  }, [onSwitchBusiness, onSwitchAccount, goToChat]);
 
-  const handleSend = useCallback((text, attachments, slashIds) => {
-    setActiveView({ type: 'chat' });
+  const handleSend = useCallback((text, attachments, slashIds, rawDisplayText) => {
+    // Already on a chat path by definition (send only fires from ChatInterface)
     // Inject skill context: slash commands take priority, then active skill
     let skillCtx = null;
     if (slashIds?.length) {
@@ -319,71 +386,76 @@ export const Dashboard = ({
     const brandCtx = getBrandContext();
     const allContext = [skillCtx, brandCtx].filter(Boolean).join('\n\n---\n\n');
     const fullText = allContext ? `${allContext}\n\n---\n\nUser message: ${text}` : text;
-    // Pass active custom skill IDs so backend load_skill can apply them
+    // Pass active custom skill IDs so backend load_skill can apply them.
+    // displayText = what user sees; prefer raw input (no [Uploaded image:...]
+    // preamble), fall back to `text` for callers that don't supply it.
     const customSkillIds = activeSkills.filter(s => !s.isDefault).map(s => s.id);
-    sendMessage(fullText, attachments, { displayText: text, activeCustomSkill: customSkillIds[0] || null, activeCustomSkills: customSkillIds });
-  }, [sendMessage, getSkillContext, getSkillContextById, activeSkills, getBrandContext]);
+    sendMessage(fullText, attachments, { displayText: rawDisplayText ?? text, activeCustomSkill: customSkillIds[0] || null, activeCustomSkills: customSkillIds });
+
+    // First send on `/` (blank new chat) → promote URL to /c/<id>, ChatGPT-style.
+    // replace:true so the back-button from the session doesn't return to an
+    // already-stale blank-chat url.
+    if (!urlSessionId && activeSessionId) {
+      navigate(`/c/${activeSessionId}`, { replace: true });
+    }
+  }, [sendMessage, getSkillContext, getSkillContextById, activeSkills, getBrandContext, urlSessionId, activeSessionId, navigate]);
 
   const handleSwitchSession = useCallback((sessionId) => {
-    setActiveView({ type: 'chat' });
-    switchSession(sessionId);
-  }, [switchSession]);
+    // Navigate first; the URL-sync effect below calls switchSession().
+    // If the user clicks the session they're already on, this is a no-op.
+    if (sessionId !== urlSessionId) navigate(`/c/${sessionId}`);
+  }, [navigate, urlSessionId]);
 
   const handleNewChat = useCallback(() => {
-    setActiveView({ type: 'chat' });
-    createNewChat();
-  }, [createNewChat]);
+    // Navigate home; URL-sync effect spins up a fresh chat if the current
+    // session is already persisted. If already on `/`, force a new chat.
+    if (location.pathname !== '/') navigate('/');
+    else createNewChat();
+  }, [navigate, location.pathname, createNewChat]);
+
+  // ── URL → hook state sync ────────────────────────────────────────────────
+  // Keeps the chat engine aligned with whatever the URL says. The opposite
+  // direction (state → URL) is handled inside the wrapped handlers above, so
+  // we don't need a reverse effect here (which would risk ping-pong loops).
+  const didInitialSyncRef = useRef(false);
+  useEffect(() => {
+    // Only run on chat-shaped paths. Visiting /campaigns shouldn't mint a new
+    // chat session — but we still flip the ref so a later /campaigns→/ jump
+    // is treated as "user wants a new chat", not "first mount".
+    const onChatPath = !!urlSessionId || location.pathname === '/';
+    if (!onChatPath) {
+      didInitialSyncRef.current = true;
+      return;
+    }
+    if (urlSessionId) {
+      if (urlSessionId !== activeSessionId) switchSession(urlSessionId);
+    } else if (didInitialSyncRef.current) {
+      createNewChat();
+    }
+    didInitialSyncRef.current = true;
+  }, [urlSessionId, location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleViewSavedItem = useCallback((item) => {
-    setActiveView({ type: 'saved', itemId: item.id });
-  }, []);
+    navigate(`/saved/${encodeURIComponent(item.id)}`);
+  }, [navigate]);
 
   const handleDeleteSavedItem = useCallback((itemId) => {
     deleteSavedItem(itemId);
     if (activeView.type === 'saved' && activeView.itemId === itemId) {
-      setActiveView({ type: 'chat' });
+      goToChat();
     }
-  }, [deleteSavedItem, activeView]);
+  }, [deleteSavedItem, activeView, goToChat]);
 
-  const handleOpenAudiences = useCallback(() => {
-    setActiveView({ type: 'audiences' });
-  }, []);
-
-  const handleOpenCampaigns = useCallback(() => {
-    setActiveView({ type: 'campaigns' });
-  }, []);
-
-  const handleOpenSkillsLibrary = useCallback(() => {
-    setActiveView({ type: 'skillsLibrary' });
-  }, []);
-
-  const handleOpenCreativeLibrary = useCallback(() => {
-    setActiveView({ type: 'creativeLibrary' });
-  }, []);
-
-  const handleOpenAutomationRules = useCallback(() => {
-    setActiveView({ type: 'automationRules' });
-  }, []);
-
-  const handleOpenInstantForms = useCallback(() => {
-    setActiveView({ type: 'instantForms' });
-  }, []);
-
-  const handleOpenEventsManager = useCallback(() => {
-    setActiveView({ type: 'eventsManager' });
-  }, []);
-
-  const handleOpenOptimizations = useCallback(() => {
-    setActiveView({ type: 'optimizations' });
-  }, []);
-
-  const handleOpenAdLibrary = useCallback(() => {
-    setActiveView({ type: 'adLibrary' });
-  }, []);
-
-  const handleOpenReports = useCallback(() => {
-    setActiveView({ type: 'report' });
-  }, []);
+  const handleOpenAudiences      = useCallback(() => navigate('/audiences'),      [navigate]);
+  const handleOpenCampaigns      = useCallback(() => navigate('/campaigns'),      [navigate]);
+  const handleOpenSkillsLibrary  = useCallback(() => navigate('/skills'),         [navigate]);
+  const handleOpenCreativeLibrary= useCallback(() => navigate('/creative-hub'),   [navigate]);
+  const handleOpenAutomationRules= useCallback(() => navigate('/automations'),    [navigate]);
+  const handleOpenInstantForms   = useCallback(() => navigate('/lead-forms'),     [navigate]);
+  const handleOpenEventsManager  = useCallback(() => navigate('/events'),         [navigate]);
+  const handleOpenOptimizations  = useCallback(() => navigate('/optimizations'),  [navigate]);
+  const handleOpenAdLibrary      = useCallback(() => navigate('/ad-gallery'),     [navigate]);
+  const handleOpenReports        = useCallback(() => navigate('/reports'),        [navigate]);
 
   const handleOpenSettings = useCallback(() => {
     setShowSettings(true);
@@ -423,34 +495,41 @@ export const Dashboard = ({
   }, [skillToggles]);
 
   const handleBuildSkillWithAI = useCallback(() => {
-    createNewChat();
+    const newId = createNewChat();
     const skillCreator = skills.find(s => s.id === 'skill-creator');
     if (skillCreator) setPendingSlashSkill(skillCreator);
     setPendingInput("Help me create a skill together using /skill-creator. First ask me what the skill should do.");
-    setActiveView({ type: 'chat' });
-  }, [skills, createNewChat]);
+    navigate(newId ? `/c/${newId}` : '/');
+  }, [skills, createNewChat, navigate]);
 
   const handleTrySkill = useCallback((skill) => {
-    createNewChat();
+    const newId = createNewChat();
     setPendingSlashSkill(skill);
     setPendingInput(`I just added the /${skill.id} skill for AI Ad Manager. Can you demo it with some great examples?`);
-    setActiveView({ type: 'chat' });
-  }, [createNewChat]);
+    navigate(newId ? `/c/${newId}` : '/');
+  }, [createNewChat, navigate]);
 
   const handleAudienceToChat = useCallback((prompt) => {
-    setActiveView({ type: 'chat' });
+    goToChat();
     sendMessage(prompt);
-  }, [sendMessage]);
+  }, [sendMessage, goToChat]);
 
   const handlePrefillChat = useCallback((text, pill) => {
-    createNewChat();
+    const newId = createNewChat();
     setPendingInput(text);
     if (pill) setPendingPill(pill);
-    setActiveView({ type: 'chat' });
-  }, [createNewChat]);
+    navigate(newId ? `/c/${newId}` : '/');
+  }, [createNewChat, navigate]);
 
-  // Close canvas when switching to any module
-  useEffect(() => { setCanvasData(null); }, [activeView]);
+  // Close canvas when switching to a different MODULE (chat → reports etc.).
+  // Depend on activeView.type, not the whole activeView object — the object
+  // is rebuilt by useMemo whenever location.pathname or skills change, so
+  // depending on `activeView` would close the canvas every time the route
+  // shifts from `/` to `/c/<id>` (which happens right after the first
+  // message of a new chat) or whenever the skills list refetches. That's
+  // why the right detail panel was auto-closing while the user was still
+  // inside the chat view.
+  useEffect(() => { setCanvasData(null); }, [activeView.type]);
 
   const handleOpenCanvas = useCallback((data) => {
     setCanvasData(data);
@@ -465,6 +544,13 @@ export const Dashboard = ({
     setCanvasData(null); // close canvas on chat switch
     handleSwitchSession(sessionId);
   }, [handleSwitchSession]);
+
+  // Delete session — if the deleted session is the one in the URL, go home
+  // so we don't leave a dangling /c/<deleted-id>.
+  const handleDeleteSession = useCallback((sessionId) => {
+    deleteSession(sessionId);
+    if (sessionId === urlSessionId) navigate('/');
+  }, [deleteSession, urlSessionId, navigate]);
 
   // Find current saved item for viewer
   const currentSavedItem = activeView.type === 'saved'
@@ -485,7 +571,7 @@ export const Dashboard = ({
         activeSessionId={activeSessionId}
         onNewChat={handleNewChat}
         onSwitchSession={handleSwitchSessionWithCanvas}
-        onDeleteSession={deleteSession}
+        onDeleteSession={handleDeleteSession}
         onRenameSession={renameSession}
         onPinSession={pinSession}
         savedItems={savedItems}
@@ -529,37 +615,57 @@ export const Dashboard = ({
 
       {/* Main Content */}
       <main className="flex-1 flex min-w-0">
-        {/* Chat area — shrinks to 40% when canvas is open */}
-        <div className={`flex flex-col min-w-0 transition-all duration-300 ease-in-out ${canvasData ? 'w-[40%]' : 'flex-1'}`}>
+        {/* Chat area —
+            • No canvas open → fills the whole main pane (flex-1).
+            • Canvas open → fixed 520px so the chat width never depends on
+              viewport size or canvas content. Previously this was 40% which
+              squeezed the chat to an unusable width on laptop screens (and
+              triggered a horizontal scrollbar at the bottom). overflow-x-hidden
+              kills that scrollbar even if a child message overshoots.
+        */}
+        <div className={`flex flex-col min-w-0 overflow-x-hidden transition-[width] duration-300 ease-in-out ${canvasData ? 'w-[520px] shrink-0' : 'flex-1'}`}>
 
           {activeView.type === 'skillsLibrary' ? (
             <SkillsLibrary
               skills={skills}
               onCreate={createSkill}
               onDelete={deleteSkill}
-              onBack={() => setActiveView({ type: 'chat' })}
-              onActivateSkill={(skill) => { toggleSkill(skill.id); setActiveView({ type: 'chat' }); }}
+              onBack={goToChat}
+              onActivateSkill={(skill) => { toggleSkill(skill.id); goToChat(); }}
               onBuildWithAI={handleBuildSkillWithAI}
               onTrySkill={handleTrySkill}
+              onEditSkill={(skill) => navigate(`/skills/${encodeURIComponent(skill.id)}`)}
               onRefresh={fetchSkills}
               onEnrich={enrichSkill}
               skillToggles={skillToggles}
               onToggleChange={setSkillToggles}
             />
-          ) : activeView.type === 'skillConfig' && activeView.skill ? (
-            <StrategistConfig
-              strategist={activeView.skill}
-              onUpdate={async (id, updates) => {
-                await updateSkill(id, updates);
-              }}
-              onAddDoc={() => {}}
-              onRemoveDoc={() => {}}
-              onBack={() => setActiveView({ type: 'skillsLibrary' })}
-            />
+          ) : activeView.type === 'skillConfig' ? (
+            activeView.skill ? (
+              <StrategistConfig
+                strategist={activeView.skill}
+                onUpdate={async (id, updates) => {
+                  await updateSkill(id, updates);
+                }}
+                onAddDoc={() => {}}
+                onRemoveDoc={() => {}}
+                onBack={() => navigate('/skills')}
+                fetchRevisions={fetchRevisions}
+                fetchRevision={fetchRevision}
+                revertSkill={revertSkill}
+              />
+            ) : (
+              // Skills array might still be loading on a hard refresh of
+              // /skills/<id>. Render a placeholder rather than falling through
+              // to the chat view (which would briefly flash the wrong UI).
+              <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
+                Loading skill…
+              </div>
+            )
           ) : activeView.type === 'campaigns' ? (
             <CampaignManager
               adAccountId={adAccountId}
-              onBack={() => setActiveView({ type: 'chat' })}
+              onBack={goToChat}
               onSendToChat={handleAudienceToChat}
               onPrefillChat={handlePrefillChat}
               token={token}
@@ -578,7 +684,7 @@ export const Dashboard = ({
           ) : activeView.type === 'creativeLibrary' ? (
             <CreativeLibrary
               adAccountId={adAccountId}
-              onBack={() => setActiveView({ type: 'chat' })}
+              onBack={goToChat}
               token={token}
               onLogin={onLogin}
               onLogout={onLogout}
@@ -591,7 +697,7 @@ export const Dashboard = ({
           ) : activeView.type === 'automationRules' ? (
             <AutomationRules
               adAccountId={adAccountId}
-              onBack={() => setActiveView({ type: 'chat' })}
+              onBack={goToChat}
               token={token}
               onLogin={onLogin}
               onLogout={onLogout}
@@ -628,7 +734,7 @@ export const Dashboard = ({
           ) : activeView.type === 'adLibrary' ? (
             <AdLibrary
               adAccountId={adAccountId}
-              onBack={() => setActiveView({ type: 'chat' })}
+              onBack={goToChat}
               token={token}
               onLogin={onLogin}
               onLogout={onLogout}
@@ -647,7 +753,7 @@ export const Dashboard = ({
               selectedAccount={selectedAccount}
               selectedBusiness={selectedBusiness}
               onSelectAccount={handleAccountSelect}
-              onNavigateToOptimizations={() => setActiveView({ type: 'optimizations' })}
+              onNavigateToOptimizations={() => navigate('/optimizations')}
               googleConnected={googleConnected}
               googleCustomerId={googleCustomerId}
               googleLoginCustomerId={googleLoginCustomerId}
@@ -675,7 +781,7 @@ export const Dashboard = ({
                 project={proj}
                 skills={skills}
                 onUpdate={(updates) => updateProject(proj.id, updates)}
-                onDelete={() => { deleteProject(proj.id); setActiveView({ type: 'chat' }); }}
+                onDelete={() => { deleteProject(proj.id); goToChat(); }}
                 onAddTask={(title) => addTask(proj.id, title)}
                 onToggleTask={(taskId) => toggleTask(proj.id, taskId)}
                 onDeleteTask={(taskId) => deleteTask(proj.id, taskId)}
@@ -685,7 +791,7 @@ export const Dashboard = ({
                 onToggleSkill={(skillId) => toggleProjectSkill(proj.id, skillId)}
                 onAddConnector={(connector) => addConnector(proj.id, connector)}
                 onRemoveConnector={(connectorId) => removeConnector(proj.id, connectorId)}
-                onOpenChat={() => setActiveView({ type: 'chat' })}
+                onOpenChat={goToChat}
               />
             );
           })() : activeView.type === 'optimizations' ? (
@@ -712,7 +818,7 @@ export const Dashboard = ({
               adAccountId={adAccountId}
               onSendToChat={handleAudienceToChat}
               onPrefillChat={handlePrefillChat}
-              onBack={() => setActiveView({ type: 'chat' })}
+              onBack={goToChat}
               token={token}
               onLogin={onLogin}
               onLogout={onLogout}
@@ -726,12 +832,18 @@ export const Dashboard = ({
               onGoogleDisconnect={onGoogleDisconnect}
               onSelectGoogleAccount={onSelectGoogleAccount}
             />
-          ) : activeView.type === 'saved' && currentSavedItem ? (
-            <SavedItemView
-              item={currentSavedItem}
-              onBack={() => setActiveView({ type: 'chat' })}
-              onDelete={handleDeleteSavedItem}
-            />
+          ) : activeView.type === 'saved' ? (
+            currentSavedItem ? (
+              <SavedItemView
+                item={currentSavedItem}
+                onBack={goToChat}
+                onDelete={handleDeleteSavedItem}
+              />
+            ) : (
+              <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
+                Loading…
+              </div>
+            )
           ) : (
             <ChatInterface
               messages={messages}
@@ -751,7 +863,7 @@ export const Dashboard = ({
               onDeactivateSkill={(id) => id ? toggleSkill(id) : activeSkills.forEach(s => toggleSkill(s.id))}
               skills={skills}
               onToggleSkill={toggleSkill}
-              onManageSkills={(skill) => skill ? setActiveView({ type: 'skillConfig', skill }) : setActiveView({ type: 'skillsLibrary' })}
+              onManageSkills={(skill) => navigate(skill ? `/skills/${encodeURIComponent(skill.id)}` : '/skills')}
               token={token}
               onLogin={onLogin}
               isLoginLoading={isLoginLoading}
@@ -761,8 +873,8 @@ export const Dashboard = ({
               onSelectAccount={handleAccountSelect}
               onLogout={onLogout}
               onNavigate={(view) => {
-                const viewMap = { audiences: 'audiences', skills: 'skillsLibrary' };
-                setActiveView({ type: viewMap[view] || 'chat' });
+                const pathMap = { audiences: '/audiences', skills: '/skills' };
+                navigate(pathMap[view] || '/');
               }}
               onOpenCanvas={handleOpenCanvas}
               initialInput={pendingInput}
@@ -783,8 +895,12 @@ export const Dashboard = ({
           )}
         </div>
 
-        {/* Canvas Panel — slides in from right, 60% width */}
-        <div className={`transition-all duration-300 ease-in-out overflow-hidden ${canvasData ? 'w-[60%]' : 'w-0'}`}>
+        {/* Canvas Panel — fills the remaining space next to the fixed-width
+            chat. Was a hard 60%, which combined with chat=40% meant the
+            split flexed with viewport instead of giving the user a stable
+            chat column. flex-1 + min-w-0 lets the canvas absorb whatever
+            width is left after the chat's 520px. */}
+        <div className={`transition-[width,flex] duration-300 ease-in-out overflow-hidden ${canvasData ? 'flex-1 min-w-0' : 'w-0'}`}>
           {canvasData && (
             <CanvasPanel
               data={canvasData}

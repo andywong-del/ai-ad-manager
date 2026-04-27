@@ -19,6 +19,56 @@ try {
   upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 } catch { upload = null; }
 
+// ── Revision helpers ─────────────────────────────────────────────────────────
+// Every committed state (create/edit/revert) of a custom skill is snapshotted
+// into `custom_skill_revisions`. We do this best-effort — a snapshot failure
+// is logged but does not fail the parent write, since a missing audit row
+// is far less harmful than a lost user edit. Run sql/custom_skill_revisions.sql
+// once on each Supabase project to enable.
+
+const nextRevisionVersion = async (skillId) => {
+  const { data, error } = await supabase
+    .from('custom_skill_revisions')
+    .select('version')
+    .eq('skill_id', skillId)
+    .order('version', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    console.warn('[skills] nextRevisionVersion error:', error.message);
+    return 1;
+  }
+  return (data?.version || 0) + 1;
+};
+
+const writeRevision = async (skillRow, { source = 'edit', revertedFrom = null } = {}) => {
+  if (!supabase) return null;
+  try {
+    const version = await nextRevisionVersion(skillRow.id);
+    const { error } = await supabase.from('custom_skill_revisions').insert({
+      skill_id: skillRow.id,
+      fb_user_id: skillRow.fb_user_id,
+      version,
+      name: skillRow.name,
+      description: skillRow.description || '',
+      content: skillRow.content || '',
+      icon: skillRow.icon || 'sparkles',
+      type: skillRow.type || 'strategy',
+      preview: skillRow.preview || '',
+      source,
+      reverted_from: revertedFrom,
+    });
+    if (error) {
+      console.warn('[skills] writeRevision insert error:', error.message);
+      return null;
+    }
+    return version;
+  } catch (e) {
+    console.warn('[skills] writeRevision threw:', e?.message || e);
+    return null;
+  }
+};
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 const parseMd = (content, filename) => {
@@ -66,29 +116,9 @@ const readSkillsFrom = async (dir, extraProps = {}, { recursive = false, prefix 
   return skills;
 };
 
-// ── FB User ID extraction (cached) ──────────────────────────────────────────
-const userIdCache = new Map();
-
-const getFbUserId = async (token) => {
-  if (!token) return null;
-  if (userIdCache.has(token)) return userIdCache.get(token);
-  try {
-    const { data } = await axios.get(`https://graph.facebook.com/v25.0/me?fields=id&access_token=${token}`);
-    if (data?.id) { userIdCache.set(token, data.id); return data.id; }
-  } catch (err) { console.error('[skills] FB user ID error:', err.message); }
-  return null;
-};
-
-// Middleware: resolve user
-const resolveUser = async (req, _res, next) => {
-  const auth = req.headers.authorization;
-  if (auth?.startsWith('Bearer ')) {
-    req.token = auth.slice(7);
-    req.fbUserId = await getFbUserId(req.token);
-  }
-  next();
-};
-
+// User resolution comes from the shared middleware — same logic everywhere
+// (cookie session preferred, Bearer fallback).
+import { resolveUser } from '../middleware/resolveUser.js';
 router.use(resolveUser);
 
 // ── Routes ───────────────────────────────────────────────────────────────────
@@ -165,6 +195,25 @@ router.get('/', async (req, res) => {
         .order('updated_at', { ascending: false });
 
       if (!error && data) {
+        // Fetch latest revision version per skill in one round-trip. Postgres
+        // doesn't expose a clean GROUP BY through PostgREST, so we pull just
+        // (skill_id, version), order by version desc, and keep the first
+        // hit per skill. N is small (= number of revisions for this user)
+        // so a JS reduce is fine.
+        const versionMap = {};
+        try {
+          const { data: revs } = await supabase
+            .from('custom_skill_revisions')
+            .select('skill_id, version')
+            .eq('fb_user_id', req.fbUserId)
+            .order('version', { ascending: false });
+          for (const r of revs || []) {
+            if (versionMap[r.skill_id] === undefined) versionMap[r.skill_id] = r.version;
+          }
+        } catch (e) {
+          console.warn('[skills] failed to load versions for list:', e?.message || e);
+        }
+
         for (const row of data) {
           skills.push({
             id: row.id,
@@ -176,6 +225,7 @@ router.get('/', async (req, res) => {
             preview: row.preview || '',
             isDefault: false,
             visibility: 'custom',
+            version: versionMap[row.id] || null,
             updatedAt: row.updated_at,
           });
         }
@@ -276,8 +326,11 @@ router.post('/', async (req, res) => {
       return res.status(500).json({ error: error.message });
     }
 
+    // Snapshot v1 — fire-and-forget but await so we surface errors in dev.
+    const version = await writeRevision(row, { source: 'create' });
+
     console.log('[skills] Created skill:', row.id, row.name);
-    res.json({ ...row, isDefault: false, visibility: 'custom', updatedAt: new Date().toISOString() });
+    res.json({ ...row, isDefault: false, visibility: 'custom', version: version || 1, updatedAt: new Date().toISOString() });
   } catch (err) {
     console.error('[skills] POST / error:', err);
     res.status(500).json({ error: err.message });
@@ -310,7 +363,133 @@ router.put('/:id', async (req, res) => {
 
     if (error) return res.status(500).json({ error: error.message });
 
-    res.json({ id, ...updates, isDefault: false, visibility: 'custom', updatedAt: updates.updated_at });
+    // Snapshot the new committed state. We pass the post-update row so each
+    // revision answers the question "what did v3 look like?" rather than
+    // "what changed at v3?". Diff UI can compute the delta from neighbours.
+    const version = await writeRevision({ id, fb_user_id: fbUserId, ...updates }, { source: 'edit' });
+
+    res.json({ id, ...updates, isDefault: false, visibility: 'custom', version, updatedAt: updates.updated_at });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/skills/:id/revisions — list version history (newest first)
+//
+// Returns the stored snapshots in descending version order. We trim
+// `content` to a 240-char preview in the list payload so a skill with a
+// 50KB instruction blob doesn't ship the full body N times. The single-
+// revision endpoint below returns full content for diff/restore.
+router.get('/:id/revisions', async (req, res) => {
+  try {
+    if (!supabase) return res.status(500).json({ error: 'Database not configured' });
+    const { id } = req.params;
+    const fbUserId = req.fbUserId || '_anonymous';
+
+    const { data, error } = await supabase
+      .from('custom_skill_revisions')
+      .select('id, version, name, description, content, icon, type, preview, source, reverted_from, created_at')
+      .eq('skill_id', id)
+      .eq('fb_user_id', fbUserId)
+      .order('version', { ascending: false });
+
+    if (error) return res.status(500).json({ error: error.message });
+
+    const revisions = (data || []).map(r => ({
+      id: r.id,
+      version: r.version,
+      name: r.name,
+      description: r.description,
+      icon: r.icon,
+      type: r.type,
+      preview: r.preview,
+      source: r.source,
+      revertedFrom: r.reverted_from,
+      createdAt: r.created_at,
+      contentPreview: (r.content || '').slice(0, 240),
+      contentLength: (r.content || '').length,
+    }));
+    res.json({ revisions });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/skills/:id/revisions/:version — fetch one full snapshot
+router.get('/:id/revisions/:version', async (req, res) => {
+  try {
+    if (!supabase) return res.status(500).json({ error: 'Database not configured' });
+    const { id, version } = req.params;
+    const fbUserId = req.fbUserId || '_anonymous';
+
+    const { data, error } = await supabase
+      .from('custom_skill_revisions')
+      .select('*')
+      .eq('skill_id', id)
+      .eq('fb_user_id', fbUserId)
+      .eq('version', Number(version))
+      .maybeSingle();
+
+    if (error) return res.status(500).json({ error: error.message });
+    if (!data) return res.status(404).json({ error: 'Revision not found' });
+    res.json({ revision: data });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/skills/:id/revert — restore a previous version
+//
+// Restoring v3 doesn't rewrite history: it copies v3's payload onto the
+// live row and writes a brand-new revision (vN+1, source='revert',
+// reverted_from=3). That way the audit trail stays append-only and the
+// user can always undo the undo.
+router.post('/:id/revert', async (req, res) => {
+  try {
+    if (!supabase) return res.status(500).json({ error: 'Database not configured' });
+    const { id } = req.params;
+    const { version } = req.body || {};
+    if (!version) return res.status(400).json({ error: 'version is required' });
+    const fbUserId = req.fbUserId || '_anonymous';
+
+    const { data: rev, error: revErr } = await supabase
+      .from('custom_skill_revisions')
+      .select('*')
+      .eq('skill_id', id)
+      .eq('fb_user_id', fbUserId)
+      .eq('version', Number(version))
+      .maybeSingle();
+    if (revErr) return res.status(500).json({ error: revErr.message });
+    if (!rev) return res.status(404).json({ error: 'Revision not found' });
+
+    const updates = {
+      name: rev.name,
+      description: rev.description || '',
+      content: rev.content || '',
+      icon: rev.icon || 'sparkles',
+      type: rev.type || 'strategy',
+      preview: rev.preview || '',
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error: upErr } = await supabase
+      .from('custom_skills')
+      .update(updates)
+      .eq('id', id)
+      .eq('fb_user_id', fbUserId);
+    if (upErr) return res.status(500).json({ error: upErr.message });
+
+    const newVersion = await writeRevision({ id, fb_user_id: fbUserId, ...updates }, { source: 'revert', revertedFrom: rev.version });
+
+    res.json({
+      id,
+      ...updates,
+      isDefault: false,
+      visibility: 'custom',
+      version: newVersion,
+      updatedAt: updates.updated_at,
+      revertedFrom: rev.version,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

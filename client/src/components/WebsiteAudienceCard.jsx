@@ -20,7 +20,7 @@ export default function WebsiteAudienceCard({ data, onSend, isAnswered, adAccoun
   const [retention, setRetention] = useState(30);
   const [confirmed, setConfirmed] = useState(false);
 
-  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  const headers = {}; // auth via HttpOnly aam_session cookie
 
   useEffect(() => {
     if (!adAccountId || pixels.length) return;

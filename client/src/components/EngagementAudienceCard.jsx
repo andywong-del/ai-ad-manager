@@ -74,7 +74,7 @@ export default function EngagementAudienceCard({ data, onSend, isAnswered, adAcc
   const [selectedPostIds, setSelectedPostIds] = useState(new Set());
   const [search, setSearch] = useState('');
 
-  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  const headers = {}; // auth via HttpOnly aam_session cookie
 
   // Init: fetch accounts/pages/campaigns if not provided
   useEffect(() => {

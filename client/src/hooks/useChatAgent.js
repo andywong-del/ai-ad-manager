@@ -106,12 +106,15 @@ export const useChatAgent = ({ token, adAccountId, accountName, language = 'en',
     abortRef.current = controller;
 
     try {
-      const bearerToken = token || localStorage.getItem('fb_long_lived_token');
+      // Auth is now carried by the HttpOnly aam_session cookie. We keep
+      // sending an Authorization header only if a caller explicitly passed
+      // a token down (e.g. legacy embed). Cookie path needs credentials.
       const response = await fetch('/api/chat', {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          ...(bearerToken && { Authorization: `Bearer ${bearerToken}` }),
+          ...(token && { Authorization: `Bearer ${token}` }),
         },
         body: JSON.stringify({
           message: text,  // Full text with skill context goes to the API

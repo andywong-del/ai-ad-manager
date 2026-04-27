@@ -304,6 +304,18 @@ const SkillCard = ({ skill, isActive, onToggle, onMenuAction, onView }) => {
           <div className="flex items-center gap-1.5">
             <h3 className="text-[13px] font-bold text-slate-800 truncate group-hover:text-orange-700 transition-colors">{skill.name}</h3>
             {(skill.featured || isOfficial) && <Sparkles size={12} className="text-orange-400 shrink-0" />}
+            {/* Version badge — only on custom skills that have at least one
+                recorded revision. Hidden for official/system skills (they're
+                file-based, no DB versioning) and for legacy custom skills
+                created before history existed (their version is null). */}
+            {!isOfficial && skill.version != null && (
+              <span
+                className="shrink-0 inline-flex items-center text-[9.5px] font-bold tracking-wide text-indigo-600 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded-md font-mono"
+                title={`Current version — open the skill and click History to browse all ${skill.version} version${skill.version === 1 ? '' : 's'}`}
+              >
+                v{skill.version}
+              </span>
+            )}
           </div>
         </div>
         <button
@@ -473,7 +485,7 @@ const GitHubImportBar = ({ onClose, onImport }) => {
 };
 
 // ── Main Skills Library ────────────────────────────────────────────────────
-export const SkillsLibrary = ({ skills, onCreate, onDelete, onBack, onBuildWithAI, onTrySkill, onRefresh, onEnrich, skillToggles, onToggleChange }) => {
+export const SkillsLibrary = ({ skills, onCreate, onDelete, onBack, onBuildWithAI, onTrySkill, onEditSkill, onRefresh, onEnrich, skillToggles, onToggleChange }) => {
   // Re-fetch skills on mount to pick up skills created by AI agent
   useEffect(() => { if (onRefresh) onRefresh(); }, [onRefresh]);
 
@@ -509,8 +521,11 @@ export const SkillsLibrary = ({ skills, onCreate, onDelete, onBack, onBuildWithA
         break;
       }
       case 'edit':
-        // Navigate to chat with edit prompt
-        if (onBuildWithAI) onBuildWithAI();
+        // Open the skill's config page (StrategistConfig) — name/desc/instructions
+        // editor + version history. Falls back to "Build with AI" only if the
+        // host didn't wire onEditSkill, to preserve old behaviour.
+        if (onEditSkill) onEditSkill(skill);
+        else if (onBuildWithAI) onBuildWithAI();
         break;
       case 'replace':
         // Open file picker to replace skill content

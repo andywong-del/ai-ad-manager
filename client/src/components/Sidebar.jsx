@@ -528,7 +528,12 @@ export const Sidebar = ({
               const isActive = session.id === activeSessionId && activeView?.type === 'chat';
               const isPinned = session.pinned;
               return (
-                <div key={session.id} className="relative">
+                <div
+                  key={session.id}
+                  className="relative"
+                  onMouseEnter={() => setHoveredSession(session.id)}
+                  onMouseLeave={() => setHoveredSession(null)}
+                >
                   {renamingSession === session.id ? (
                     <div className="flex items-center gap-2 px-3 py-2">
                       <ListTodo size={14} className="text-orange-500 shrink-0" />
@@ -542,25 +547,34 @@ export const Sidebar = ({
                       />
                     </div>
                   ) : (
-                    <button
-                      onClick={() => onSwitchSession(session.id)}
-                      onMouseEnter={() => setHoveredSession(session.id)}
-                      onMouseLeave={() => setHoveredSession(null)}
-                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-[12px] transition-colors group
-                        ${isActive ? 'bg-orange-50 text-orange-700 font-medium' : 'text-slate-600 hover:bg-slate-50'}`}
-                    >
-                      <ListTodo size={13} className={`shrink-0 ${isActive ? 'text-orange-500' : 'text-slate-300'}`} />
-                      <span className="truncate flex-1">{session.title}</span>
-                      {isPinned && <Pin size={10} className="text-orange-400 shrink-0" />}
+                    <>
+                      {/*
+                        Two siblings, not parent/child. The MoreVertical
+                        action used to be nested inside the row button —
+                        invalid HTML (button-in-button) and a hydration
+                        warning. Now the row is the outer button, and the
+                        action button is absolutely positioned on top of
+                        its right edge. pr-8 reserves space so the title
+                        text never slides under the action when hovered.
+                      */}
+                      <button
+                        onClick={() => onSwitchSession(session.id)}
+                        className={`w-full flex items-center gap-2 px-3 py-2 pr-8 rounded-lg text-left text-[12px] transition-colors group
+                          ${isActive ? 'bg-orange-50 text-orange-700 font-medium' : 'text-slate-600 hover:bg-slate-50'}`}
+                      >
+                        <ListTodo size={13} className={`shrink-0 ${isActive ? 'text-orange-500' : 'text-slate-300'}`} />
+                        <span className="truncate flex-1">{session.title}</span>
+                        {isPinned && <Pin size={10} className="text-orange-400 shrink-0" />}
+                      </button>
                       {hoveredSession === session.id && (
                         <button
                           onClick={(e) => { e.stopPropagation(); setContextMenu({ sessionId: session.id, x: e.clientX, y: e.clientY }); }}
-                          className="p-1 rounded hover:bg-slate-200 text-slate-300 hover:text-slate-600 transition-colors shrink-0"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-slate-200 text-slate-300 hover:text-slate-600 transition-colors"
                         >
                           <MoreVertical size={12} />
                         </button>
                       )}
-                    </button>
+                    </>
                   )}
                 </div>
               );

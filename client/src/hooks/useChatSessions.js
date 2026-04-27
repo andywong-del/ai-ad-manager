@@ -1,7 +1,59 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useChatAgent, getWelcomeMessage, makeId } from './useChatAgent.js';
+import api from '../services/api.js';
 
 const MAX_SESSIONS = 50;
+
+// ── Server sync (fire-and-forget; falls back silently on error) ─────────────
+// Keeps UI snappy: localStorage is source of truth for display, server is
+// background-persisted so history survives cross-device + cache clear.
+const serverListSessions = async () => {
+  try { const { data } = await api.get('/chat/history/sessions'); return data.sessions || []; }
+  catch { return null; }
+};
+const serverGetMessages = async (sessionId) => {
+  try { const { data } = await api.get(`/chat/history/sessions/${sessionId}/messages`); return data.messages || []; }
+  catch { return null; }
+};
+const serverUpsertSession = (sessionId, patch) => {
+  api.put(`/chat/history/sessions/${sessionId}`, patch).catch(() => {});
+};
+const serverDeleteSession = (sessionId) => {
+  api.delete(`/chat/history/sessions/${sessionId}`).catch(() => {});
+};
+// A4 fix: strip ephemeral blob: previews before persisting. They're backed by
+// URL.createObjectURL() and die the moment the tab closes — keeping them in
+// the DB would render broken <img> tags on reload. gcs_public_url is the
+// durable substitute (present whenever the GCS side-car succeeded).
+const sanitizeAttachments = (attachments) => {
+  if (!Array.isArray(attachments) || !attachments.length) return undefined;
+  return attachments.map(a => {
+    const clean = { ...a };
+    if (typeof clean.preview === 'string' && clean.preview.startsWith('blob:')) {
+      delete clean.preview;
+    }
+    return clean;
+  });
+};
+
+const serverSaveMessages = (sessionId, messages) => {
+  // Map frontend message shape → server shape. Keep metadata for attachments/activity.
+  const rows = messages
+    .filter(m => m && m.id && m.role)
+    .map(m => ({
+      id: String(m.id),
+      role: m.role,
+      content: m.text || m.content || '',
+      metadata: {
+        attachments: sanitizeAttachments(m.attachments),
+        activityLog: m.activityLog || undefined,
+        canvasBlocks: m.canvasBlocks || undefined,
+      },
+      timestamp: m.timestamp,
+    }));
+  if (rows.length === 0) return;
+  api.post(`/chat/history/sessions/${sessionId}/messages`, { messages: rows }).catch(() => {});
+};
 
 // ── localStorage helpers (global — not per account) ─────────────────────────
 const getSessionList = () => {
@@ -16,7 +68,12 @@ const getSessionMessages = (sessionId) => {
   catch { return null; }
 };
 const setSessionMessages = (sessionId, messages) => {
-  localStorage.setItem(`aam_chat_${sessionId}`, JSON.stringify(messages));
+  // Strip blob: previews from localStorage too — they expire with the tab
+  // and would render broken images on reload (see sanitizeAttachments).
+  const cleaned = messages.map(m => (
+    m?.attachments?.length ? { ...m, attachments: sanitizeAttachments(m.attachments) } : m
+  ));
+  localStorage.setItem(`aam_chat_${sessionId}`, JSON.stringify(cleaned));
 };
 const removeSessionMessages = (sessionId) => {
   localStorage.removeItem(`aam_chat_${sessionId}`);
@@ -76,32 +133,86 @@ export const groupSessionsByDate = (sessions) => {
 };
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
-export const useChatSessions = ({ token, adAccountId, accountName, language = 'en' }) => {
+// `initialSessionId` (from router) bootstraps us onto a specific session on
+// mount, avoiding the "fresh id → switch to URL id" race that would otherwise
+// let useChatAgent's externalSessionId effect wipe messages mid-load.
+export const useChatSessions = ({ token, adAccountId, accountName, language = 'en', initialSessionId: initialSessionIdOverride = null }) => {
   const [sessions, setSessions] = useState([]);
-  const [activeSessionId, setActiveSessionId] = useState(null);
+  // Pre-seed with URL id if present so the very first render already matches.
+  const [activeSessionId, setActiveSessionId] = useState(() => initialSessionIdOverride || makeId());
   const [savedItems, setSavedItemsState] = useState([]);
   const [folders, setFoldersState] = useState([...DEFAULT_FOLDERS]);
   const [saveNotification, setSaveNotification] = useState(null);
   const prevTypingRef = useRef(false);
 
-  // Load initial session from last session or create new
+  // Messages + externalSessionId fed to useChatAgent. Initialised from the
+  // same seed so agent's sessionIdRef is stable from render 1 (no reset on
+  // render 2 when null→seed transition would otherwise fire).
   const [initialMessages, setInitialMessages] = useState(null);
-  const [initialSessionId, setInitialSessionId] = useState(null);
+  const [initialSessionId, setInitialSessionId] = useState(() => initialSessionIdOverride || null);
 
-  // Initialize on mount — always start with a fresh new chat
+  // Initialize on mount — either load the URL-provided session or start fresh.
   useEffect(() => {
     const list = getSessionList();
     setSessions(list);
     setSavedItemsState(getSavedItems());
     setFoldersState(getFolders());
 
-    // Always start fresh — user can click old sessions in sidebar to resume
-    {
+    if (initialSessionIdOverride) {
+      // Came in on /c/:id — load that session's messages into the agent.
+      // We call agent.loadSession directly (instead of seeding initialMessages)
+      // because useChatAgent's messages state was already init'd from the
+      // render where initialMessages was null. loadSession is the authoritative
+      // way to swap in a transcript post-mount.
+      const local = getSessionMessages(initialSessionIdOverride);
+      if (local?.length) {
+        agent.loadSession(initialSessionIdOverride, local);
+      } else {
+        serverGetMessages(initialSessionIdOverride).then(remote => {
+          if (!remote?.length) return;
+          const mapped = remote.map(r => ({
+            id: r.id,
+            role: r.role,
+            text: r.content,
+            timestamp: new Date(r.created_at).getTime(),
+            ...(r.metadata?.attachments ? { attachments: r.metadata.attachments } : {}),
+            ...(r.metadata?.activityLog ? { activityLog: r.metadata.activityLog } : {}),
+            ...(r.metadata?.canvasBlocks ? { canvasBlocks: r.metadata.canvasBlocks } : {}),
+          }));
+          setSessionMessages(initialSessionIdOverride, mapped);
+          agent.loadSession(initialSessionIdOverride, mapped);
+        });
+      }
+    } else {
+      // Always start fresh — user can click old sessions in sidebar to resume
       const newId = makeId();
       setInitialMessages(null);
       setInitialSessionId(newId);
       setActiveSessionId(newId);
     }
+
+    // Background: fetch server-side sessions and merge into the list.
+    // Server wins for shared fields (title/pinned/updatedAt). Local-only sessions remain.
+    serverListSessions().then((remote) => {
+      if (!remote) return;  // offline / unauthed — keep local only
+      setSessions(prev => {
+        const byId = new Map(prev.map(s => [s.id, s]));
+        for (const r of remote) {
+          const local = byId.get(r.id);
+          byId.set(r.id, {
+            id: r.id,
+            title: r.title || local?.title || 'New Chat',
+            createdAt: new Date(r.created_at).getTime(),
+            updatedAt: new Date(r.updated_at).getTime(),
+            messageCount: r.message_count || local?.messageCount || 0,
+            pinned: r.pinned ?? local?.pinned ?? false,
+          });
+        }
+        const merged = [...byId.values()].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)).slice(0, MAX_SESSIONS);
+        setSessionList(merged);
+        return merged;
+      });
+    });
   }, []); // run once on mount
 
   const agent = useChatAgent({
@@ -131,12 +242,17 @@ export const useChatSessions = ({ token, adAccountId, accountName, language = 'e
             createdAt: existing?.createdAt || Date.now(),
             updatedAt: Date.now(),
             messageCount: msgs.length,
+            pinned: existing?.pinned || false,
           };
           const filtered = prev.filter(s => s.id !== activeSessionId);
           const newList = [updated, ...filtered].slice(0, MAX_SESSIONS);
           setSessionList(newList);
           return newList;
         });
+
+        // Background-persist full transcript to server (idempotent upsert by id)
+        serverSaveMessages(activeSessionId, msgs);
+        serverUpsertSession(activeSessionId, { title, message_count: msgs.length });
       }
     }
     prevTypingRef.current = agent.isTyping;
@@ -151,27 +267,45 @@ export const useChatSessions = ({ token, adAccountId, accountName, language = 'e
     }
   }, [activeSessionId, agent.messages]);
 
-  // Create new chat
+  // Create new chat. Returns the newly minted session id so callers (router
+  // integration) can navigate to /c/<id> when needed.
   const createNewChat = useCallback(() => {
     persistCurrent();
     const newId = agent.resetChat();
     setActiveSessionId(newId);
+    return newId;
   }, [persistCurrent, agent]);
 
-  // Switch to existing session
+  // Switch to existing session — prefer local (fast), fall back to server (cross-device)
   const switchSession = useCallback((sessionId) => {
     if (sessionId === activeSessionId) return;
     persistCurrent();
-    const msgs = getSessionMessages(sessionId);
-    if (msgs?.length) {
-      agent.loadSession(sessionId, msgs);
+    const local = getSessionMessages(sessionId);
+    if (local?.length) {
+      agent.loadSession(sessionId, local);
+      setActiveSessionId(sessionId);
     } else {
+      // Try server; cache to localStorage on success
       agent.loadSession(sessionId, []);
+      setActiveSessionId(sessionId);
+      serverGetMessages(sessionId).then(remote => {
+        if (!remote?.length) return;
+        const mapped = remote.map(r => ({
+          id: r.id,
+          role: r.role,
+          text: r.content,
+          timestamp: new Date(r.created_at).getTime(),
+          ...(r.metadata?.attachments ? { attachments: r.metadata.attachments } : {}),
+          ...(r.metadata?.activityLog ? { activityLog: r.metadata.activityLog } : {}),
+          ...(r.metadata?.canvasBlocks ? { canvasBlocks: r.metadata.canvasBlocks } : {}),
+        }));
+        setSessionMessages(sessionId, mapped);
+        agent.loadSession(sessionId, mapped);
+      });
     }
-    setActiveSessionId(sessionId);
   }, [activeSessionId, persistCurrent, agent, accountName]);
 
-  // Delete session
+  // Delete session — remove locally + server
   const deleteSession = useCallback((sessionId) => {
     removeSessionMessages(sessionId);
     setSessions(prev => {
@@ -179,25 +313,29 @@ export const useChatSessions = ({ token, adAccountId, accountName, language = 'e
       setSessionList(newList);
       return newList;
     });
+    serverDeleteSession(sessionId);
     if (sessionId === activeSessionId) {
       const newId = agent.resetChat();
       setActiveSessionId(newId);
     }
   }, [activeSessionId, agent]);
 
-  // Rename session
+  // Rename session — local + server
   const renameSession = useCallback((sessionId, title) => {
     setSessions(prev => {
       const newList = prev.map(s => s.id === sessionId ? { ...s, title } : s);
       setSessionList(newList);
       return newList;
     });
+    serverUpsertSession(sessionId, { title });
   }, []);
 
   const pinSession = useCallback((sessionId) => {
     setSessions(prev => {
       const newList = prev.map(s => s.id === sessionId ? { ...s, pinned: !s.pinned } : s);
       setSessionList(newList);
+      const target = newList.find(s => s.id === sessionId);
+      if (target) serverUpsertSession(sessionId, { pinned: target.pinned });
       return newList;
     });
   }, []);
@@ -286,9 +424,10 @@ export const useChatSessions = ({ token, adAccountId, accountName, language = 'e
 
     // If this is a brand new session (no messages yet), add it to sessions list
     if (!sessions.find(s => s.id === activeSessionId)) {
+      const title = text.slice(0, 50);
       const newSession = {
         id: activeSessionId,
-        title: text.slice(0, 50),
+        title,
         createdAt: Date.now(),
         updatedAt: Date.now(),
         messageCount: 1,
@@ -298,6 +437,8 @@ export const useChatSessions = ({ token, adAccountId, accountName, language = 'e
         setSessionList(newList);
         return newList;
       });
+      // Seed server row early so the session exists before first auto-save
+      serverUpsertSession(activeSessionId, { title, ad_account_id: adAccountId, message_count: 1 });
     }
   }, [agent, sessions, activeSessionId, adAccountId]);
 
