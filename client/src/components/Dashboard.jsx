@@ -24,6 +24,7 @@ import { useProjects } from '../hooks/useProjects.js';
 import { useBrandLibrary } from '../hooks/useBrandLibrary.js';
 import { useBusinesses } from '../hooks/useBusinesses.js';
 import { useAdAccounts } from '../hooks/useAdAccounts.js';
+import { LoginModal } from './LoginModal.jsx';
 
 // Brand icons — real logos for the connections panel.
 const MetaBrandIcon = ({ className = 'w-6 h-6' }) => (
@@ -125,15 +126,21 @@ const MetaRoster = ({ businesses }) => {
 //     daily ad-account switching is handled by chat bar / header).
 const SettingsView = ({
   onClose, onLogout, onLogin, onAppSignOut,
+  isAppAuthed = true, onAppSignIn,
   token, userName, userEmail = '', userAvatarUrl = '',
   isLoginLoading = false, loginError = null,
+  initialTab = 'account',
 }) => {
-  const [activeTab, setActiveTab] = useState('account');
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [showRoster, setShowRoster] = useState(false);
   const [pendingDisconnect, setPendingDisconnect] = useState(null); // platform id or null
   const { businesses, isLoading: bizLoading } = useBusinesses();
 
   const handleMetaToggle = () => {
+    // Gate: connecting Meta requires the app-level Google sign-in first.
+    // Otherwise an anonymous visitor could grant FB access without ever
+    // creating a Supabase user — confusing data state.
+    if (!isAppAuthed) { onAppSignIn?.(); return; }
     if (token) setPendingDisconnect('meta');
     else onLogin?.();
   };
@@ -350,6 +357,8 @@ export const Dashboard = ({
   onSwitchBusiness,
   onLogout,
   onLogin,
+  isAppAuthed = true,
+  onAppSignIn,
   onAppSignOut,
   isLoginLoading,
   loginError,
@@ -367,6 +376,20 @@ export const Dashboard = ({
   const [chatLanguage, setChatLanguage] = useState('en');
   const [canvasData, setCanvasData] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState('account');
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+
+  // Open the login modal instead of triggering OAuth directly. Used by
+  // every soft-paywall gate (chat send, Connect platform, …) so the user
+  // sees a consistent welcome surface before leaving for Google's popup.
+  const requestSignIn = useCallback(() => setShowLoginModal(true), []);
+
+  const openSettings = (tab = 'account') => {
+    setSettingsInitialTab(tab);
+    setShowSettings(true);
+    setShowUserMenu(false);
+  };
 
   // ── Routing — URL is source of truth for the entire main view ─────────────
   // Mapping:
@@ -485,6 +508,14 @@ export const Dashboard = ({
   }, [onSwitchBusiness, onSwitchAccount, goToChat]);
 
   const handleSend = useCallback((text, attachments, slashIds, rawDisplayText) => {
+    // Soft paywall: anonymous visitors are bounced to Google sign-in
+    // before any message hits the backend. Once they're authed they can
+    // re-submit; we don't auto-replay since the popup itself can take a
+    // moment.
+    if (!isAppAuthed) {
+      requestSignIn();
+      return;
+    }
     // Already on a chat path by definition (send only fires from ChatInterface)
     // Inject skill context: slash commands take priority, then active skill
     let skillCtx = null;
@@ -508,7 +539,7 @@ export const Dashboard = ({
     if (!urlSessionId && activeSessionId) {
       navigate(`/c/${activeSessionId}`, { replace: true });
     }
-  }, [sendMessage, getSkillContext, getSkillContextById, activeSkills, getBrandContext, urlSessionId, activeSessionId, navigate]);
+  }, [isAppAuthed, requestSignIn, sendMessage, getSkillContext, getSkillContextById, activeSkills, getBrandContext, urlSessionId, activeSessionId, navigate]);
 
   const handleSwitchSession = useCallback((sessionId) => {
     // Navigate first; the URL-sync effect below calls switchSession().
@@ -567,10 +598,6 @@ export const Dashboard = ({
   const handleOpenAdLibrary      = useCallback(() => navigate('/ad-gallery'),     [navigate]);
   const handleOpenReports        = useCallback(() => navigate('/reports'),        [navigate]);
 
-  const handleOpenSettings = useCallback(() => {
-    setShowSettings(true);
-  }, []);
-
   const [pendingInput, setPendingInput] = useState(null);
   const [pendingSlashSkill, setPendingSlashSkill] = useState(null);
   const [pendingPill, setPendingPill] = useState(null);
@@ -620,9 +647,10 @@ export const Dashboard = ({
   }, [createNewChat, navigate]);
 
   const handleAudienceToChat = useCallback((prompt) => {
+    if (!isAppAuthed) { requestSignIn(); return; }
     goToChat();
     sendMessage(prompt);
-  }, [sendMessage, goToChat]);
+  }, [isAppAuthed, requestSignIn, sendMessage, goToChat]);
 
   const handlePrefillChat = useCallback((text, pill) => {
     const newId = createNewChat();
@@ -673,6 +701,92 @@ export const Dashboard = ({
   return (
     <div className="flex h-full overflow-hidden bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
 
+      {/* Top-right CTA: anonymous → "Start Now" opens the login modal;
+          authed → user-menu avatar dropdown (Account Settings, Connected
+          Platforms, Log out). */}
+      <div className="fixed top-4 right-4 z-50">
+        {!isAppAuthed ? (
+          <button
+            onClick={() => setShowLoginModal(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-full text-[12px] font-semibold bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-[1.02] active:scale-[0.98] transition-all"
+          >
+            <Sparkles size={13} />
+            Start Now
+          </button>
+        ) : (
+          <div className="relative">
+            <button
+              onClick={() => setShowUserMenu(v => !v)}
+              className="w-9 h-9 rounded-full border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow overflow-hidden"
+              aria-label="Account menu"
+            >
+              {userAvatarUrl ? (
+                <img src={userAvatarUrl} alt={userName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center">
+                  <span className="text-white text-sm font-bold">{(userName || 'A').charAt(0).toUpperCase()}</span>
+                </div>
+              )}
+            </button>
+            {showUserMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowUserMenu(false)} />
+                <div className="absolute top-11 right-0 z-50 w-64 bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden animate-[fadeSlideUp_0.15s_ease-out]">
+                  <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full overflow-hidden shrink-0">
+                      {userAvatarUrl ? (
+                        <img src={userAvatarUrl} alt={userName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center">
+                          <span className="text-white text-sm font-bold">{(userName || 'A').charAt(0).toUpperCase()}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-semibold text-slate-800 truncate">{userName || 'User'}</p>
+                      <p className="text-[11px] text-slate-400 truncate">{userEmail || ''}</p>
+                    </div>
+                  </div>
+                  <div className="py-1">
+                    <button
+                      onClick={() => openSettings('account')}
+                      className="w-full flex items-center gap-2.5 px-4 py-2 text-[12px] text-slate-700 hover:bg-slate-50 transition-colors"
+                    >
+                      <User size={14} className="text-slate-400" />
+                      Account Settings
+                    </button>
+                    <button
+                      onClick={() => openSettings('connections')}
+                      className="w-full flex items-center gap-2.5 px-4 py-2 text-[12px] text-slate-700 hover:bg-slate-50 transition-colors"
+                    >
+                      <Plug size={14} className="text-slate-400" />
+                      Connected Platforms
+                    </button>
+                  </div>
+                  <div className="border-t border-slate-100 py-1">
+                    <button
+                      onClick={() => { setShowUserMenu(false); onAppSignOut?.(); }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2 text-[12px] text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                      <LogOut size={14} />
+                      Log out
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Login modal — opened by Start Now or any soft-paywall gate */}
+      {showLoginModal && (
+        <LoginModal
+          onClose={() => setShowLoginModal(false)}
+          onGoogleSignIn={onAppSignIn}
+        />
+      )}
+
       {/* Sidebar */}
       <Sidebar
         open={sidebarOpen}
@@ -718,7 +832,6 @@ export const Dashboard = ({
         onOpenBrandLibrary={handleOpenBrandLibrary}
         onOpenSkillsLibrary={handleOpenSkillsLibrary}
         onOpenReports={handleOpenReports}
-        onOpenSettings={handleOpenSettings}
         token={token}
         onLogin={onLogin}
       />
@@ -1025,8 +1138,11 @@ export const Dashboard = ({
       {showSettings && (
         <SettingsView
           onClose={() => setShowSettings(false)}
+          initialTab={settingsInitialTab}
           onLogin={onLogin}
           onLogout={onLogout}
+          isAppAuthed={isAppAuthed}
+          onAppSignIn={requestSignIn}
           onAppSignOut={onAppSignOut}
           token={token}
           userName={userName}

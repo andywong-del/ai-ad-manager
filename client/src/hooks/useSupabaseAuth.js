@@ -13,6 +13,11 @@ export const useSupabaseAuth = () => {
       if (!mounted) return;
       setUser(data.session?.user ?? null);
       setBootChecked(true);
+      // Supabase's detectSessionInUrl strips the auth tokens but leaves an
+      // empty `#` behind. Clean it so the URL bar isn't ugly post-login.
+      if (window.location.hash === '' && window.location.href.endsWith('#')) {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {

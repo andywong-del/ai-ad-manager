@@ -232,7 +232,6 @@ export const Sidebar = ({
   onOpenAdLibrary,
   onOpenBrandLibrary,
   onOpenReports,
-  onOpenSettings,
   token,
   onLogin,
 }) => {
@@ -423,14 +422,6 @@ export const Sidebar = ({
           )}
         </div>
         <div className="flex-1" />
-        <div className="pb-4 px-1.5">
-          <button onClick={onOpenSettings}
-            className={`group relative w-full h-[36px] rounded-xl flex items-center justify-center transition-colors
-              ${activeView?.type === 'settings' ? 'bg-slate-100 text-slate-600' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'}`}>
-            <Settings size={16} />
-            <span className="absolute left-full ml-2 px-2.5 py-1 text-[11px] font-medium text-white bg-slate-800 rounded-lg whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-[60] shadow-lg">Settings</span>
-          </button>
-        </div>
       </div>
 
       {/* Expanded content — fades in/out */}
@@ -584,17 +575,6 @@ export const Sidebar = ({
       </div>
       )}
 
-      {/* Settings — always at bottom */}
-      <div className="px-3 pb-4 pt-2 shrink-0 border-t border-slate-100 mt-auto">
-        <button onClick={onOpenSettings}
-          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12px] font-medium transition-all
-            ${activeView?.type === 'settings' || activeView?.type === 'skillsLibrary' || activeView?.type === 'skillConfig'
-              ? 'bg-slate-100 text-slate-700'
-              : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'}`}>
-          <Settings size={15} />
-          <span>Settings</span>
-        </button>
-      </div>
       {/* Context Menu for chat sessions */}
       {contextMenu && (
         <div ref={contextRef}
