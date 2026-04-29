@@ -10,6 +10,7 @@ import { SavedItemView } from './SavedItemView.jsx';
 import { StrategistConfig } from './StrategistConfig.jsx';
 import { SkillsLibrary } from './SkillsLibrary.jsx';
 import { AudienceManager } from './AudienceManager.jsx';
+import { KeywordsManager } from './KeywordsManager.jsx';
 import { CampaignManager } from './CampaignManager.jsx';
 import { CreativeLibrary } from './CreativeLibrary.jsx';
 import { AutomationRules } from './AutomationRules.jsx';
@@ -319,6 +320,7 @@ export const Dashboard = ({
     if (path === '/' || path === '/c' || path.startsWith('/c/')) return { type: 'chat' };
     if (path === '/campaigns') return { type: 'campaigns' };
     if (path === '/audiences') return { type: 'audiences' };
+    if (path === '/keywords') return { type: 'keywords' };
     if (path === '/reports') return { type: 'report' };
     if (path === '/optimizations') return { type: 'optimizations' };
     if (path === '/ad-gallery') return { type: 'adLibrary' };
@@ -448,6 +450,7 @@ export const Dashboard = ({
 
   const handleOpenAudiences      = useCallback(() => navigate('/audiences'),      [navigate]);
   const handleOpenCampaigns      = useCallback(() => navigate('/campaigns'),      [navigate]);
+  const handleOpenKeywords       = useCallback(() => navigate('/keywords'),       [navigate]);
   const handleOpenSkillsLibrary  = useCallback(() => navigate('/skills'),         [navigate]);
   const handleOpenCreativeLibrary= useCallback(() => navigate('/creative-hub'),   [navigate]);
   const handleOpenAutomationRules= useCallback(() => navigate('/automations'),    [navigate]);
@@ -531,6 +534,14 @@ export const Dashboard = ({
   // inside the chat view.
   useEffect(() => { setCanvasData(null); }, [activeView.type]);
 
+  // Close canvas when the URL session changes — covers ALL paths that swap
+  // chats: explicit sidebar click (handleSwitchSessionWithCanvas), the
+  // "New Task" button (handleNewChat → navigate('/')), prefill flows, and
+  // any future caller. Keeping the chart from a previous chat visible
+  // while a new chat starts streaming is confusing. urlSessionId being
+  // undefined (route '/') is also a session change worth closing on.
+  useEffect(() => { setCanvasData(null); }, [urlSessionId]);
+
   const handleOpenCanvas = useCallback((data) => {
     setCanvasData(data);
   }, []);
@@ -598,6 +609,7 @@ export const Dashboard = ({
         activeSkillIds={activeSkillIds}
         onToggleSkill={toggleSkill}
         onOpenAudiences={handleOpenAudiences}
+        onOpenKeywords={handleOpenKeywords}
         onOpenCampaigns={handleOpenCampaigns}
         onOpenCreativeLibrary={handleOpenCreativeLibrary}
         onOpenAutomationRules={handleOpenAutomationRules}
@@ -819,6 +831,23 @@ export const Dashboard = ({
               onSendToChat={handleAudienceToChat}
               onPrefillChat={handlePrefillChat}
               onBack={goToChat}
+              token={token}
+              onLogin={onLogin}
+              onLogout={onLogout}
+              selectedAccount={selectedAccount}
+              selectedBusiness={selectedBusiness}
+              onSelectAccount={handleAccountSelect}
+              googleConnected={googleConnected}
+              googleCustomerId={googleCustomerId}
+              googleLoginCustomerId={googleLoginCustomerId}
+              onGoogleConnect={onGoogleConnect}
+              onGoogleDisconnect={onGoogleDisconnect}
+              onSelectGoogleAccount={onSelectGoogleAccount}
+            />
+          ) : activeView.type === 'keywords' ? (
+            <KeywordsManager
+              onBack={goToChat}
+              onSendToChat={handleAudienceToChat}
               token={token}
               onLogin={onLogin}
               onLogout={onLogout}

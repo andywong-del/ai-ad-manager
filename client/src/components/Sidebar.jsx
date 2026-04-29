@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Zap, Plus, MessageSquare, Trash2, ChevronDown, ChevronLeft, ChevronRight, LogOut, FileText, Lightbulb, FolderOpen, Building2, Check, Globe, GripVertical, FolderPlus, X, Users, Sparkles, MoreVertical, Pin, Pencil, PenLine, Menu, BarChart3, Image, Calendar, TrendingUp, ClipboardList, Settings, Palette, LayoutGrid, ListTodo, BookMarked, Layers, Diamond } from 'lucide-react';
+import { Zap, Plus, MessageSquare, Trash2, ChevronDown, ChevronLeft, ChevronRight, LogOut, FileText, Lightbulb, FolderOpen, Building2, Check, Globe, GripVertical, FolderPlus, X, Users, Sparkles, MoreVertical, Pin, Pencil, PenLine, Menu, BarChart3, Image, Calendar, TrendingUp, ClipboardList, Settings, Palette, LayoutGrid, ListTodo, BookMarked, Layers, Diamond, Hash } from 'lucide-react';
 import { groupSessionsByDate } from '../hooks/useChatSessions.js';
 import { useAdAccounts } from '../hooks/useAdAccounts.js';
 import { useBusinesses } from '../hooks/useBusinesses.js';
@@ -231,6 +231,7 @@ export const Sidebar = ({
   onOpenOptimizations,
   onOpenAdLibrary,
   onOpenBrandLibrary,
+  onOpenKeywords,
   onOpenReports,
   onOpenSettings,
   token,
@@ -319,6 +320,7 @@ export const Sidebar = ({
   const modules = [
     { icon: BarChart3, type: 'campaigns', action: onOpenCampaigns, label: 'Campaigns' },
     { icon: Users, type: 'audiences', action: onOpenAudiences, label: 'Audiences' },
+    { icon: Hash, type: 'keywords', action: onOpenKeywords, label: 'Keywords', platformBadge: 'G' },
     { icon: Palette, type: 'adLibrary', action: onOpenAdLibrary, label: 'Ad Gallery' },
     { icon: Image, type: 'creativeLibrary', action: onOpenCreativeLibrary, label: 'Creative Hub', premium: true },
     { icon: BookMarked, type: 'brandLibrary', action: onOpenBrandLibrary, label: 'Brand Memory', premium: true },

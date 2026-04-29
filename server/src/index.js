@@ -32,6 +32,7 @@ import googleAccountsRouter from './api/google/accounts.js';
 import googleCampaignsRouter from './api/google/campaigns.js';
 import googleReportsRouter from './api/google/reports.js';
 import googleAudiencesRouter from './api/google/audiences.js';
+import googleKeywordsRouter from './api/google/keywords.js';
 import googleAuthRouter from './api/google/auth.js';
 
 const app = express();
@@ -144,6 +145,7 @@ app.use('/api/google/accounts', limitDefault, googleAccountsRouter);
 app.use('/api/google/campaigns', limitDefault, googleCampaignsRouter);
 app.use('/api/google/reports', limitDefault, googleReportsRouter);
 app.use('/api/google/audiences', limitDefault, googleAudiencesRouter);
+app.use('/api/google/keywords', limitDefault, googleKeywordsRouter);
 
 app.use((err, _req, res, _next) => {
   console.error('EXPRESS ERROR:', err?.message, err?.stack);

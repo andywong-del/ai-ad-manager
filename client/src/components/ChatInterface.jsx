@@ -183,26 +183,58 @@ const ActivityLog = ({ entries }) => {
   );
 };
 
-const TypingIndicator = ({ thinkingText, activityLog }) => (
-  <div className="flex items-end gap-3 mb-6">
-    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center shrink-0">
-      <Zap size={15} className="text-white" />
-    </div>
-    <div className="bg-white/80 backdrop-blur-sm border border-slate-200 rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm min-w-[160px]">
-      <ActivityLog entries={activityLog} />
-      {!activityLog?.some(e => !e.done) && (
-        <div className="flex items-center gap-2.5">
-          <div className="flex gap-1">
-            {[0, 150, 300].map((d) => (
-              <span key={d} className="w-2 h-2 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: `${d}ms` }} />
-            ))}
-          </div>
-          {thinkingText && <span className="text-xs text-blue-600 italic">{thinkingText}</span>}
+// Loading state shown while the agent is streaming a response.
+//
+// Old version: 3 bouncy dots + italic blue "Thinking..." text. Read as
+// "page still loading" rather than "AI generating", and clashed visually
+// with the rest of the chat (which uses muted slate / orange brand).
+//
+// New version is layered:
+//   • Avatar wears a soft pulsing halo (animate-ping ring) so the page
+//     has one obvious "I'm alive" signal even at a glance.
+//   • Bubble has a slow shimmer sweeping left-to-right — the same trick
+//     Linear/Vercel use for inflight skeleton rows. Kept subtle (orange
+//     tint at 30% over white) so it doesn't compete with content.
+//   • Three dots fade in/out in sequence (longer 1.4s cycle, no bounce)
+//     paired with a calm slate label ("Generating response" by default,
+//     overridable via thinkingText prop).
+//
+// shimmer keyframes live in client/src/index.css so any chat skeleton
+// elsewhere can reuse the same `animate-shimmer` class.
+const TypingIndicator = ({ thinkingText, activityLog }) => {
+  const hasActivity = activityLog?.some(e => !e.done);
+  return (
+    <div className="flex items-end gap-3 mb-6">
+      <div className="relative w-8 h-8 shrink-0">
+        <span className="absolute inset-0 rounded-full bg-orange-400/40 animate-ping" />
+        <div className="relative w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center shadow-sm shadow-orange-500/30">
+          <Zap size={15} className="text-white" />
         </div>
-      )}
+      </div>
+      <div className="relative overflow-hidden bg-white/90 backdrop-blur-sm border border-slate-200/70 rounded-2xl rounded-bl-sm px-4 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)] min-w-[150px]">
+        {/* Light orange shimmer pass — sits behind content via z-0. */}
+        <span aria-hidden className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 bg-gradient-to-r from-transparent via-orange-200/40 to-transparent animate-shimmer" />
+        <div className="relative">
+          <ActivityLog entries={activityLog} />
+          {!hasActivity && (
+            <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-1">
+                {[0, 200, 400].map((d) => (
+                  <span
+                    key={d}
+                    className="w-1.5 h-1.5 rounded-full bg-orange-400/80"
+                    style={{ animation: 'pulse 1.4s ease-in-out infinite', animationDelay: `${d}ms` }}
+                  />
+                ))}
+              </div>
+              <span className="text-[12px] font-medium text-slate-500">{thinkingText || 'Generating response'}</span>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // ── Markdown table parser ────────────────────────────────────────────────────
 const isTableRow = (line) => line.trim().startsWith('|') && line.trim().endsWith('|');
